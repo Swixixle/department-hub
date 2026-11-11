@@ -52,9 +52,10 @@ export function linkParts(text = '') {
   return parts;
 }
 
-export const FILTERS = [['all', 'All'], ['learning', 'Learning'], ['voice', 'Voice'], ['media', 'Photos and video'], ['files', 'Files']];
+export const FILTERS = [['all', 'All'], ['dated', 'Dates'], ['learning', 'Learning'], ['voice', 'Voice'], ['media', 'Photos and video'], ['files', 'Files']];
 export function matchesFilter(post, filter) {
   const media = post.media || [];
+  if (filter === 'dated') return Boolean(post.when);
   if (filter === 'learning') return Boolean(post.learning);
   if (filter === 'voice') return Boolean(post.voice);
   if (filter === 'media') return media.some(item => item.kind === 'image' || item.kind === 'video') || Boolean(videoLink(post.body));

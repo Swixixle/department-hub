@@ -182,6 +182,24 @@ Personal and low-census totals, including the CSV export, now follow the selecte
 
 Independent checks: 47 Node tests pass, including three new record regressions, and both production builds pass. The two launcher checks passed on the original patch; launcher code is unchanged by these fixes. Browser task replay, physical-phone sizing and real-person usability were not independently rerun during this integration.
 
+## Added on branch `claude/fairness-record`: Ask
+
+The owner's direction on 2026-11-11: a department assistant behind one button, which he does not want called a chat bot. Ask it when things are due, about meetings and new messages. It should read the schedule and the board, and know the protocols, policies and procedures. He wants it in.
+
+What is in is the part that needs no language model.
+
+- **Ask** (`src/ask.js`), a button on every screen. A question is matched to a kind of lookup, the lookup runs on the app's own records, and the answer says where it came from with a button that opens the record. It answers: when someone works, who is on a shift, who the person is working with, what is new on the board since they last looked, what is due or coming up, how to reach someone, the person's own fairness standing, shifts with more or fewer people than usual, and anything the added documents say.
+- **It does not guess.** When nothing on record answers a question it says so, and offers to put the question on the board so the answer ends up on record.
+- **Whose word it is.** An answer from a document carries the title, section, kind (policy, procedure, protocol, manual) and effective date. An answer from the board is labelled as a coworker's post, not policy.
+- **Access is applied before the lookup.** Another person's fairness numbers are given only to whoever keeps the record.
+- **Dated posts.** A post can be marked due, a meeting or an event, with a date. The board has a Dates filter.
+- **Documents.** A small library Ask can search, added as a text file or pasted text, with what it is and its effective date. Text is kept in the workspace and goes into backups. The receipt for adding one records the title, not the words. PDFs are not read yet.
+- Nothing typed into Ask is stored or counted. The press counter records only that a question was asked.
+
+What it is not: it does not learn, summarise or understand phrasing outside the shapes it knows. That needs a language model, which needs the hosted service, costs money for each question, and sends the department's text to an outside company. That is a separate decision. If it is made, the model should be handed only the records this module finds for the person asking.
+
+Limits to respect: only documents the department is allowed to share should be added. For a clinical protocol, Ask quotes the passage and its date. It gives no advice about a patient.
+
 ## Still open from the review
 
 - Matches that are blocked are hidden with no reason given.

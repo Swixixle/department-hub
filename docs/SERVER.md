@@ -26,6 +26,10 @@ There is no machine to run or look after.
 - **The schedule, requests and directory** moved behind the same kind of module.
 - **Direct messages**, then trades that both people confirm from their own phones.
 
+## A language model for Ask
+
+Ask works today by looking things up, with no model. A model would let it take questions in any wording and summarise. It would run on the hosted service, because the key for it cannot sit in the app. Each question would cost a little and would send the text of the records it uses to the company that runs the model. Hand the model only what `src/ask.js` finds for the person asking, keep the source and date on every answer, and decide first whether the department's documents may be sent to an outside service at all.
+
 ## Hosting
 
 The pick is Cloudflare: Workers for the service, D1 for the database, R2 for files. Figures read from their pricing pages on 2026-11-11:

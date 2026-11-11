@@ -22,6 +22,8 @@ The Fairness tab is a kept record of who carried what. Everyone sees their own s
 
 The first release uses an illustrative Indianapolis department profile with day and night shifts. Eligibility based on a photo import remains provisional until current hours and staff attributes can be checked. A request can reach both agreed and queued for review. Official roster edits and real coworker notifications require an authorized shared deployment and integration.
 
+**Ask**, on every screen, answers questions from the workspace's own records: when someone works, who is on, what is new on the board, what is due, how to reach someone, and what the added documents say. Every answer names its source and opens it. There is no language model in it, it does not guess, and nothing typed into it leaves the device.
+
 Controls are sized for phones: 60 px for a main action, 48 px for any other control and 16 px text, with an **Aa** button for larger text. `docs/USER-TEST.md` is a one-page sheet for watching coworkers try five tasks.
 
 ## Work on the source

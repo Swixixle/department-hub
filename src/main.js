@@ -6,11 +6,12 @@ import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, ph
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
 import { localBoard } from './backend.js';
+import { SUGGESTIONS, ask, pretty as prettyDate } from './ask.js';
 
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
 const draftKey = storageKey + '-draft';
-const BUILD = 8;
+const BUILD = 9;
 const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
@@ -39,6 +40,7 @@ const initial = {
   custodians: ['jordan'],
   holidayRules: { off: [], extra: [] },
   history: [],
+  documents: [],
   assignments: staffSample,
   directory: sampleDirectory,
   hoursVerified: true,
@@ -55,7 +57,7 @@ const initial = {
 function prepare(loaded) {
   let next = loaded;
   if (!next.people) next = { ...next, people: next.mode === 'sample' ? samplePeople : [], peopleSource: next.mode === 'sample' ? 'sample' : 'import', manualLinks: {} };
-  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}], ['history', []],
+  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}], ['history', []], ['documents', []],
     ['custodians', next.mode === 'sample' ? ['jordan'] : []], ['holidayRules', { off: [], extra: [] }]]) if (!next[field]) next = { ...next, [field]: empty };
   next = withContacts(next);
   // The starter rules live in code. A saved workspace picks up a new rule version on load.
@@ -104,10 +106,16 @@ function countPress(action, value) {
   } catch { /* counting must never get in the way */ }
 }
 const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory',
-  shift:'Opened a shift', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
+  shift:'Opened a shift', 'ask-open':'Opened Ask', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
   import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
   over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog' };
+// When the board was last opened on this device, so Ask can say what is new since then.
+const seenKey = storageKey + '-seen';
+const boardSeen = loadState(seenKey, null);
+const askWorld = () => ({ today: localToday(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
+  documents: state.documents, releases: state.releases, requests: state.requests, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt });
+const DOC_LIMIT = 300000, DOC_TOTAL = 1500000;
 // Attachments on board posts: the files themselves, and addresses the page can show them from.
 const mediaBlobs = new Map(), mediaUrls = new Map();
 // The one place the board keeps posts and files. A hosted service replaces this line (see src/backend.js).
@@ -217,7 +225,7 @@ function schedule() {
   const usual = { D: staffing(state.assignments, 'D', state.directory), N: staffing(state.assignments, 'N', state.directory) };
   const offUsual = (date, shift) => usual[shift].over.find(item => item.date === date) || usual[shift].short.find(item => item.date === date);
   const title = dayLabel(dates[0], { month:'long', day:'numeric' }) + ' – ' + dayLabel(dates.at(-1), { month:'short', day:'numeric' });
-  const cells = dates.map(date => '<article class="day-card"><header><span>' + h(dayLabel(date, { weekday:'long' })) +
+  const cells = dates.map(date => '<article class="day-card" data-date="' + date + '"><header><span>' + h(dayLabel(date, { weekday:'long' })) +
     '</span><strong>' + h(dayLabel(date, { day:'numeric' })) + '</strong></header>' + Object.entries(SHIFTS).map(([shift, def]) => {
       const rows = state.assignments.filter(row => row.date === date && row.shift === shift);
       return '<section class="shift"><div class="shift-label ' + (shift === 'N' ? 'night' : 'day') + '"><b>' + def.label + '</b><span>' +
@@ -267,10 +275,11 @@ function postMarkup(post) {
     if (item.kind === 'audio') return '<audio class="post-audio" data-media="' + h(item.id) + '" src="' + url + '" controls preload="metadata"></audio>' + (post.voice ? '' : '<small>' + h(item.name) + '</small>');
     return '<a class="post-file" href="' + url + '" download="' + h(item.name) + '"><b>' + h(item.name) + '</b><span>' + fileSize(item.size) + ' · Download</span></a>';
   };
-  return '<article class="panel post"><div class="post-head">' + avatar(post.author) +
+  return '<article class="panel post" data-post="' + h(post.id) + '"><div class="post-head">' + avatar(post.author) +
     '<div><b>' + h(post.author) + '</b><small>' + h(post.created ? timeLabel(post.created) : 'Sample announcement') +
     (post.voice ? ' · Voice message' + (post.media?.[0]?.seconds ? ' · ' + clock(post.media[0].seconds) : '') : '') + '</small></div>' +
-    (post.learning ? '<span class="badge learning">Learning</span>' : '') + '</div>' + words +
+    (post.learning ? '<span class="badge learning">Learning</span>' : '') + '</div>' +
+    (post.when ? '<p><span class="badge dated">' + ({ due:'Due', meeting:'Meeting', event:'Event' }[post.when.kind] || 'Date') + ' · ' + h(prettyDate(post.when.date)) + '</span></p>' : '') + words +
     (post.media?.length ? '<div class="post-media">' + post.media.map(piece).join('') + '</div>' : '') +
     (link ? '<div class="link-player" data-embed="' + h(link.embed) + '">' + button('▶ Play here · ' + h(link.site), 'play-link', 'class="play-link"') + '</div>' : '') +
     '<div class="post-actions">' + (post.inside ? '<span class="subtle">Department only</span>' : button('↗ Share', 'share', 'class="post-action" ' + valueAttr(post.id))) +
@@ -284,7 +293,9 @@ function board() {
     button('🎙 Voice message to everyone', 'voice', 'class="primary voice-start"') + '</section>' +
     (boardStore.shared ? '' : '<div class="roster-status"><span class="status-dot"></span><b>Kept in ' + h(boardStore.where) + '</b><span>Nobody else sees a post until the shared version is switched on. Share sends one out now.</span></div>') +
     '<form data-form="post" class="panel form-panel composer"><label for="post-text">Write to the department</label>' +
-    '<textarea id="post-text" name="body" maxlength="2000" placeholder="Share something with the department. A YouTube or Vimeo link plays right on the board."></textarea>' +
+    '<textarea id="post-text" name="body" maxlength="2000" placeholder="Share something with the department. A YouTube or Vimeo link plays right on the board.">' + h(ui.draftPost || '') + '</textarea>' +
+    '<div class="cell-when"><label>Does it have a date?<select name="whenKind"><option value="">No date</option><option value="due">Due by</option><option value="meeting">Meeting on</option><option value="event">Event on</option></select></label>' +
+    '<label>Date<input name="whenDate" type="date"></label></div>' +
     '<label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple></label>' +
     '<label><span><input type="checkbox" name="learning"> Add to Learning (instructional, CEU-type)</span></label>' +
     '<label><span><input type="checkbox" name="inside"> Keep inside the department (no Share button)</span></label>' +
@@ -436,7 +447,9 @@ function render() {
     (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : schedule()) +
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
     ' · No payroll or official schedule changes · Version ' + BUILD + '</span><span>' + (publicDemo ? '' : button('Backup and restore', 'data', 'class="text-button"') + ' ') +
-    button('Decision history', 'audit', 'class="text-button"') + '</span></footer></div></main>' + dialogMarkup();
+    button('Decision history', 'audit', 'class="text-button"') + '</span></footer></div>' +
+    button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-fab" aria-label="Ask a question about the schedule, the board or the documents"') + '</main>' + dialogMarkup();
+  if (ui.scrollTo) { app.querySelector(ui.scrollTo)?.scrollIntoView({ block:'start' }); ui.scrollTo = null; }
   for (const item of playing) {
     const player = app.querySelector('[data-media="' + CSS.escape(item.id) + '"]');
     if (player) { player.currentTime = item.time; if (item.on) player.play().catch(() => {}); }
@@ -660,6 +673,40 @@ function dialogMarkup() {
   }
   if (type === 'remove-post') return shell('Remove this post?', '<p>It is taken off the board together with its files. This cannot be undone.</p><div class="actions">' +
     button('Keep it', 'close', 'class="secondary"') + button('Remove it', 'remove-post-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
+  if (type === 'ask') {
+    const { q = '', result } = ui.dialog;
+    const item = entry => '<div class="ask-item"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h(entry.sub) + '</small>' : '') + '</div>' +
+      (entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
+    return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
+      '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
+      (result ? '<div class="ask-answer" role="status">' + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') + result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.map(item).join('') +
+        '<p class="subtle">From: ' + h(result.source) + '</p>' + (result.empty ? '<p>' + button('Put this question on the board', 'ask-post', 'class="secondary"') + '</p>' : '') + '</div>' :
+        '<p class="subtle">It looks things up in this workspace and shows where each answer came from. It does not guess, and nothing you type leaves this device.</p>') +
+      '<div class="chip-list"><span class="subtle">Try</span><div>' + SUGGESTIONS.map((text, index) => button(h(text), 'ask-try', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' +
+      '<p>' + button('Documents it can search (' + state.documents.length + ')', 'docs', 'class="text-button"') + '</p>');
+  }
+  if (type === 'docs') {
+    const about = doc => [doc.kind, doc.effective ? 'effective ' + doc.effective : 'no effective date given', 'added by ' + doc.by + ' on ' + prettyDate(doc.added.slice(0, 10)), fileSize(doc.text.length)].join(' · ');
+    return shell('Documents', '<p class="subtle">Ask searches these and quotes them with their title, section and date. Add only what the department is allowed to share. They are kept in this browser and go into backups.</p>' +
+      (state.documents.length ? '<div class="line-list">' + state.documents.map(doc => '<div><span><b>' + h(doc.title) + '</b> <small>' + h(about(doc)) + '</small></span><span class="pair">' +
+        button('Open', 'doc-open', 'class="secondary" ' + valueAttr(doc.id)) + (ui.dialog.confirm === doc.id ? button('Remove for good', 'doc-remove-yes', 'class="danger" ' + valueAttr(doc.id)) :
+          button('Remove', 'doc-remove', 'class="secondary" ' + valueAttr(doc.id))) + '</span></div>').join('') + '</div>' : '<p>No documents yet.</p>') +
+      '<h3>Add a document</h3><form data-form="doc"><label>Title<input name="title" maxlength="120" required autocomplete="off" placeholder="Time off requests"></label>' +
+      '<div class="cell-when"><label>What it is<select name="kind">' + ['Policy', 'Procedure', 'Protocol', 'Manual', 'Other'].map(kind => '<option>' + kind + '</option>').join('') + '</select></label>' +
+      '<label>Effective date<input name="effective" type="date"></label></div>' +
+      '<label class="attach"><b>＋ A text file (.txt or .md)</b><input id="doc-file" name="file" type="file" accept=".txt,.md,text/plain,text/markdown"></label>' +
+      '<label>Or paste the words<textarea name="text" rows="5" placeholder="Paste the text of the document here"></textarea></label>' +
+      '<p class="subtle">A PDF cannot be read yet. Open it, select all, copy, and paste the words here. ' + RULE + '</p>' +
+      '<div class="actions">' + button('Back to Ask', 'ask-back', 'class="secondary"') + '<button class="primary">Add the document</button></div></form>');
+  }
+  if (type === 'doc') {
+    const doc = state.documents.find(entry => entry.id === id);
+    if (!doc) return '';
+    const at = ui.dialog.at, end = at == null ? 0 : (doc.text.indexOf('\n\n', at) < 0 ? doc.text.length : doc.text.indexOf('\n\n', at));
+    return shell(doc.title, '<p class="subtle">' + h([doc.kind, doc.effective ? 'effective ' + doc.effective : 'no effective date given', 'added by ' + doc.by + ' on ' + prettyDate(doc.added.slice(0, 10))].join(' · ')) + '</p>' +
+      '<div class="doc-text">' + (at == null ? h(doc.text) : h(doc.text.slice(0, at)) + '<mark id="doc-mark">' + h(doc.text.slice(at, end)) + '</mark>' + h(doc.text.slice(end))) + '</div>' +
+      '<div class="actions">' + button('Back to Ask', 'ask-back', 'class="secondary"') + '</div>');
+  }
   if (type === 'holiday-rules') {
     const rules = state.holidayRules;
     return shell('Which holidays count', '<form data-form="holidays"><p class="subtle">Untick a day your department does not treat as a holiday. Add any day of your own.</p>' +
@@ -947,7 +994,35 @@ async function act({action, value, kind}) {
   ui.notice = '';
   ui.flash = '';
   switch (action) {
-    case 'tab': ui.tab = value; ui.dialog = null; break;
+    case 'tab':
+      ui.tab = value;
+      ui.dialog = null;
+      if (value === 'board') { try { localStorage.setItem(seenKey, JSON.stringify(new Date().toISOString())); } catch { /* only affects "what is new" */ } }
+      break;
+    case 'ask-open': ui.dialog = ui.lastAsk || { type:'ask' }; break;
+    case 'ask-back': ui.dialog = ui.lastAsk || { type:'ask' }; break;
+    case 'ask-try': ui.lastAsk = ui.dialog = { type:'ask', q:SUGGESTIONS[Number(value)], result:ask(SUGGESTIONS[Number(value)], askWorld()) }; break;
+    case 'ask-post': ui.draftPost = ui.dialog.q || ''; ui.tab = 'board'; ui.boardFilter = 'all'; ui.dialog = null; ui.scrollTo = '.composer'; break;
+    case 'ask-go': {
+      const [kind, first, second] = String(value).split('|');
+      if (kind === 'doc') { ui.dialog = { type:'doc', id:first, at:Number(second) }; ui.scrollTo = '#doc-mark'; break; }
+      ui.dialog = null;
+      if (kind === 'date') { ui.tab = 'schedule'; ui.view = 'week'; ui.date = first; ui.scrollTo = '.day-card[data-date="' + first + '"]'; }
+      else if (kind === 'post') { ui.tab = 'board'; ui.boardFilter = 'all'; ui.scrollTo = '[data-post="' + CSS.escape(first) + '"]'; }
+      else if (kind === 'people' || kind === 'fairness') ui.tab = kind;
+      break;
+    }
+    case 'docs': ui.dialog = { type:'docs' }; break;
+    case 'doc-open': ui.dialog = { type:'doc', id:value }; break;
+    case 'doc-remove': ui.dialog = { type:'docs', confirm:value }; break;
+    case 'doc-remove-yes': {
+      const doc = state.documents.find(entry => entry.id === value);
+      if (!doc) return;
+      await commit('Document removed', { id:doc.id, title:doc.title }, previous => ({ ...previous, documents: previous.documents.filter(entry => entry.id !== value) }));
+      ui.dialog = { type:'docs' };
+      ui.flash = 'Removed ' + doc.title + '.';
+      break;
+    }
     case 'view': ui.view = value; break;
     case 'navigate': ui.date = addDays(ui.date, Number(value)); break;
     case 'today': ui.date = localToday(); break;
@@ -1194,7 +1269,9 @@ async function submit(form) {
       const refusal = refuseFiles(files);
       if (refusal) { form.querySelector('.refusal').textContent = refusal; return; }     // said in place, so nothing typed is lost
       const media = files.map(file => ({ id:crypto.randomUUID(), name:file.name, type:file.type, size:file.size, kind:mediaKind(file.type, file.name) }));
-      const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}) };
+      if (data.whenKind && !/^\d{4}-\d{2}-\d{2}$/.test(data.whenDate || '')) { form.querySelector('.refusal').textContent = 'Pick the date, or set it back to No date.'; return; }
+      const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}),
+        ...(data.whenKind ? { when:{ kind:data.whenKind, date:data.whenDate } } : {}) };
       const send = form.querySelector('button.primary');
       send.disabled = true;
       send.textContent = 'Posting…';
@@ -1202,6 +1279,27 @@ async function submit(form) {
       catch (error) { throw error.name === 'QuotaExceededError' ? new Error('This browser is out of room for files. Remove an old post with a large file, or post a smaller one.') : error; }
       media.forEach((item, index) => { mediaBlobs.set(item.id, files[index]); mediaUrls.set(item.id, URL.createObjectURL(files[index])); });
       ui.boardFilter = 'all';
+      ui.draftPost = '';
+      break;
+    }
+    case 'ask': {
+      const q = (data.q || '').trim();
+      if (!q) return;
+      ui.lastAsk = ui.dialog = { type:'ask', q, result:ask(q, askWorld()) };
+      break;
+    }
+    case 'doc': {
+      const file = form.querySelector('#doc-file')?.files[0];
+      if (file && file.size > DOC_LIMIT * 2) throw new Error('That file is too large to be the text of one document.');
+      const text = ((file ? await file.text() : '') + '\n\n' + (data.text || '')).replace(/\r\n?/g, '\n').replace(/\u0000/g, '').trim();
+      const title = (data.title || '').trim().replace(/\s+/g, ' ');
+      if (!title || text.length < 20) throw new Error('A document needs a title and its words. Choose a text file or paste the text.');
+      if (text.length > DOC_LIMIT) throw new Error('That is ' + fileSize(text.length) + ' of text. One document can be up to ' + fileSize(DOC_LIMIT) + '. Add it in parts.');
+      if (state.documents.reduce((sum, doc) => sum + doc.text.length, 0) + text.length > DOC_TOTAL) throw new Error('The documents together are at the limit this browser can keep. Remove one first.');
+      const doc = { id:crypto.randomUUID(), title, kind:data.kind || 'Other', effective:/^\d{4}-\d{2}-\d{2}$/.test(data.effective || '') ? data.effective : '', added:new Date().toISOString(), by:state.actor, text };
+      await commit('Document added', { id:doc.id, title, kind:doc.kind, effective:doc.effective, characters:text.length }, previous => ({ ...previous, documents:[...previous.documents, doc] }));
+      ui.dialog = { type:'docs' };
+      ui.flash = 'Added ' + title + '. Ask can now search it.';
       break;
     }
     case 'voice': {
