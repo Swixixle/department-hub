@@ -226,7 +226,7 @@ test('learning keeps negation and obligation separate and ambiguous names need c
   const note = { id:'n', asks:['can we reuse circuits'], answer:'Only a note.' };
   assert.equal(matchTaught('cannot we reuse circuits', [note]), null);
   assert.equal(matchTaught('must we reuse circuits', [note]), null);
-  const result = ask('is kesha on tonight', {...world, assignments:[row(today,'N','Keshia'),row(today,'N','Keisha')]});
+  const result = ask('is maria on tonight', {...world, assignments:[row(today,'N','Marian'),row(today,'N','Marina')]});
   assert.equal(result.empty, true);
   assert.match(result.title, /Which staff name/);
   assert.equal(result.items.length, 0);
