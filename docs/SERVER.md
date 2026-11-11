@@ -1,61 +1,88 @@
-# Switching on the shared version
+# Preparing the private department pilot
 
-Written 2026-11-11. Nothing in this file is built yet except the plug-in point. It records what was decided so that turning the shared version on is a short job.
+Updated 2026-11-11 from the owner's clarified direction. This is a plan. The current Version 12 is still one-browser software: shared accounts, storage, messages between devices and notifications are not built.
 
-## Where things stand
+## The department is the workspace
 
-The app runs in one browser. A board post, a voice message and an uploaded file are kept there and reach nobody else. The Share button is the only way a post leaves the device today.
+The owner will introduce the app to willing coworkers in his own department, ask for patience and feedback, and improve it around their actual use. He intends to fund a server in a few weeks. The next milestone is useful adoption in that department.
 
-The board talks to one small module, `src/backend.js`. It has six functions: `list`, `publish`, `remove`, `file`, `clear`, and two facts about itself, `shared` and `where`. The version in use, `localBoard`, keeps posts in the saved workspace and files in the browser's IndexedDB. A hosted version provides the same six over HTTP and replaces one line in `src/main.js`. The schedule, requests and directory are not behind this module yet. They need the same treatment before they can be shared.
+There is one private workspace for the department and one personal account per member, with their own email and credentials. This interprets the owner's statements together; it is not one shared identity or password. Only approved members can enter. Another job, cross-department membership, global profiles and a workspace switcher are outside the pilot's scope.
 
-## What the owner will have to do
+The daily experience is one place for the schedule, department updates, due dates, meetings, messages and request conversations. Keep one department feed and stable navigation. Avoid a collection of channels and group-selection screens. Private conversations stay inside the same department.
 
-1. Create one free account with the hosting service.
-2. Approve the connection so the app can be deployed to it.
-3. Send each coworker their personal link.
+Information ordinarily sent by email should be easier to notice and consume here. Start with a person posting the relevant announcement, source link and dates. Mailbox ingestion, email credentials and replacing email are not requirements. Seeing an announcement does not establish that a course or official requirement was completed.
 
-There is no machine to run or look after.
+## What can be prepared before hosting
 
-## What has to be built first
+Build and test locally using synthetic records, two isolated test departments and separate authenticated test users. Keep the existing local app and fictional public demo usable. Do not silently upload the owner's browser workspace when shared mode becomes available.
 
-- **Accounts by personal invite link.** Decided by the owner. One link per person, sent from the Directory's Text button. The link is the login. A shared link could be forwarded, and whoever opened it could claim any name.
-- **Each person adds their own phone number** when they join. The whole telephone list is not uploaded on anyone's behalf.
-- **The hosted board:** the six functions above as HTTP calls, a database table for posts, and a file store for attachments. Large videos go straight from the phone to the file store, because the request size through the service itself is capped.
-- **Roles.** At least two admins, so the department does not depend on one person's account. Admins can remove any post.
-- **A report button** on every post.
-- **The schedule, requests and directory** moved behind the same kind of module.
-- **Direct messages**, then trades that both people confirm from their own phones.
+### Membership and accounts
 
-## A language model for Ask
+The recommended enrollment flow is an administrator's single-use, expiring invitation bound to an intended email and department, verified email, then the member's own password and session. An invitation enrolls someone; it is not a reusable permanent login link. Use a maintained authentication implementation rather than custom password cryptography.
 
-Ask works today by looking things up, with no model. A model could broaden supported wording and provide summaries. For a hosted API, keep the provider key on the server rather than in the app. That route would incur the provider's usage charges and send selected records to that provider. A local model is also possible but is not implemented. Hand a model only records the person asking is allowed to see, keep the source and date on every answer, and establish an approved processing route before sending department documents to an outside service.
+Prepare sign-in, sign-out, password recovery, invitation revocation and member removal. Removing membership must terminate server access and sessions; it cannot recall copies already downloaded. Establish a second administrator and a recovery route before wider use. Separate membership administration from the custodian's access to restricted named fairness records.
 
-There are two further steps, and they are different decisions.
+Members enter their own optional phone numbers. Do not upload the whole imported telephone directory on their behalf. Emails support sign-in and recovery; directory visibility must be explicit. Authenticated membership replaces Viewing as in shared mode. That selector stays only in the local simulation and fictional demo.
 
-1. **A small embedding model in the browser.** It can rank existing passages by similarity of meaning. It does not generate text, but can still select the wrong passage. Bundle model and runtime assets locally, prohibit remote loading, apply source/role/version filters first, and measure accuracy, abstention, memory and latency on actual phones before enabling it. This remains unimplemented; no model assets are currently downloaded.
-2. **A language model through an approved processing route.** A hosted API requires its key on the server and incurs provider charges; selected records would be sent to that provider. A local generative model is another unimplemented option. Neither route guarantees understanding of every wording. Keep original passages beside generated explanations and verify their scope, authority, exceptions and dates.
+### Shared records and department boundaries
 
-## The log on the hosted service
+The existing src/backend.js adapter handles only the local board. Its methods are list, publish, remove, file and clear, with shared and where properties. The schedule, directory, requests, exchanges, documents, feedback and receipts still need shared service boundaries. Replacing the board adapter alone does not make the app shared.
 
-In the browser the log is as trustworthy as the device it sits on. On the hosted service the server should write each receipt, with the signed-in person's identity and the server's clock, into a table that the app can add to and never change. The latest fingerprint should be copied somewhere outside the service on a schedule, which makes the checkpoint automatic. Fingerprinting of posts and files stays as it is.
+The proposed data model includes department-scoped members/roles, roster revisions and assignments, posts and private attachments, dated announcements, conversations/messages, requests and exchange acceptances, documents/versions, fairness records, correction feedback and receipts. Use stable IDs for people and records. A department ID provides isolation; it does not require a multi-department user interface.
 
-## Hosting
+Derive the authorized department and person from the server session. Check membership and resource permissions on every request: listing, search, direct URLs, uploads/downloads, message recipients, exports and Ask retrieval. Changing a supplied ID must never expose another department. Within a department, only conversation participants may retrieve private messages, and only authorized custodians may retrieve restricted named fairness records. Hidden buttons are not authorization.
 
-The pick is Cloudflare: Workers for the service, D1 for the database, R2 for files. Figures read from their pricing pages on 2026-11-11:
+Use private file storage with authorized downloads or short-lived links issued after access checks. Scope caches, search indexes, audit chains and backups to the department and, where needed, the person. A member clearing their device must not erase the shared department.
 
-- Workers free plan: 100,000 requests a day.
-- D1 free plan: 5 GB.
-- R2: the first 10 GB of files each month are free, and there is no charge for downloading or streaming them. Past 10 GB, storage is $0.015 per GB a month. A hundred GB of video would be about $1.35 a month.
-- Requests through a Worker are capped at 100 MB on the free plan, which is why large videos must upload directly to R2.
+A simple bounded refresh can precede live updates. Show loading, stale-data, failed-save and unsent states accurately. Prevent duplicate submissions on reconnection.
 
-Compared on the same day: Supabase's free plan allows 1 GB of files and 50 MB per file and pauses a project after a week without use. Netlify's free plan gives 300 credits a month, with bandwidth at 20 credits per GB and each production deploy at 15.
+### A feed people can readily check
 
-Not confirmed: whether Cloudflare asks for a payment card before R2 can be switched on.
+Recommended first shared screen: the person's next shift, important department updates, approaching meetings/due dates and unread messages, with clear links into the existing views. Reuse the current interface before adding navigation.
 
-## Risks to settle before rollout
+Prepare a per-person read position and visible new-item indicators. Announcements can carry source, author, due/meeting/event dates and an important/pinned status. Include correction, post-reporting and app-feedback routes. A read marker is not evidence of attendance, course completion or assent.
 
-- **Patient information.** Pictures, video and recordings made on a hospital unit are where it leaks, and no free hosting plan is set up to hold it. The rule is shown at every upload. Removal by the poster exists. Removal by an admin and the report button are still to build.
-- **Other people's courses.** A third-party CEU course should be posted as a link, not uploaded. Watching in the app does not award credit.
-- **No alerts.** A web app can only alert an iPhone after it has been added to the home screen. Until that is built, people have to open the app to see anything new.
-- **Recordings across devices.** A voice message is recorded as AAC in an .m4a where the browser can, and as Opus in a .webm otherwise. Whether every phone in the department plays both has not been tested on real devices.
-- **YouTube and Vimeo players** load only when tapped. They have not been tested against the live sites from this build.
+Plan opt-in notification preferences and minimal-content notices that avoid exposing department material on a locked phone. The unread view must work if permission or delivery is unavailable. Verify notifications on actual phones before relying on them; publishing a web app alone is not notification delivery.
+
+### Separate-person agreements
+
+Retain the current whole-exchange arithmetic and immutable proposal details. Add authenticated acceptance by each participant from their own session. A person must not accept for someone else by selecting their name.
+
+At final acceptance, one database transaction must recheck membership/permissions, proposal version, roster revision, shift ownership/reservations and current rules, then record the agreement, reserve every move and write its receipt together. A competing request or stale version must fail without a partial exchange. Client checks explain options; the server decides whether an agreement can be recorded.
+
+The result remains queued for coordinator review. Agreement in the app and entry of an approved change into the official system are separate events. Do not enable shared agreement until competing-request and transaction tests pass.
+
+### Documents, Ask and corrections
+
+Ask remains LLM-free and may retrieve only records the authenticated person can access. Apply permissions before search results, caches or any later model receive the text. Department membership does not grant access to every private conversation or named fairness record.
+
+An approved, complete, current employer policy corpus has not been established. Added documents need source, effective/version dates and a named review responsibility. Human notes stay labelled and linked. Correct a roster error in the roster, a source error through document replacement/withdrawal, and a wrong search match through reviewed passage feedback. Save a question's wording only after explicit review.
+
+No outside AI service, automatic paraphrasing or semantic-model download is needed for the pilot. Browser embeddings and generative models remain separate proposals requiring accuracy, permissions and actual-phone performance checks.
+
+### Privacy, receipts and operation
+
+Keep the independent-product notice and prohibition on patient information. Improve the text screen from reviewed false-positive examples; it remains incomplete and does not inspect media or uploaded document contents. Add reporting, administrator removal and a response route before uploads reach coworkers.
+
+The server should record changes, proposal versions, acceptances, rule changes and exports with authenticated identity and server time. Serialize receipt writes per department and retain checkpoints independently of the primary database. Receipts support integrity comparison, not factual correctness, hospital approval or proof that a downstream transfer completed.
+
+The owner previously requested broad tracking. The later recommendation to remove identifiable ordinary-browsing logs is not yet a confirmed change. Resolve and explain access-log scope, read-status visibility and retention before rollout. Recommendation: keep personal unread state, audit actions with operational consequences, and use aggregate voluntary usability measurements for ordinary navigation. Do not silently turn read markers into a coworker-surveillance dashboard.
+
+Prepare backups and tested restore of structured data and attachment bytes, retention/deletion, failure reporting, spending limits and dependency updates. Existing browser JSON backups exclude source photos and board media bytes. A migration must not claim those files were copied unless their bytes were transferred and verified. No private data is uploaded as part of this plan.
+
+## Implementation order and launch checks
+
+| Stage | Prepare | Evidence before enabling |
+| --- | --- | --- |
+| Accounts and boundaries | Invitations, email/password/session recovery, roles and scoped APIs | Two departments cannot read, search, change or download each other's data; revoked users lose server access; custodian-only data remains restricted |
+| Shared consumption | Versioned roster, feed, dated/pinned posts, personal unread state and directory self-entry | Another signed-in phone receives a post and schedule correction; failure and stale states are accurate |
+| Conversations and exchanges | Private messages, request threads, immutable proposals and atomic agreement | Only participants can read messages; distinct accounts accept; competing trades cannot double-commit |
+| Reliable pilot | Notifications, reporting/removal, reviewed corrections, backups and checkpoints | Actual-phone checks, successful restore including media, failure tests and a short member-facing privacy explanation |
+
+Recruit a few willing coworkers first, with an obvious feedback route and clear expectations that it is an independent pilot. Observe finding a next shift, new announcement, deadline and conversation. When shared agreement is ready, observe a complete exchange from separate accounts. The existing docs/USER-TEST.md is a local-prototype exercise; shared pilot tasks should match the capabilities enabled.
+
+## Hosting decision
+
+The owner intends to pay for a server. Provider and budget are not settled here. Cloudflare Workers/D1/R2 was an earlier proposed route, not a deployed backend or a final requirement. Select hosting that supports authentication, database transactions, private files, recovery and the operational responsibilities above. Verify current pricing, limits and terms when choosing it rather than relying on earlier free-tier figures.
+
+Prepare concrete configuration, domain/TLS setup, storage, backup, permissions and recurring-cost estimates before deployment. This document creates no hosting account, incurs no charges and changes no running app behavior.
