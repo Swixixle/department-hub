@@ -1,11 +1,14 @@
 import './style.css';
-import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster } from './model.js';
+import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { census, ledger, releaseOrder, staffing, statSheet } from './fairness.js';
 
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
+const draftKey = storageKey + '-draft';
+const BUILD = 6;
+const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
 const sample = await fetch(asset('fixtures/manifest.json')).then(response => {
@@ -42,20 +45,39 @@ const initial = {
   posts: [{ id: 'sample-welcome', author: 'Avery', body: 'Use the schedule to start a trade or coverage request. The conversation stays attached to the shift.', created: null }],
   events: []
 };
-let state = loadState(storageKey, initial);
-// Workspaces saved before the directory existed.
-if (!state.people) state = { ...state, people: state.mode === 'sample' ? samplePeople : [], peopleSource: state.mode === 'sample' ? 'sample' : 'import', manualLinks: {} };
-if (!state.releases) state = { ...state, releases: [] };
-state = withContacts(state);
-// The starter rules live in code. A saved workspace picks up a new rule version on load.
-if (state.policy?.version !== POLICY.version) state = { ...state, policy: POLICY };
+// Readies a workspace that was saved by any earlier version, whether it comes from this browser or from a backup file.
+function prepare(loaded) {
+  let next = loaded;
+  if (!next.people) next = { ...next, people: next.mode === 'sample' ? samplePeople : [], peopleSource: next.mode === 'sample' ? 'sample' : 'import', manualLinks: {} };
+  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}]]) if (!next[field]) next = { ...next, [field]: empty };
+  next = withContacts(next);
+  // The starter rules live in code. A saved workspace picks up a new rule version on load.
+  if (next.policy?.version !== POLICY.version) next = { ...next, policy: POLICY };
+  return next;
+}
+let state = prepare(loadState(storageKey, initial));
+const localToday = () => new Date().toLocaleDateString('en-CA');
+// Open on today when the roster covers it. Otherwise on its first day.
+function startDate() {
+  const dates = state.assignments.map(row => row.date).sort();
+  if (dates.length && localToday() >= dates[0] && localToday() <= dates.at(-1)) return localToday();
+  return state.mode === 'sample' || !dates.length ? '2026-11-13' : dates[0];
+}
+// An import that was read but not yet published is kept, so closing or reloading the page does not lose the review.
+function loadDraft() {
+  const draft = loadState(draftKey, null);
+  return draft && Array.isArray(draft.assignments) && Array.isArray(draft.flags) && Array.isArray(draft.pages) ? draft : null;
+}
+function saveDraft() {
+  try { ui.pending ? localStorage.setItem(draftKey, JSON.stringify(ui.pending)) : localStorage.removeItem(draftKey); } catch { /* storage full: the draft stays in memory */ }
+}
 const agreedRequestFor = row => state.requests.find(request => request.status === AGREED_STATUS &&
   [request.from?.key, request.to?.key].includes(row.key));
 const checkChange = (details, exceptId = null) => evaluateChange({
   roster: projectRoster(state.assignments, state.requests), directory: state.directory,
   hoursVerified: state.hoursVerified, policy: state.policy, committed: committedKeys(state.requests, exceptId), ...details
 });
-let ui ={ tab: 'schedule', date: '2026-11-13', view: 'weekend', dialog: null, pending: null, busy: null, notice: '' };
+let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: null, pending: loadDraft(), busy: null, notice: '', flash: '' };
 let sourceUrl = null;
 let writing = false;
 const h = value => String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -126,7 +148,8 @@ function top() {
   return '<aside><div class="brand"><img src="' + h(asset('mark.svg')) + '" alt=""><div><b>Department Hub</b><small>WORKSPACE</small></div></div>' +
     '<div class="space-label">YOUR DEPARTMENT</div><div class="space-name">Respiratory Care</div><nav aria-label="Workspace">' +
     nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Board') + nav('requests', '⇄', 'Requests') + nav('fairness', '⚖', 'Fairness') + nav('people', '☎', 'Directory') +
-    '</nav><div class="aside-bottom"><span class="status-dot"></span>' + (publicDemo ? 'Public demo · fictional data' : 'Local workspace · this browser') + '</div></aside>';
+    '</nav><div class="aside-bottom"><span class="status-dot"></span>' + (publicDemo ? 'Public demo · fictional data' :
+      button('Saved in this browser · ' + h(location.host), 'data', 'class="where" title="Backup, restore and where this workspace is kept"')) + '</div></aside>';
 }
 
 function displayDates() {
@@ -135,7 +158,6 @@ function displayDates() {
   return Array.from({ length: 3 }, (_, i) => addDays(friday, i));
 }
 
-const localToday = () => new Date().toLocaleDateString('en-CA');
 const countNote = item => item.people.length + ' listed · ' + Math.abs(item.extra) + (item.extra > 0 ? ' over' : ' short');
 const firstInLine = order => order.filter(item => item.first).map(item => item.person);
 
@@ -156,17 +178,23 @@ function schedule() {
           (row.hours ? '<i class="tag">' + h(row.hours) + '</i>' : '') +
           (isMine(row) ? '<em>You</em>' : ''), 'shift', 'class="staff ' + (isMine(row) ? 'mine ' : '') + h(row.role || '') + '" ' +
           (row.role ? 'title="' + h(ROLE_LABELS[row.role] || row.role) + '" ' : '') + valueAttr(row.key))).join('') :
-          '<p class="empty-shift">No assignments in this roster.</p>') + '</section>';
+          '<p class="empty-shift">No assignments in this roster.</p>') +
+        button(rows.length ? 'Edit names' : 'Add names', 'edit-shift', 'class="edit-shift" ' + valueAttr(date + '|' + shift)) + '</section>';
     }).join('') + '</article>').join('');
   return '<section class="intro"><div><div class="eyebrow">TEAM ROSTER</div><h1>Schedule</h1><p>See who’s working. Start a trade or find coverage from your shift.</p></div>' +
     button('＋ Import schedule', 'import', 'class="primary"') + '</section>' +
     '<div class="roster-status"><span class="status-dot"></span><b>' + (state.mode === 'sample' ? 'Fictional practice roster' : 'Imported roster') +
-    '</b><span>' + h(state.mode === 'sample' ? 'Try the full flow with sample staff' : 'Published ' + timeLabel(state.importedAt)) +
-    '</span><span class="spacer"></span>' + (state.mode === 'local' ? '<span>Hours and pickups need verification</span>' + button('Staff details', 'staff-setup', 'class="text-button"') + '' : '<span>Demo hours only</span>') + '</div>' +
+    '</b><span>' + h(state.mode !== 'sample' ? 'Published ' + timeLabel(state.importedAt) : publicDemo ? 'Try the full flow with sample staff' :
+      'No schedule is saved in this browser at ' + location.host + '. These are sample names.') +
+    '</span><span class="spacer"></span>' + (state.mode === 'local' ? '<span>Hours and pickups need verification</span>' + button('Staff details', 'staff-setup', 'class="text-button"') + '' :
+      publicDemo ? '<span>Demo hours only</span>' : button('Restore a backup', 'data', 'class="text-button"')) + '</div>' +
+    (ui.pending && !ui.busy ? '<div class="roster-status waiting"><span class="status-dot"></span><b>An import is waiting to be finished</b><span>' + ui.pending.assignments.length + ' shifts read, ' +
+      ui.pending.flags.filter(flag => flag.status === 'open').length + ' to check</span><span class="spacer"></span>' + button('Continue', 'import', 'class="text-button"') +
+      button('Discard', 'clear-draft', 'class="text-button"') + '</div>' : '') +
     '<div class="calendar-toolbar"><div><div class="eyebrow">ROSTER VIEW</div><h2>' + h(title) + '</h2></div><div class="controls">' +
     '<div class="segments">' + button('Weekend', 'view', 'class="' + (ui.view === 'weekend' ? 'selected' : '') + '" data-value="weekend"') +
     button('Week', 'view', 'class="' + (ui.view === 'week' ? 'selected' : '') + '" data-value="week"') + '</div>' +
-    '<div class="segments">' + button('‹', 'navigate', 'aria-label="Previous week" data-value="-7"') +
+    '<div class="segments">' + button('Today', 'today') + button('‹', 'navigate', 'aria-label="Previous week" data-value="-7"') +
     button('›', 'navigate', 'aria-label="Next week" data-value="7"') + '</div></div></div>' +
     '<div class="calendar ' + ui.view + '">' + cells + '</div>' +
     (state.assignments.some(row => row.role) ? '<p class="calendar-foot legend"><span class="name charge">Pink</span> charge <span class="name icu">Green</span> ICU' +
@@ -286,7 +314,8 @@ function render() {
     (ui.notice ? '<div role="status" class="notice">' + h(ui.notice) + '</div>' : '') +
     (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : schedule()) +
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
-    ' · No payroll or official schedule changes</span>' + button('Decision history', 'audit', 'class="text-button"') + '</footer></div></main>' + dialogMarkup();
+    ' · No payroll or official schedule changes · Version ' + BUILD + '</span><span>' + (publicDemo ? '' : button('Backup and restore', 'data', 'class="text-button"') + ' ') +
+    button('Decision history', 'audit', 'class="text-button"') + '</span></footer></div></main>' + dialogMarkup();
   const dialog = app.querySelector('dialog');
   if (dialog) {
     dialog.showModal();
@@ -296,7 +325,26 @@ function render() {
 
 function shell(title, body) {
   return '<dialog data-dialog="' + ui.dialog.type + '" aria-labelledby="dialog-title"><div class="dialog-head"><h2 id="dialog-title">' +
-    h(title) + '</h2>' + button('×', 'close', 'class="close" aria-label="Close dialog"') + '</div><div class="dialog-body">' + body + '</div></dialog>';
+    h(title) + '</h2>' + button('×', 'close', 'class="close" aria-label="Close dialog"') + '</div><div class="dialog-body">' +
+    (ui.flash ? '<p class="flash" role="status">' + h(ui.flash) + '</p>' : '') + body + '</div></dialog>';
+}
+
+// One line per person: name, role, partial hours.
+function nameLine(row, index, focus = -1) {
+  return '<div class="name-row' + (row?.check ? ' check' : '') + '"><input name="person" list="known-names" maxlength="80" autocomplete="off" placeholder="Name" aria-label="Name ' +
+    (index + 1) + '" value="' + h(row?.person || '') + '"' + (index === focus ? ' autofocus' : '') + '><select name="role" aria-label="Role for name ' + (index + 1) + '">' +
+    [['', 'No role'], ...Object.entries(ROLE_LABELS)].map(([value, label]) => '<option value="' + value + '"' + ((row?.role || '') === value ? ' selected' : '') + '>' + label + '</option>').join('') +
+    '</select><input name="hours" maxlength="9" autocomplete="off" placeholder="7-3" pattern="\\d{1,2}(:\\d{2})?-\\d{1,2}(:\\d{2})?" title="Partial hours like 7-3 or 7-3:30" aria-label="Partial hours for name ' + (index + 1) + '" value="' + h(row?.hours || '') + '"></div>';
+}
+const nameLines = (rows, focus) => '<div class="name-rows">' + Array.from({ length: Math.max(rows.length + 2, 5) }, (_, index) => nameLine(rows[index], index, focus)).join('') + '</div>' +
+  '<p>' + button('＋ More lines', 'more-lines', 'class="text-button"') + '</p>';
+const knownList = names => '<datalist id="known-names">' + names.map(name => '<option value="' + h(name) + '">').join('') + '</datalist>';
+// Reads the name lines of a form into clean rows, one person each.
+function readNameLines(form, known) {
+  const fields = new FormData(form), roles = fields.getAll('role'), times = fields.getAll('hours');
+  const entries = fields.getAll('person').map((person, position) => ({ person, role: roles[position], hours: times[position].trim() }));
+  if (entries.some(entry => entry.person.trim() && entry.hours && !HOURS.test(entry.hours))) throw new Error('Write partial hours like 7-3 or 7-3:30.');
+  return tidyNames(entries, known);
 }
 
 function dialogMarkup() {
@@ -312,7 +360,7 @@ function dialogMarkup() {
     const { pending } = ui;
     const unresolved = pending.flags.filter(flag => flag.status === 'open').length;
     return shell('Review import', '<div class="import-stats"><b>' + pending.pages.length + ' pages</b><b>' + pending.assignments.length +
-      ' assignments</b><b>' + (unresolved + pending.issues.length) + ' to review</b></div>' +
+      ' assignments</b><b>' + unresolved + ' to check</b></div>' +
       '<p>Review the flagged cells and check the date span. Duplicate assignments are combined with their source references.</p>' +
       '<details' + (pending.pages.some(page => page.shift) ? ' open' : '') + '><summary>Pages and extracted dates</summary><ul class="compact">' + pending.pages.map(page => '<li>' +
         h(page.name + ' · ' + page.status + (page.dates.length ? ' · ' + page.dates.at(0) + ' to ' + page.dates.at(-1) : '')) +
@@ -385,18 +433,13 @@ function dialogMarkup() {
     const known = [...new Set([...ui.pending.assignments.map(item => item.person), ...actorNames()])].sort((a, b) => a.localeCompare(b));
     const blank = rows.findIndex(row => row.check);
     const focus = blank >= 0 ? blank : rows.length;
-    const line = (row, index) => '<div class="name-row' + (row?.check ? ' check' : '') + '"><input name="person" list="known-names" maxlength="80" autocomplete="off" placeholder="Name" aria-label="Name ' +
-      (index + 1) + '" value="' + h(row?.person || '') + '"' + (index === focus ? ' autofocus' : '') + '><select name="role" aria-label="Role for name ' + (index + 1) + '">' +
-      [['', 'No role'], ...Object.entries(ROLE_LABELS)].map(([value, label]) => '<option value="' + value + '"' + ((row?.role || '') === value ? ' selected' : '') + '>' + label + '</option>').join('') +
-      '</select><input name="hours" maxlength="9" autocomplete="off" placeholder="7-3" pattern="\\d{1,2}(:\\d{2})?-\\d{1,2}(:\\d{2})?" title="Partial hours like 7-3 or 7-3:30" aria-label="Partial hours for name ' + (index + 1) + '" value="' + h(row?.hours || '') + '"></div>';
     return shell('Check this shift · ' + left + ' left', '<p>' + h(flag.message) + '</p>' + (chosen ? cropMarkup(chosen, flag.source) : '') +
       '<form data-form="correct" data-index="' + id + '"><div class="cell-when"><label>Date<input name="date" type="date" value="' + h(flag.draft.date) +
       '" required></label><label>Shift<select name="shift"><option value="D"' + (flag.draft.shift === 'D' ? ' selected' : '') +
       '>Day</option><option value="N"' + (flag.draft.shift === 'N' ? ' selected' : '') + '>Night</option></select></label></div>' +
-      '<p class="subtle">One box per person. Fix a name, add anyone missing, or clear a box to remove someone.' +
+      '<p class="subtle">One line per person. Fix a name, add anyone missing, or clear a line to remove someone. A name entered twice is kept once.' +
       (suggested.length ? ' Shaded names are unsure readings.' : '') + '</p>' +
-      '<div class="name-rows">' + Array.from({ length: Math.max(rows.length + 2, 5) }, (_, index) => line(rows[index], index)).join('') + '</div>' +
-      '<datalist id="known-names">' + known.map(name => '<option value="' + h(name) + '">').join('') + '</datalist><div class="actions">' +
+      nameLines(rows, focus) + knownList(known) + '<div class="actions">' +
       button('Leave as read', 'dismiss-flag', 'class="secondary" ' + valueAttr(id)) +
       '<button class="primary">Save and next</button></div></form>');
   }
@@ -404,10 +447,12 @@ function dialogMarkup() {
     (row.role ? ' · ' + h(ROLE_LABELS[row.role] || row.role) : '') + (row.hours ? ' · ' + h(row.hours) : '') + '</p>' +
     (contactFor(row.person)?.cell && !isMine(row) ? '<p class="person-lines"><span>' + h(formatPhone(contactFor(row.person).cell)) + '</span>' + contactButtons(contactFor(row.person)) + '</p>' : '') +
     (row.sources.length ? '<p>' + button('See photo source', 'source', 'class="text-button" ' + valueAttr(row.key)) +
-      ' <small>' + h(row.sources.length + ' source page(s)') + '</small></p>' : '<p class="subtle">Fictional starting roster. Import sample photos to see image evidence.</p>') +
+      ' <small>' + h(row.sources.length + ' source page(s)') + '</small></p>' : '<p class="subtle">' + (row.manual ? 'Added by hand. There is no photo for this line.' :
+      state.mode === 'sample' ? 'Fictional starting roster. Import sample photos to see image evidence.' : 'There is no photo for this line.') + '</p>') +
     (state.releases.some(item => item.key === row.key) ? '<p class="subtle">Low census recorded: ' + h(state.releases.filter(item => item.key === row.key).map(item =>
       item.hours + ' h, ' + (item.voluntary ? 'offered to go' + (item.inPlaceOf ? ' in place of ' + item.inPlaceOf : '') : 'sent home')).join('; ')) + '</p>' : '') +
-    '<p>' + button('Record low census (VA)', 'release', 'class="text-button" ' + valueAttr(row.key)) + '</p>' +
+    '<p>' + button('Record low census (VA)', 'release', 'class="text-button" ' + valueAttr(row.key)) + ' ' +
+      button('Edit names on this shift', 'edit-shift', 'class="text-button" ' + valueAttr(row.date + '|' + row.shift)) + '</p>' +
     (agreedRequestFor(row) ? '<p class="subtle">This shift is part of an agreed request that is queued for review. It cannot be offered again until that is settled.</p>' +
       '<div class="actions">' + button('Open the request', 'thread', 'class="secondary" ' + valueAttr(agreedRequestFor(row).id)) + '</div>' :
     isMine(row) ? '<div class="actions">' + button('Trade this shift', 'matches', 'class="primary" data-kind="trade" ' + valueAttr(row.key)) +
@@ -446,7 +491,7 @@ function dialogMarkup() {
     (state.events.length ? '<ul class="compact">' + [...state.events].reverse().slice(0,25).map(event => '<li>' +
       h(event.type + ' · ' + timeLabel(event.time) + ' · ' + event.hash.slice(0,12)) + '</li>').join('') + '</ul>' : '<p>No decisions recorded yet.</p>') +
     '<div class="actions">' + button('Export receipts', 'export', 'class="secondary"') +
-    (!publicDemo ? button('Manage local data', 'data', 'class="text-button"') : '') + '</div>');
+    (!publicDemo ? button('Backup and restore', 'data', 'class="text-button"') : '') + '</div>');
   if (type === 'staff-setup') {
     const name = chosen || state.actor;
     const profile = state.directory[normalizeName(name)] || { skills:[] };
@@ -463,8 +508,27 @@ function dialogMarkup() {
       '<p class="subtle">Either choice takes this person’s weekend shifts out of the rotation, so nobody else is measured against them. Extra weekends taken by choice are shown as credit.</p>' +
       '<button class="primary">Save staff details</button></form>');
   }
-  if (type === 'data') return shell('Local workspace data', '<p>Clear the imported roster, source photos, messages and receipts from this browser and restore the sample workspace.</p>' +
-    button('Erase local workspace', 'erase', 'class="danger"'));
+  if (type === 'edit-shift') {
+    const { date, shift } = ui.dialog;
+    const rows = state.assignments.filter(item => item.date === date && item.shift === shift);
+    return shell('Who is on · ' + shiftCaption({ date, shift }), '<form data-form="edit-shift"><input type="hidden" name="date" value="' + h(date) + '"><input type="hidden" name="shift" value="' + h(shift) + '">' +
+      '<p class="subtle">One line per person. Add a name, fix one, or clear a line to take someone off. A name entered twice is kept once.</p>' +
+      nameLines(rows, rows.length) + knownList(actorNames()) + '<div class="actions"><button class="primary">Save</button></div></form>');
+  }
+  if (type === 'data') {
+    const { restore, confirmErase } = ui.dialog;
+    return shell('Workspace data', '<p>This workspace is kept in this browser only, at <b>' + h(location.host) + '</b>. A different browser, or a different address, starts with sample names.</p>' +
+      '<p><b>' + state.assignments.length + '</b> shifts · <b>' + state.people.length + '</b> contacts · ' + h(state.mode === 'sample' ? 'sample workspace' : 'published ' + timeLabel(state.importedAt)) + ' · version ' + BUILD + '</p>' +
+      '<h3>Backup</h3><p class="subtle">A backup file holds the schedule, the contacts with their phone numbers, requests and history. Photos are not included. Keep the file somewhere private.</p>' +
+      '<p>' + button('Save a backup file', 'backup', 'class="primary"') + '</p>' +
+      '<label class="drop"><b>Restore from a backup file</b><span>Choose a file saved with the button above</span><input id="backup-file" type="file" accept="application/json,.json"></label>' +
+      (restore ? '<div class="flag"><p><b>' + h(restore.name) + '</b> holds ' + restore.state.assignments.length + ' shifts and ' + (restore.state.people || []).length + ' contacts' +
+        (restore.savedAt ? ', saved ' + h(timeLabel(restore.savedAt)) : '') + '. Restoring replaces what is in this browser now' +
+        (state.mode === 'sample' ? ' (sample names).' : ' (' + state.assignments.length + ' shifts).') + '</p>' + button('Replace this workspace with the backup', 'restore', 'class="danger"') + '</div>' : '') +
+      '<h3>Start over</h3><p class="subtle">Clears the roster, contacts, source photos, messages and receipts from this browser and brings back the sample names.</p>' +
+      (confirmErase ? '<div class="flag"><p><b>This cannot be undone.</b> ' + (state.mode === 'sample' ? '' : state.assignments.length + ' shifts and ' + state.people.length + ' contacts will be removed. Save a backup file first if you might want them back.') +
+        '</p>' + button('Erase everything in this browser', 'erase', 'class="danger"') + '</div>' : button('Erase local workspace', 'erase-ask', 'class="secondary"')));
+  }
   return '';
 }
 
@@ -580,6 +644,7 @@ async function importFiles(files, sampleImport = false) {
     ui.pending.sample = sampleImport;
   } finally {
     ui.busy = null;
+    saveDraft();
     render();
   }
 }
@@ -591,7 +656,7 @@ app.addEventListener('click', event => {
     ui.notice = error.message || String(error);
     if (!ui.busy) ui.dialog = null;
     render();
-  });
+  }).finally(saveDraft);
 });
 app.addEventListener('change', event => {
   if (event.target.id === 'actor') {
@@ -605,7 +670,20 @@ app.addEventListener('change', event => {
     void commit('Contact matched', { name: key }, previous => withContacts({ ...previous, manualLinks: { ...previous.manualLinks, [key]: value } })).then(render).catch(fail);
   }
   if (event.target.id === 'photos') void importFiles([...event.target.files]).catch(fail);
+  if (event.target.id === 'backup-file' && event.target.files[0]) void readBackup(event.target.files[0]).catch(fail);
 });
+// A backup file made by this app, or a bare workspace. Nothing is replaced until the person confirms.
+async function readBackup(file) {
+  if (file.size > 30 * 1024 * 1024) throw new Error('That file is too large to be a Department Hub backup.');
+  let parsed;
+  try { parsed = JSON.parse(await file.text()); } catch { throw new Error('That file could not be read as a Department Hub backup.'); }
+  const saved = parsed?.app === 'department-hub' && parsed.state ? parsed.state : parsed;
+  const valid = saved && Array.isArray(saved.assignments) && saved.assignments.every(row => /^\d{4}-\d{2}-\d{2}$/.test(row?.date) && SHIFTS[row.shift] && typeof row.person === 'string' && Array.isArray(row.sources)) &&
+    ['sample', 'local'].includes(saved.mode) && typeof saved.actor === 'string';
+  if (!valid) throw new Error('That file is not a Department Hub backup.');
+  ui.dialog = { type:'data', restore:{ name:file.name, savedAt:parsed.savedAt || saved.importedAt || null, state:saved } };
+  render();
+}
 app.addEventListener('dragover', event => { if (event.target.closest('#drop-zone')) event.preventDefault(); });
 app.addEventListener('drop', event => {
   if (!event.target.closest('#drop-zone')) return;
@@ -621,11 +699,44 @@ function fail(error) { ui.notice = error.message || String(error); ui.dialog = n
 
 async function act({action, value, kind}) {
   const row = state.assignments.find(item => item.key === value);
+  if (action === 'more-lines') {          // added in place, so nothing already typed is lost
+    const rows = app.querySelector('dialog .name-rows');
+    if (rows) rows.insertAdjacentHTML('beforeend', Array.from({ length: 3 }, (_, index) => nameLine(null, rows.children.length + index)).join(''));
+    return;
+  }
   ui.notice = '';
+  ui.flash = '';
   switch (action) {
     case 'tab': ui.tab = value; ui.dialog = null; break;
     case 'view': ui.view = value; break;
     case 'navigate': ui.date = addDays(ui.date, Number(value)); break;
+    case 'today': ui.date = localToday(); break;
+    case 'edit-shift': { const [date, shift] = value.split('|'); ui.dialog = { type:'edit-shift', date, shift }; break; }
+    case 'erase-ask': ui.dialog = { type:'data', confirmErase:true }; break;
+    case 'backup': {
+      const file = { app:'department-hub', kind:'backup', version:1, savedAt:new Date().toISOString(), from:location.host, state };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type:'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'department-hub-backup-' + localToday() + '.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+      ui.flash = 'Backup saved to your downloads as ' + link.download + '.';
+      break;
+    }
+    case 'restore': {
+      const { restore } = ui.dialog;
+      if (!restore) return;
+      state = prepare(restore.state);
+      saveState(storageKey, state);
+      await commit('Workspace restored from a backup', { savedAt:restore.savedAt || null, assignmentCount:state.assignments.length }, previous => previous);
+      ui.pending = null;
+      ui.dialog = null;
+      ui.date = startDate();
+      ui.view = 'week';
+      ui.notice = 'Backup restored: ' + state.assignments.length + ' shifts and ' + state.people.length + ' contacts.';
+      break;
+    }
     case 'close': if (ui.busy) return; clearPreview(); ui.dialog = null; break;
     case 'import': ui.dialog = { type:'import' }; break;
     case 'samples': {
@@ -688,7 +799,7 @@ async function act({action, value, kind}) {
       }));
       state = withContacts(state);
       saveState(storageKey, state);
-      ui.date = draft.assignments[0].date;
+      ui.date = startDate();
       ui.view = 'week';
       ui.pending = null;
       ui.dialog = null;
@@ -731,7 +842,7 @@ async function act({action, value, kind}) {
       state = withContacts(structuredClone(initial));
       ui.pending = null;
       ui.dialog = null;
-      ui.date = '2026-11-13';
+      ui.date = startDate();
       ui.notice = 'Local workspace cleared.';
       break;
     case 'export': {
@@ -752,9 +863,10 @@ app.addEventListener('submit', event => {
   const form = event.target.closest('[data-form]');
   if (!form) return;
   event.preventDefault();
-  void submit(form).catch(fail);
+  void submit(form).catch(fail).finally(saveDraft);
 });
 async function submit(form) {
+  ui.flash = '';
   const data = Object.fromEntries(new FormData(form));
   const body = (data.body || '').trim();
   const message = { author:state.actor, body, created:new Date().toISOString() };
@@ -812,27 +924,52 @@ async function submit(form) {
       const fields = new FormData(form);
       const date = fields.get('date'), shift = fields.get('shift');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SHIFTS[shift]) return;
-      const roles = fields.getAll('role'), times = fields.getAll('hours');
-      // The boxes replace what was read for this date and shift on this photo.
+      // The lines replace what was read for this date and shift on this photo.
       const sameCell = date === flag.draft.date && shift === flag.draft.shift;
       const existing = sameCell ? flagCellRows(flag) : [];
-      const listed = [];
-      fields.getAll('person').forEach((value, position) => {
-        const person = value.trim().replace(/\s+/g, ' ');
-        if (!person || listed.some(row => isSame(row.person, person))) return;
-        const hours = times[position].trim();
-        if (hours && !/^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/.test(hours)) throw new Error('Write partial hours like 7-3 or 7-3:30.');
-        const before = existing.find(row => isSame(row.person, person));
-        listed.push({
-          date, shift, person, ...(roles[position] ? { role:roles[position] } : {}), ...(hours ? { hours } : {}),
-          sources: before?.sources || [{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
-        });
-      });
+      const tidy = readNameLines(form, [...new Set([...ui.pending.assignments.map(item => item.person), ...actorNames()])]);
+      const listed = tidy.rows.map(row => ({
+        date, shift, ...row,
+        sources: existing.find(item => isSame(item.person, row.person))?.sources || [{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
+      }));
       const settled = sameCell ? flagCellFlags(flag) : [flag];
       ui.pending.assignments = mergeAssignments([...ui.pending.assignments.filter(item => !existing.includes(item)), ...listed]);
       ui.pending.issues = verifyRoster(ui.pending.assignments);
       for (const item of [...settled, flag]) item.status = 'corrected';
       await nextFlag(index);
+      const notes = tidyNotes({ ...tidy, fresh: [] });
+      if (notes.length) ui.flash = 'On ' + dayLabel(date, { month:'short', day:'numeric' }) + ': ' + notes.join(' ');
+      break;
+    }
+    case 'edit-shift': {
+      const { date, shift } = data;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SHIFTS[shift]) return;
+      const tidy = readNameLines(form, actorNames());
+      const before = state.assignments.filter(item => item.date === date && item.shift === shift);
+      const after = tidy.rows.map(row => {
+        const kept = before.find(item => isSame(item.person, row.person));
+        const { role, hours, ...rest } = kept || { date, shift, person:row.person, sources:[], manual:true };
+        const next = { ...rest, ...(row.role ? { role:row.role } : {}), ...(row.hours ? { hours:row.hours } : {}) };
+        return { ...next, key:assignmentKey(next) };
+      });
+      const describe = item => item.person + (item.role ? ' (' + (ROLE_LABELS[item.role] || item.role) + ')' : '') + (item.hours ? ' ' + item.hours : '');
+      const notes = tidyNotes(tidy);
+      if (before.map(describe).sort().join('|') !== after.map(describe).sort().join('|')) {
+        const removed = before.filter(item => !after.some(row => isSame(row.person, item.person)));
+        const added = after.filter(row => !before.some(item => isSame(item.person, row.person)));
+        await commit('Shift edited', { date, shift, before:before.map(describe), after:after.map(describe) }, previous => ({
+          ...previous, assignments: mergeAssignments([...previous.assignments.filter(item => !(item.date === date && item.shift === shift)), ...after])
+        }));
+        state = withContacts(state);
+        saveState(storageKey, state);
+        for (const item of added) {
+          const other = state.assignments.find(entry => entry.date === date && entry.shift !== shift && isSame(entry.person, item.person));
+          if (other) notes.push(item.person + ' is also on the ' + SHIFTS[other.shift].label.toLowerCase() + ' shift that date.');
+        }
+        for (const item of removed) if (agreedRequestFor(item)) notes.push(item.person + '’s shift was part of an agreed request. Open Requests to sort that out.');
+        ui.notice = ['Saved ' + shiftCaption({ date, shift }) + ': ' + (after.map(item => item.person).join(', ') || 'nobody listed') + '.', ...notes].join(' ');
+      } else ui.notice = notes.length ? ['Nothing changed on ' + shiftCaption({ date, shift }) + '.', ...notes].join(' ') : '';
+      ui.dialog = null;
       break;
     }
     case 'request': {

@@ -114,6 +114,27 @@ Assumptions in the low-census rule that the owner has not confirmed: that everyo
 
 Open design point for the shared version: the full table is a standings table. Each person should see their own sheet and the department spread. The full table belongs to whoever builds the schedule.
 
+## Added on branch `claude/edit-and-backup`
+
+Two things from the owner on 2026-11-11.
+
+First, he opened the app and found sample names where he expected his schedule. The workspace lives in one browser at one address. He had two browsers open and the app had been started at two different addresses, and no copy of an earlier import could be found in any of them. Nothing in the app said where a workspace was kept, there was no way to move one, and an import that had been read but not published was lost when the page closed.
+
+Second, he asked again for several lines when entering names on the schedule, one name per line, and for a name entered twice to be noticed and fixed.
+
+- **Edit a shift on the schedule.** Every shift has an "Edit names" button. It opens one line per person with role and partial hours, and more lines can be added without losing what is typed. Saving replaces that shift's names. People who stay keep their photo source. People added by hand are marked as such. Each edit is a receipt with the names before and after. This is how a handwritten replacement gets onto the roster without importing again.
+- **One person per line** (`tidyNames` in `src/model.js`), used by the shift editor and the import review. A line that holds several people is split: commas, slashes, "and", or several known names in a row. A known name that contains a space is never split. A name entered twice is kept once, and the app says so. A name that matches a known one takes the known spelling. A name nobody has used before is pointed out so a typo does not become a new person.
+- **Where the workspace is kept.** The side bar and the workspace data dialog name the browser address. When nothing is saved there, the schedule says so in plain words and offers to restore a backup.
+- **Backup and restore.** One file holds the schedule, contacts, requests and history. Restoring shows what the file holds and what it will replace, and waits for a second press. Photos are not in the file. The file contains names and phone numbers, so it is the user's to keep private.
+- **Erase asks first** and says what will be removed.
+- **An unfinished import is kept.** The draft is saved after every step and offered again after a reload, with its photos.
+- **The schedule opens on today** when the roster covers it, and has a Today button.
+- **The import count** shows shifts to check. It used to add the structural notes to that number, which made a four-page import look like 120 items of work when 61 shifts needed a look.
+
+Checked in a browser: the editor with a doubled name, several names on one line and a new name; a backup saved, the workspace erased and the backup restored; an import interrupted by a reload and continued; and the four real schedule photos imported, reviewed and published on this build, matching the hand transcription 361 of 361.
+
+Still missing: the launcher takes a port number and the workspace is tied to it. Start it without a number every time. A shared service is what removes the problem for good.
+
 ## Still open from the review
 
 - Matches that are blocked are hidden with no reason given.
