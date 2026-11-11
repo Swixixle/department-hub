@@ -487,3 +487,36 @@ test('who is off tonight filters the requested night shift and identifies missin
   const absent=ask('who is off tonight',{...w,assignments:w.assignments.filter(item=>item.date!==today||item.shift!=='N')});
   assert.match(absent.items[0].text,/no schedule entries/i);
 });
+
+// Found on the merged Version 13: moving the invalid-date check ahead of document questions made a policy question
+// with "24/7" in it answer "That is not a valid date". Any question with "24/7" already did.
+test('a fraction such as 24/7 is not a date, and a date that cannot exist is still reported', () => {
+  assert.equal(parseWhen('is the department staffed 24/7', today), null);
+  assert.equal(parseWhen('split the weekend 50/50', today)?.label, 'this weekend');
+  assert.equal(parseWhen('20/20 vision', today), null);
+  assert.deepEqual([parseWhen('do i work 12/25', today).from, parseWhen('do i work 2/30', today).invalid, parseWhen('13/01', today).invalid, parseWhen('24/7/2027', today).invalid], ['2026-12-25', true, true, true]);
+  const docs = [{ id: 'cover', title: 'Coverage', kind: 'Policy', effective: '2026-01-01', text: 'Staffing\n\nThe department is staffed 24/7 with four therapists on days and three on nights.' }];
+  assert.match(ask('is the department staffed 24/7', { ...world, documents: docs }).items[0].text, /staffed 24\/7/);
+  const policy = ask('what is the 24/7 coverage policy', { ...world, documents: docs });
+  assert.deepEqual([policy.kind, /valid date/.test(policy.title)], ['look', false]);                        // a document search again, whatever it finds
+  assert.match(reply('do i work 2/30').title, /not a valid date/);
+});
+
+// Measured on sixteen ordinary rewordings against a real schedule: the merged rule refused five, four of them only
+// because the wording Ask reads best ends in "next".
+test('a rewording may end in "next", and still may not add or drop a day, a span or a direction in time', () => {
+  for (const [from, to] of [['when is Morgan back', 'when does Morgan work next'], ['when am i up', 'when do i work next'], ['what do i have coming', 'when do i work next']])
+    assert.equal(readingProblem(from, to, world), '', from + ' -> ' + to);
+  for (const [from, to] of [['is Morgan around next Friday', 'does Morgan work Friday'], ['is Morgan around Friday', 'does Morgan work next Friday'], ['whats on my plate', 'what do i work this week'],
+    ['when am i up', 'when was my last shift'], ['when am i up', 'what did i work last week'], ['who is on the bench tonight', 'who was off last night']])
+    assert.notEqual(readingProblem(from, to, world), '', from + ' -> ' + to);
+  const corrections = [{ id: 'back', asks: ['when is Morgan back'], reads: 'when does Morgan work next', people: ['Morgan'], by: 'Jordan', at: '2026-11-11T12:00:00Z' }];
+  const other = ask('when is parker back', { ...world, corrections });
+  assert.deepEqual([other.read, other.kind, other.corrected.id], ['when does parker work next', 'when', 'back']);
+});
+
+test('a non-date slash expression does not hide an actual date later in the question', () => {
+  const result=parseWhen('In our 24/7 department, do I work 12/25?',today);
+  assert.equal(result?.from,'2026-12-25');
+  assert.equal(parseWhen('The split is 50/50; do I work 2/30?',today)?.invalid,true);
+});

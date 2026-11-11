@@ -58,7 +58,9 @@ export function parseWhen(text, today, rules = {}) {
   if (iso) return wide(one(iso[0]));
   const named = q.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? (\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/);
   if (named) return wide(one(named[3] ? dateIn(named[3], monthNumber(named[1]), Number(named[2])) : near(monthNumber(named[1]), Number(named[2]))));
-  const slashed = q.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/);
+  // "24/7", "50/50" and "20/20" are not dates. A date that cannot exist, such as 2/30 or 13/01, is still reported as invalid.
+  const fraction = parts => !parts[3] && (parts[0] === '24/7' || [parts[1],parts[2]].some(part => Number(part) < 1 || Number(part) > 31) || (Number(parts[1]) > 12 && Number(parts[2]) > 12));
+  const slashed = [...q.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/g)].find(parts => !fraction(parts));
   if (slashed) return wide(one(slashed[3] ? dateIn(slashed[3], Number(slashed[1]), Number(slashed[2])) : near(Number(slashed[1]), Number(slashed[2]))));
   const nextMonth = month === 12 ? [year + 1, 1] : [year, month + 1];
   const nth = q.match(new RegExp('\\b(first|1st|second|2nd|third|3rd|fourth|4th|last) week (?:of|in) (?:(next month|this month)|' + MONTH_WORD + ')\\b'));
@@ -238,7 +240,9 @@ export function matchCorrection(question, corrections = [], tidy = text => text,
 // It cannot bring in a person or a date the question did not have, so it cannot point everyone's question at one
 // coworker or fix a relative question to one calendar date. The answer is computed from current records each time.
 const DATE_MARK = /\d+|\b(?:jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\bin may\b|\b(?:christmas|thanksgiving|easter|new year|memorial day|labor day|independence day)\b/g;
-const RELATIVE_MARK = /\b(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|today|tonight|tomorrow|yesterday|next|this|last|first|second|third|fourth|before|after|until|till|weeks?|weekends?|months?|years?)\b/g;
+// "Next", "this" and "last" set a date only in front of a day or a span: "next Friday", "this week", "last night". In
+// "when does Morgan work next" the word sets nothing, and that is the wording Ask reads best.
+const RELATIVE_MARK = /\b(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|today|tonight|tomorrow|yesterday|(?:next|this|last)(?=\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|weeks?|weekends?|months?|years?|night)\b)|last(?=\s+(?:shift|time)\b)|first|second|third|fourth|before|after|until|till|weeks?|weekends?|months?|years?)\b/g;
 export function readingProblem(asked, reads, world) {
   const names = [...new Set(world.assignments.map(row => row.person))], tidy = text => tidyQuestion(text, names).text;
   const from = tidy(asked), to = tidy(reads);
