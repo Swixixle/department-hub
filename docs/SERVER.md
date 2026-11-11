@@ -1,6 +1,6 @@
 # Preparing the private department pilot
 
-Updated 2026-11-11 from the owner's clarified direction. This is a plan. The current Version 12 is still one-browser software: shared accounts, storage, messages between devices and notifications are not built.
+Updated 2026-11-11 from the owner's clarified direction. This is a plan. The current local build is still one-browser software: shared accounts, storage, messages between devices and notifications are not built.
 
 ## The department is the workspace
 

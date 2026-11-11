@@ -335,7 +335,7 @@ test('a third round of ordinary questions: who is off, in a row, after, last, le
   const earlier = { ...world, assignments: [...world.assignments, row('2026-11-06', 'N', 'Jordan', 'icu')] };
   const said = question => { const found = ask(question, earlier); return [found.kind, found.title, ...found.items.map(item => item.text)]; };
   // "Who is off" used to list who was on.
-  assert.deepEqual(said('whos off tonite'), ['offlist', 'No shift listed tonight:', 'Wed, Nov 11: Jordan, Jordan K and Riley']);
+  assert.deepEqual(said('whos off tonite'), ['offlist', 'No shift listed tonight:', 'Wed, Nov 11: Avery, Blair, Jordan, Jordan K and Riley']);
   assert.deepEqual(said('who is not working friday').slice(0, 2), ['offlist', 'No shift listed Fri, Nov 13:']);
   assert.equal(said('is anyone off this weekend').length, 5);
   assert.match(ask('who is off tonight', earlier).source, /not the same as free or willing/);
@@ -413,9 +413,9 @@ test('a reviewed correction is worked out live, covers the same question about a
   assert.equal(ask('who is on the bench tonight', world).kind, 'who');                                     // without it: who is on
   const fixed = ask('whos on the bench tonite', { ...world, corrections });                                // spelling is tidied before matching
   assert.deepEqual([fixed.kind, fixed.read, fixed.corrected.kind, fixed.corrected.id], ['offlist', 'who is off tonight', 'reading', 'c1']);
-  assert.equal(fixed.items[0].text, 'Wed, Nov 11: Jordan, Jordan K and Riley');
+  assert.equal(fixed.items[0].text, 'Wed, Nov 11: Avery, Blair, Jordan, Jordan K and Riley');
   const later = ask('who is on the bench tonight', { ...world, corrections, assignments: [...world.assignments, row(today, 'N', 'Riley')] });
-  assert.equal(later.items[0].text, 'Wed, Nov 11: Jordan and Jordan K');                                   // the answer follows the schedule, not the day it was taught
+  assert.equal(later.items[0].text, 'Wed, Nov 11: Avery, Blair, Jordan and Jordan K');                       // the answer follows the schedule, not the day it was taught
   // The same question about another day or another person is read the same way, with that day or person.
   assert.deepEqual([ask('who is on the bench friday', { ...world, corrections }).read, ask('who is on the bench friday', { ...world, corrections }).kind], ['who is off friday', 'offlist']);
   const other = ask('is jordan k around saturday', { ...world, corrections });
@@ -428,7 +428,8 @@ test('a reviewed correction is worked out live, covers the same question about a
   assert.match(readingProblem('when do i work', 'when does Morgan work', world), /cannot add a person or a date the question did not have: Morgan\./);
   assert.match(readingProblem('when do i work', 'do i work nov 26', world), /cannot add a person or a date/);
   assert.equal(readingProblem('who is on the bench tonight', 'Who is on the bench tonight?', world), 'That is the same wording.');
-  assert.equal(readingProblem('who is on the bench tonight', 'where is the linen cart', world), 'Ask has no answer for that wording either.');
+  assert.equal(readingProblem('who is on the bench tonight', 'where is the linen cart', world), 'Keep the same people and date scope in the rewording.');
+  assert.equal(readingProblem('where is the cart','where is the linen cart',world),'Ask has no answer for that wording either.');
 });
 
 test('a passage the record keeper chose comes first for that question, and stops when the document changes', async () => {
@@ -445,4 +446,44 @@ test('a passage the record keeper chose comes first for that question, and stops
   const numbered = [{ ...corrections[0], asks: ['what is rule 3'] }];
   assert.equal(ask('what is rule 3', { ...world, corrections: numbered, versions: { leave: version } }).corrected.kind, 'passage');
   assert.equal(ask('what is rule 4', { ...world, corrections: numbered, versions: { leave: version } }).corrected, undefined);   // a chosen passage is not carried to another number
+});
+
+test('reading corrections preserve the named people, relative dates and shift scope', () => {
+  for (const [from,to] of [
+    ['when do I work','do I work Friday'],
+    ['is Morgan around Friday','when do I work Friday'],
+    ['who is on the bench tonight','who is off tomorrow'],
+    ['is Morgan around next Friday','does Morgan work Friday'],
+    ['is Morgan around Friday','does Morgan work Friday night']
+  ]) assert.notEqual(readingProblem(from,to,world),'',from+' -> '+to);
+  const invalid = [{id:'bad',asks:['is Morgan around Friday'],reads:'when do I work Friday',by:'Jordan',at:'2026-11-11T12:00:00Z'}];
+  assert.equal(ask('is Morgan around Friday',{...world,corrections:invalid}).corrected,undefined);
+  const scoped=[{...invalid[0],reads:'does Morgan work Friday',people:['Morgan']}];
+  assert.equal(ask('is Morgan around Friday',{...world,corrections:scoped,assignments:world.assignments.filter(row=>row.person!=='Morgan')}).corrected,undefined);
+});
+
+test('passage corrections do not override restricted fairness, invalid dates or ambiguous names', async () => {
+  const version=await documentVersion(documents[0]), go='doc|leave|'+documents[0].text.indexOf('Holiday time off rotates');
+  const corrections=['is it fair how many weekends Morgan has','do I work Feb 30','is maria on tonight'].map((q,i)=>({id:String(i),asks:[q],go,sourceHash:version,by:'Jordan',at:'2026-11-11T12:00:00Z'}));
+  const w={...world,corrections,versions:{leave:version}};
+  assert.match(ask(corrections[0].asks[0],w).title,/whoever keeps the record/);
+  assert.match(ask(corrections[1].asks[0],w).title,/not a valid date/);
+  assert.match(ask(corrections[2].asks[0],{...w,assignments:[row(today,'N','Marian'),row(today,'N','Marina')]}).title,/Which staff name/);
+});
+
+test('an incomplete weekend cannot establish that the entire weekend is off', () => {
+  const partial=ask('do I have this weekend off',{...world,assignments:[row('2026-11-13','N','Morgan')]});
+  assert.equal(partial.empty,true);
+  assert.doesNotMatch(partial.title,/^Yes/);
+  assert.match(partial.lines.join(' '),/missing/i);
+});
+
+test('who is off tonight filters the requested night shift and identifies missing shift data', () => {
+  const w={...world,assignments:[row(today,'D','Avery'),row(today,'N','Morgan'),row('2026-11-13','N','Jordan')]};
+  const result=ask('who is off tonight',w);
+  assert.match(result.items[0].text,/Avery/);
+  assert.doesNotMatch(result.items[0].text,/Morgan/);
+  assert.match(result.items[0].sub,/night/);
+  const absent=ask('who is off tonight',{...w,assignments:w.assignments.filter(item=>item.date!==today||item.shift!=='N')});
+  assert.match(absent.items[0].text,/no schedule entries/i);
 });

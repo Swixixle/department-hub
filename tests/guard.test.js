@@ -234,7 +234,7 @@ test('a phone number or a labelled number is not a patient number', () => {
   assert.deepEqual(patientSigns('Jordan’s new cell is 3175550142, text first.'), []);
   assert.deepEqual(patientSigns('Order 4471902 for filters arrives Friday.'), []);
   assert.deepEqual(patientSigns('4455667 is the one I meant'), ['a long number with nothing to say what it is']);
-  assert.deepEqual(patientSigns('pt callback 3175550142'), ['a long number with nothing to say what it is']);
+  assert.deepEqual(patientSigns('pt callback 3175550142'), ['a patient’s contact number']);
 });
 
 // What the screen is known to get wrong. Kept here so the limits are written down and a later change that fixes one
@@ -244,4 +244,10 @@ test('known limits', () => {
   assert.deepEqual(patientSigns('My account got locked again, IT number is 555-0100.'), []);
   assert.deepEqual(patientSigns('Jane Doe 03/04/1951'), [], 'a name and a date with no label is not caught');
   assert.deepEqual(patientSigns('the 70 year old with COPD in the ER is crashing'), [], 'an age with no patient word and no room is not caught');
+});
+
+test('a patient contact label cannot exempt the following telephone number', () => {
+  for(const text of ['Patient phone 3175550142','patient phone 317-555-0142','pt callback: (317) 555-0142'])
+    assert.ok(patientSigns(text).length,text);
+  assert.deepEqual(patientSigns('Staff phone 3175550142, call about coverage.'),[]);
 });

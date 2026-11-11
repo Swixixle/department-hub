@@ -2,7 +2,7 @@
 
 A small department workspace with a roster, a department board, and conversations attached to trade and coverage requests. The public demo uses fictional data. The standalone local build accepts PNG, JPEG, and WebP screenshots.
 
-The next rollout is a private pilot in the owner's department: one department workspace, one personal account per member, a shared feed and conversations, with feedback from coworkers. Cross-department switching and other jobs are outside scope. The owner plans to fund hosting. This is direction for the next stage; the current Version 12 remains a one-browser prototype. See [the shared pilot plan](docs/SERVER.md) for the preparation and launch checks.
+The next rollout is a private pilot in the owner's department: one department workspace, one personal account per member, a shared feed and conversations, with feedback from coworkers. Cross-department switching and other jobs are outside scope. The owner plans to fund hosting. This is direction for the next stage; the current local build remains a one-browser prototype. See [the shared pilot plan](docs/SERVER.md) for the preparation and launch checks.
 
 ## Try the public demo
 

@@ -35,6 +35,7 @@ const NOT_A_NAME = new Set('on in at the an and or not by to for is was required
 const LONG = /(?<![\d-])\d{7,12}(?![\d-])/g;
 const PHONE = /^1?[2-9]\d{2}[2-9]\d{6}$/;
 const LABELLED = /\b(?:pager|page|ext|extension|call|text|cell|phone|mobile|fax|dial|office|desk|line|hotline|helpdesk|order|po|p\.o\.|part|lot|serial|model|ref|reference|ticket|invoice|item|catalog|sku|tracking|asset|tag|badge|employee|pass|permit|license|code|confirmation)\b[^.!?\n]{0,30}$/i;
+const PATIENT_CONTACT = /\b(?:pt|patient)(?:'s|’s)?\s+(?:(?:home|work|cell|mobile|contact|callback|phone|telephone|number)\s*)+(?:is\s*)?[:#=]?\s*(?:\+?1[ -]?)?\(?[2-9]\d{2}\)?[ .-]?[2-9]\d{2}[ .-]?\d{4}\b/i;
 const ABOUT_A_RECORD = /\b(?:pt|patient|mrn|record|csn|dob|look\s?up)\b/i;
 export const LONG_NUMBER_HELP = 'If the number is a phone, write it with dashes, like 317-555-0142. If it is an order, part or badge number, say which.';
 
@@ -48,6 +49,8 @@ export function patientFindings(text) {
   for (const [sign, shape] of SHAPES) { const hit = shape.exec(all); if (hit) add(sign, hit[0], hit.index); }
   const titled = TITLED.exec(all);
   if (titled) add('a patient’s name', titled[0]);
+  const contact = PATIENT_CONTACT.exec(all);
+  if (contact) add('a patient’s contact number',contact[0],contact.index);
   for (const sentence of all.split(/[.!?]+(?=\s|$)|\n+/)) {
     const old = OLD.exec(sentence), named = NAMED.exec(sentence), one = ONE.exec(sentence), person = PERSON.exec(sentence), place = PLACE.exec(sentence) || IN_NUMBER.exec(sentence), there = PERSON_THERE.exec(sentence);
     // "My baby is 6 months old" is the writer's own family.

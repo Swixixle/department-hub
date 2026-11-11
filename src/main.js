@@ -6,9 +6,9 @@ import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, ph
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
 import { localBoard } from './backend.js';
-import { SUGGESTIONS, ask, pretty as prettyDate, readingProblem, searchDocuments } from './ask.js';
+import { SUGGESTIONS, ask, findPeople, pretty as prettyDate, readingProblem, searchDocuments } from './ask.js';
 import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, parties, shiftName } from './trades.js';
-import { keywords, qualifiers } from './words.js';
+import { keywords, qualifiers, tidyQuestion } from './words.js';
 import { LONG_NUMBER_HELP, patientShown, patientSigns } from './guard.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
@@ -169,7 +169,7 @@ async function askAndLog(q) {
   ui.lastAsk = ui.dialog = dialog;
   await commit(result.kind === 'blocked' ? 'Question blocked by text screen' : 'Question asked', {
     ...(result.kind === 'blocked' ? {} : { fingerprint:await sha256(q.trim().toLowerCase()) }),
-    engine:'ask-13', build:BUILD, kind:result.kind, answered:!result.empty, ...(result.corrected ? { correction:result.corrected.id } : {}),
+    engine:'ask-13-review-1', build:BUILD, kind:result.kind, answered:!result.empty, ...(result.corrected ? { correction:result.corrected.id } : {}),
     resolved:result.context?.when || null,
     sources:result.items.map(item => ({ reference:item.go || 'note',
       ...(item.go?.startsWith('doc|') ? { version:sourceVersions[item.go.split('|')[1]] } : {}) })),
@@ -850,7 +850,7 @@ function dialogMarkup() {
       const words = ui.dialog.words || '', passages = words ? searchDocuments(words, liveDocuments(), 5, [], sourceVersions) : [];
       return shell('Correct this answer', '<p class="fair-line">' + h(picked.text) + '</p><p class="subtle">' + h([WRONG[picked.reason] || WRONG.unanswered, 'sent ' + prettyDate(picked.at.slice(0, 10))].join(' · ')) + '</p>' +
         '<div class="ask-answer"><p class="subtle">What Ask says now</p>' + brief(now) + '</div>' +
-        '<h3>Read it another way</h3><p class="subtle">Type the same question in words Ask gets right. The answer is still worked out from the schedule and documents each time it is asked, so it cannot go out of date. The same question about another person or day is read the same way.</p>' +
+        '<h3>Read it another way</h3><p class="subtle">Type the same question in words Ask gets right, keeping its people, dates and shift scope. Ask uses the current records each time; it does not save a fixed answer. A matching question about another person or day uses that person or day.</p>' +
         '<form data-form="reading-try"><label>It should be read as<input name="reads" maxlength="200" autocomplete="off" value="' + h(reads) + '" placeholder="Who is not working tonight?"></label>' +
         '<div class="actions inline"><button class="secondary">Try it</button></div></form>' +
         (reads ? '<div class="ask-answer">' + (tried ? brief(tried) : '') + (problem ? '<p class="refusal" role="alert">' + h(problem) + '</p>' :
@@ -1399,9 +1399,11 @@ async function act({action, value, kind}) {
       if (!isKeeper() || ui.dialog?.type !== 'teach') return;
       const waiting = state.unanswered.find(item => item.id === value), reads = (ui.dialog.reads || '').trim();
       if (!waiting || !reads || patientSigns(waiting.text + '\n' + reads).length || readingProblem(waiting.text, reads, askWorld())) return;
-      const entry = { id:crypto.randomUUID(), asks:[waiting.text], reads, by:state.actor, at:new Date().toISOString() };
+      const names = [...new Set(state.assignments.map(row=>row.person))];
+      const entry = { id:crypto.randomUUID(), asks:[waiting.text], reads, people:findPeople(tidyQuestion(waiting.text,names).text,names), by:state.actor, at:new Date().toISOString() };
       await commit('Reading correction saved', { id:entry.id, question:await sha256(waiting.text.trim().toLowerCase()), reads:await sha256(reads.toLowerCase()) }, previous => ({ ...previous,
-        corrections:[...previous.corrections.filter(item => !sameAsk(item, waiting.text)), entry].slice(-200), unanswered:previous.unanswered.filter(item => item.id !== waiting.id) }));
+        corrections:[...previous.corrections.filter(item => !sameAsk(item, waiting.text)), entry].slice(-200), unanswered:previous.unanswered.filter(item => item.id !== waiting.id),
+        learned:previous.learned.filter(link=>!previous.corrections.some(item=>sameAsk(item,waiting.text)&&item.id===link.correctionId)) }));
       ui.dialog = { type:'teach' };
       ui.flash = 'Saved. That question is now read as “' + reads + '”.';
       break;
@@ -1415,12 +1417,14 @@ async function act({action, value, kind}) {
       await commit('Passage correction saved', { id:entry.id, question:await sha256(waiting.text.trim().toLowerCase()), reference:value, sourceHash }, previous => ({ ...previous,
         corrections:[...previous.corrections.filter(item => !sameAsk(item, waiting.text)), entry].slice(-200), unanswered:previous.unanswered.filter(item => item.id !== waiting.id),
         // a question worded nearly the same way gets the same passage lifted, as it does after a confirmed answer
-        learned: !terms.length ? previous.learned : [...previous.learned.filter(link => !(link.go === value && link.terms.join(' ') === terms.join(' '))), { terms, go:value, count:3, sourceHash, qualifiers:qualifiers(wording) }].slice(-400) }));
+        learned: [...previous.learned.filter(link => !previous.corrections.some(item=>sameAsk(item,waiting.text)&&item.id===link.correctionId) &&
+          !(link.go === value && link.terms.join(' ') === terms.join(' '))), ...(terms.length ? [{ terms, go:value, count:3, sourceHash, qualifiers:qualifiers(wording),correctionId:entry.id }] : [])].slice(-400) }));
       ui.dialog = { type:'teach' };
       ui.flash = 'Saved. That question now quotes the passage you chose, until the document changes.';
       break;
     }
-    case 'correction-remove': if (isKeeper()) await commit('Correction removed', { id:value }, previous => ({ ...previous, corrections:previous.corrections.filter(item => item.id !== value) })); break;
+    case 'correction-remove': if (isKeeper()) await commit('Correction removed', { id:value }, previous => ({ ...previous,
+      corrections:previous.corrections.filter(item => item.id !== value),learned:previous.learned.filter(link=>link.correctionId!==value) })); break;
     case 'teach-copy': {
       if (!isKeeper()) return;
       const lines = state.unanswered.map(item => [item.text, WRONG[item.reason] || WRONG.unanswered, item.understood ? 'understood as: ' + item.understood : ''].filter(Boolean).join(' | '));

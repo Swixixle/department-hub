@@ -222,6 +222,7 @@ export function matchCorrection(question, corrections = [], tidy = text => text,
   const asked = shape(question, names);
   if (!asked.pattern) return null;
   for (const correction of corrections) for (const wording of correction.asks || []) {
+    if (correction.people?.some(person => !names.some(name => same(name,person)))) continue;
     const taught = shape(tidy(wording), names);
     if (taught.pattern !== asked.pattern) continue;
     const identical = taught.values.every((value, index) => value === asked.values[index]);
@@ -235,16 +236,21 @@ export function matchCorrection(question, corrections = [], tidy = text => text,
 }
 // Why a rewording cannot be saved as a correction, or '' when it can. A correction changes how a question is worded.
 // It cannot bring in a person or a date the question did not have, so it cannot point everyone's question at one
-// coworker or go stale on one day, and the answer is still worked out from the records every time.
+// coworker or fix a relative question to one calendar date. The answer is computed from current records each time.
 const DATE_MARK = /\d+|\b(?:jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\bin may\b|\b(?:christmas|thanksgiving|easter|new year|memorial day|labor day|independence day)\b/g;
+const RELATIVE_MARK = /\b(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|today|tonight|tomorrow|yesterday|next|this|last|first|second|third|fourth|before|after|until|till|weeks?|weekends?|months?|years?)\b/g;
 export function readingProblem(asked, reads, world) {
   const names = [...new Set(world.assignments.map(row => row.person))], tidy = text => tidyQuestion(text, names).text;
   const from = tidy(asked), to = tidy(reads);
   if (!plain(to)) return 'Type the wording first.';
   if (plain(from) === plain(to)) return 'That is the same wording.';
-  const had = new Set([...findPeople(from, names), ...(from.match(DATE_MARK) || [])]);
-  const added = [...findPeople(to, names), ...(to.match(DATE_MARK) || [])].filter(mark => !had.has(mark));
+  const marks = text => [...findPeople(text,names), ...(text.match(DATE_MARK) || []), ...(text.match(RELATIVE_MARK) || [])];
+  const had = new Set(marks(from)), wanted = new Set(marks(to));
+  const added = [...wanted].filter(mark => !had.has(mark));
   if (added.length) return 'A correction can reword a question. It cannot add a person or a date the question did not have: ' + list(added) + '.';
+  if ([...had].some(mark => !wanted.has(mark))) return 'Keep the same people and date scope in the rewording.';
+  if ((parseWhen(from,world.today,world.rules)?.shift || null) !== (parseWhen(to,world.today,world.rules)?.shift || null))
+    return 'Keep the same day or night scope in the rewording.';
   const result = ask(reads, { ...world, uncorrected: true, last: null });
   if (result.empty) return 'Ask has no answer for that wording either.';
   return '';
@@ -366,17 +372,21 @@ export function ask(question, world) {
     sub:'Recorded as ' + taught.by + ' on ' + pretty(taught.at.slice(0, 10)) + (taught.source ? ' · ' + taught.source : ''), go:'note|' + taught.id }],
     'Human-written guidance. The selected profile is not a verified identity; check the original source.', { taught:taught.id });
 
-  // A correction the record keeper reviewed for this exact question comes before everything else, and the answer says so.
+  // Corrections cannot bypass clarification or a restricted record.
+  if (tidy.ambiguous.length) return answer('Which staff name did you mean?', [], 'No person lookup was made.',
+    {lines:tidy.ambiguous.map(item => item.typed + ': ' + item.choices.join(' or ')),empty:true});
+  if (when?.invalid) return answer('That is not a valid date.', [], 'No schedule lookup was made.', {lines:['Use a date such as Nov 26, 2027.'],empty:true});
+  if (kind === 'fair' && others.length && !world.keeper) return answer('That is kept by whoever keeps the record', [], 'Fairness',
+    {lines:['You can see your own sheet. Other people’s numbers are shown only to the person who keeps the record.'],empty:false});
+  // A reviewed correction is labelled and revalidated against the current question before it runs.
   const fix = world.uncorrected ? null : matchCorrection(q, world.corrections, tidyText, names), correction = fix?.correction;
-  if (fix?.reads) {
+  if (fix?.reads && !readingProblem(q,fix.reads,world)) {
     const result = ask(fix.reads, { ...world, uncorrected: true });
     return { ...result, read: fix.reads, corrected: { id: correction.id, kind: 'reading', by: correction.by, at: correction.at } };
   }
   const chosen = correction?.go ? chosenPassage(correction) : null;
   if (chosen) return documentAnswer(chosen, correction);
 
-  if (tidy.ambiguous.length) return answer('Which staff name did you mean?', [], 'No person lookup was made.',
-    { lines:tidy.ambiguous.map(item => item.typed + ': ' + item.choices.join(' or ')), empty:true });
   if (kind === 'who' && has('not', 'no', 'never', 'without')) return answer('Please clarify who you want listed.', [], scheduleSource,
     { lines:['Ask who is scheduled, or name a person and ask whether they work that date.'], empty:true });
   if (q.includes(' called off ') && !has('census', 'va')) return answer('Do you mean a low-census release?', [], 'Low census',
@@ -387,7 +397,6 @@ export function ask(question, world) {
 
   // Explicit document questions take precedence over words such as "due", "call" or "short" inside a policy title.
   if (docQuestion) return documentAnswer();
-  if (when?.invalid) return answer('That is not a valid date.', [], 'No schedule lookup was made.', { lines:['Use a date such as Nov 26, 2027.'], empty:true });
 
   // 1. How to reach someone.
   if (kind === 'contact') {
@@ -532,6 +541,8 @@ export function ask(question, world) {
       const days = [range.from, addDays(range.from, 1), addDays(range.from, 2)].filter(date => date <= range.to), unknown = days.filter(date => !known.has(date));
       if (unknown.length === days.length) return answer('No schedule entries are on record for ' + range.label + '.', [], note, { lines:['A missing date cannot establish that someone is off.'], empty:true });
       const rows = shiftsOf(subject).filter(row => row.date >= range.from && row.date <= range.to && (!range.shift || row.shift === range.shift)), free = days.filter(date => known.has(date) && !worked.has(date));
+      if (!rows.length && unknown.length) return answer('The full ' + range.label + ' is not on record, so I cannot confirm it is off.', [], note,
+        {empty:true,lines:[unknown.length + ' of those dates are missing from this roster.']});
       return answer(rows.length ? 'No. ' + (mine ? 'You work ' : subject + ' works ') + rows.length + ' shift' + (rows.length === 1 ? '' : 's') + ' ' + range.label + '.' : 'Yes. ' + (mine ? 'You are' : subject + ' is') + ' off ' + range.label + '.', rows.map(shiftItem), note,
         { empty:false, lines:[...(rows.length && free.length ? [(mine ? 'You are' : subject + ' is') + ' off ' + list(free.map(pretty)) + '.'] : []), ...(unknown.length ? [unknown.length + ' of those dates are missing from this roster.'] : [])] });
     }
@@ -556,8 +567,8 @@ export function ask(question, world) {
     if (span.to > addDays(span.from, 3)) return answer('That is ' + span.label + '. Open the schedule to see each day.', [{ text: 'Open the schedule at ' + pretty(span.from), sub: '', go: 'date|' + span.from }], scheduleSource);
     const items = [];
     for (let date = span.from; date <= span.to; date = addDays(date, 1)) {
-      const rows = assignments.filter(row => row.date === date), working = new Set(rows.map(row => normalizeName(row.person))), free = names.filter(name => !working.has(normalizeName(name))).sort();
-      items.push(rows.length ? { text: pretty(date) + ': ' + (free.length ? list(free) : 'everyone is listed'), sub: free.length + ' of ' + names.length + ' people have no shift that day, day or night', go: 'date|' + date } :
+      const rows = assignments.filter(row => row.date === date && (!span.shift || row.shift === span.shift)), working = new Set(rows.map(row => normalizeName(row.person))), free = names.filter(name => !working.has(normalizeName(name))).sort();
+      items.push(rows.length ? { text: pretty(date) + ': ' + (free.length ? list(free) : 'everyone is listed'), sub: free.length + ' of ' + names.length + ' people have no ' + (span.shift ? shiftWord(span.shift) + ' shift listed; they may have another shift that day' : 'shift that day, day or night'), go: 'date|' + date } :
         { text: pretty(date) + ': no schedule entries are on record', sub: 'A missing date cannot establish that anyone is off', go: 'date|' + date });
     }
     return answer('No shift listed ' + span.label + ':', items, scheduleSource + '. No shift listed is not the same as free or willing: leave, other jobs and handwritten changes are not recorded here.', { empty: false });
