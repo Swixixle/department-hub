@@ -2,7 +2,7 @@ import './style.css';
 import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
-import { ledger, releaseOrder, statSheet } from './fairness.js';
+import { census, ledger, releaseOrder, staffing, statSheet } from './fairness.js';
 
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
@@ -125,7 +125,7 @@ function top() {
     'class="nav-item ' + (ui.tab === id ? 'active' : '') + '" ' + valueAttr(id) + (ui.tab === id ? ' aria-current="page"' : ''));
   return '<aside><div class="brand"><img src="' + h(asset('mark.svg')) + '" alt=""><div><b>Department Hub</b><small>WORKSPACE</small></div></div>' +
     '<div class="space-label">YOUR DEPARTMENT</div><div class="space-name">Respiratory Care</div><nav aria-label="Workspace">' +
-    nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Department board') + nav('requests', '⇄', 'Requests') + nav('fairness', '⚖', 'Fairness') + nav('people', '☎', 'Directory') +
+    nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Board') + nav('requests', '⇄', 'Requests') + nav('fairness', '⚖', 'Fairness') + nav('people', '☎', 'Directory') +
     '</nav><div class="aside-bottom"><span class="status-dot"></span>' + (publicDemo ? 'Public demo · fictional data' : 'Local workspace · this browser') + '</div></aside>';
 }
 
@@ -135,14 +135,23 @@ function displayDates() {
   return Array.from({ length: 3 }, (_, i) => addDays(friday, i));
 }
 
+const localToday = () => new Date().toLocaleDateString('en-CA');
+const countNote = item => item.people.length + ' listed · ' + Math.abs(item.extra) + (item.extra > 0 ? ' over' : ' short');
+const firstInLine = order => order.filter(item => item.first).map(item => item.person);
+
 function schedule() {
   const dates = displayDates();
+  const usual = { D: staffing(state.assignments, 'D', state.directory), N: staffing(state.assignments, 'N', state.directory) };
+  const offUsual = (date, shift) => usual[shift].over.find(item => item.date === date) || usual[shift].short.find(item => item.date === date);
   const title = dayLabel(dates[0], { month:'long', day:'numeric' }) + ' – ' + dayLabel(dates.at(-1), { month:'short', day:'numeric' });
   const cells = dates.map(date => '<article class="day-card"><header><span>' + h(dayLabel(date, { weekday:'long' })) +
     '</span><strong>' + h(dayLabel(date, { day:'numeric' })) + '</strong></header>' + Object.entries(SHIFTS).map(([shift, def]) => {
       const rows = state.assignments.filter(row => row.date === date && row.shift === shift);
       return '<section class="shift"><div class="shift-label ' + (shift === 'N' ? 'night' : 'day') + '"><b>' + def.label + '</b><span>' +
-        (shift === 'N' ? '7 PM – 7 AM' : '7 AM – 7 PM') + '</span></div>' +
+        (shift === 'N' ? '7 PM – 7 AM' : '7 AM – 7 PM') + '</span>' +
+        (!offUsual(date, shift) ? '' : offUsual(date, shift).extra > 0 ?
+          button(h(countNote(offUsual(date, shift))), 'over', 'class="count-note over" title="More people than usual. See who is next for low census." ' + valueAttr(date + '|' + shift)) :
+          '<i class="count-note">' + h(countNote(offUsual(date, shift))) + '</i>') + '</div>' +
         (rows.length ? rows.map(row => button(avatar(row.person) + '<span class="name">' + h(row.person) + '</span>' +
           (row.hours ? '<i class="tag">' + h(row.hours) + '</i>' : '') +
           (isMine(row) ? '<em>You</em>' : ''), 'shift', 'class="staff ' + (isMine(row) ? 'mine ' : '') + h(row.role || '') + '" ' +
@@ -183,15 +192,18 @@ function fairness() {
   const line = (label, value) => '<div><b>' + h(value) + '</b><span>' + h(label) + '</span></div>';
   const card = sheet.row ? '<div class="panel stat-sheet"><div class="eyebrow">YOUR SHEET · ' + h(state.actor.toUpperCase()) + '</div><div class="stat-grid">' +
     line('shifts', sheet.row.shifts) +
-    line(sheet.row.weekendOnly ? 'weekend turns' : 'weekend turns, fair share ' + sheet.row.weekendFair.toFixed(1), sheet.row.weekend) +
+    line(sheet.row.weekendOnly ? 'weekend turns' : sheet.row.weekendVolunteer ? 'weekend turns, ' + sheet.weekendExtra.toFixed(1) + ' beyond a regular share by choice' :
+      'weekend turns, fair share ' + sheet.row.weekendFair.toFixed(1), sheet.row.weekend) +
     line('holidays' + (sheet.row.holidays.length ? ': ' + sheet.row.holidays.join(', ') : ''), sheet.row.holidays.length) +
     line('charge', sheet.row.charge) + line('ICU', sheet.row.icu) +
     line('trades accepted', sheet.tradesAccepted) + line('shifts covered', sheet.shiftsCovered) +
     line('went home for someone', sheet.wentHomeForSomeone) + line('low-census hours', sheet.releasedHours) + '</div></div>' : '';
-  const rows = table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + (entry.regular ? '' : ' light') + '"><th scope="row">' + h(entry.person) +
-    (entry.weekendOnly ? ' <small>weekend only</small>' : entry.regular ? '' : ' <small>' + h(entry.status === 'PRN' ? 'PRN' : 'few shifts') + '</small>') + '</th><td>' + entry.shifts + '</td><td>' + entry.weekend + '</td><td>' +
-    (entry.weekendOnly ? '–' : entry.weekendFair.toFixed(1)) + '</td><td class="gap ' + (entry.weekendOnly || Math.abs(entry.weekendGap) < 1 ? 'even' : entry.weekendGap > 0 ? 'over' : 'under') + '">' +
-    (entry.weekendOnly ? '–' : signed(entry.weekendGap)) + '</td><td>' + (entry.holidays.length ? '<span title="' + h(entry.holidays.join(', ')) + '">' + entry.holidays.length + '</span>' : '0') +
+  const rows = table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + (entry.regular || entry.weekendVolunteer ? '' : ' light') + '"><th scope="row">' + h(entry.person) +
+    (entry.weekendOnly ? ' <small>weekend only</small>' : entry.weekendVolunteer ? ' <small>extra weekends by choice</small>' : entry.regular ? '' :
+      ' <small>' + h(entry.status === 'PRN' ? 'PRN' : 'few shifts') + '</small>') + '</th><td>' + entry.shifts + '</td><td>' + entry.weekend + '</td><td>' +
+    (entry.weekendOnly ? '–' : entry.weekendFair.toFixed(1)) + '</td><td class="gap ' +
+    (entry.weekendVolunteer ? 'credit' : entry.weekendOnly || Math.abs(entry.weekendGap) < 1 ? 'even' : entry.weekendGap > 0 ? 'over' : 'under') + '">' +
+    (entry.weekendOnly ? '–' : entry.weekendVolunteer ? '+' + entry.weekendExtra.toFixed(1) + ' by choice' : signed(entry.weekendGap)) + '</td><td>' + (entry.holidays.length ? '<span title="' + h(entry.holidays.join(', ')) + '">' + entry.holidays.length + '</span>' : '0') +
     '</td><td>' + entry.charge + '</td><td>' + entry.icu + '</td></tr>').join('');
   return '<section class="intro"><div><div class="eyebrow">WHO CARRIED WHAT</div><h1>Fairness</h1><p>Counted from the schedule in this workspace. These are outcomes of how the schedule was built, not anyone’s doing.</p></div></section>' +
     card + '<div class="calendar-toolbar"><div><div class="eyebrow">' + (table.from ? h(dayLabel(table.from, { month:'short', day:'numeric' }) + ' – ' + dayLabel(table.to, { month:'short', day:'numeric' })) : 'NO SHIFTS') +
@@ -200,9 +212,31 @@ function fairness() {
     (table.people.length ? '<div class="panel"><p class="fair-line"><b>' + table.withinOne + ' of ' + table.regulars + '</b> regulars are within one weekend turn of their fair share. The spread is <b>' +
       table.spread.toFixed(1) + '</b> turns. The aim is under one.</p>' +
       (table.next.length && table.spread >= 1 ? '<p class="subtle">Next weekend turns would go first to ' + h(table.next.join(', ')) + '.</p>' : '') +
+      table.volunteers.map(item => '<p class="subtle"><b>' + h(item.person) + '</b> has taken ' + item.extra.toFixed(1) +
+        ' weekend turns beyond a regular share by choice. Those turns are out of the rotation, so nobody else is measured against them.</p>').join('') +
       '<div class="fair-scroll"><table class="fair"><thead><tr><th scope="col">Name</th><th scope="col">Shifts</th><th scope="col">Weekend</th><th scope="col">Fair share</th><th scope="col">Difference</th><th scope="col">Holidays</th><th scope="col">Charge</th><th scope="col">ICU</th></tr></thead><tbody>' +
-      rows + '</tbody></table></div><p class="subtle">A weekend turn is a Saturday or Sunday day shift, or a Friday, Saturday or Sunday night. Fair share follows how many shifts each person works. Students are left out. Call-offs and declined requests are never counted.</p></div>' :
+      rows + '</tbody></table></div><p class="subtle">A weekend turn is a Saturday or Sunday day shift, or a Friday, Saturday or Sunday night. Fair share follows how many shifts each person works. Students are left out. Calling in sick and declined requests are never counted.</p>' +
+      '<p class="subtle">On a weekend-only position, or taking extra weekends by choice? ' + button('Set it in Staff details', 'staff-setup', 'class="text-button"') + '</p></div>' + lowCensus(pool) :
       '<div class="panel empty"><strong>No ' + (pool === 'N' ? 'night' : 'day') + ' shifts in this workspace.</strong></div>');
+}
+
+function lowCensus(pool) {
+  const table = census(state.assignments, pool, state.directory, state.releases, localToday());
+  const word = pool === 'N' ? 'night' : 'day';
+  const chip = item => button(h(dayLabel(item.date, { weekday:'short', month:'short', day:'numeric' })), 'over', 'class="chip" ' + valueAttr(item.date + '|' + pool));
+  const next = item => firstInLine(item.order).length === 1 ? 'next in line is ' + firstInLine(item.order)[0] : 'tied for next: ' + firstInLine(item.order).join(', ');
+  const shortDates = table.short.map(item => dayLabel(item.date, { month:'short', day:'numeric' }));
+  return '<div class="calendar-toolbar"><div><div class="eyebrow">MORE PEOPLE THAN USUAL</div><h2>Low census</h2></div></div><div class="panel">' +
+    (table.over.length ? '<p class="fair-line"><b>' + table.over.length + '</b> ' + word + ' shift' + (table.over.length === 1 ? ' lists' : 's list') + ' more than the usual <b>' + table.usual +
+      '</b>. Someone is likely to be released on each.</p>' : '<p class="fair-line">No ' + word + ' shift in this roster lists more than the usual <b>' + table.usual + '</b>.</p>') +
+    (table.upcoming.length ? '<div class="chip-list"><span class="subtle">Coming up</span>' + table.upcoming.map(item => '<div>' + chip(item) + ' <span class="subtle">' + h(next(item)) + '</span></div>').join('') + '</div>' : '') +
+    (table.unrecorded.length ? '<div class="chip-list"><span class="subtle">Past, nothing recorded yet</span><div>' + table.unrecorded.map(chip).join(' ') + '</div></div>' : '') +
+    (table.people.length ? '<div class="fair-scroll"><table class="fair"><thead><tr><th scope="col">Name</th><th scope="col">On those shifts</th><th scope="col">Share of the cuts</th><th scope="col">Released</th><th scope="col">Hours</th><th scope="col">Offered</th></tr></thead><tbody>' +
+      table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + '"><th scope="row">' + h(entry.person) + '</th><td>' + entry.onOver + '</td><td>' + entry.share.toFixed(2) +
+        '</td><td>' + entry.turns + '</td><td>' + entry.hours + '</td><td>' + entry.offered + '</td></tr>').join('') + '</tbody></table></div>' +
+      '<p class="subtle">Whoever has lost the fewest hours is next. Hours count the same whether a person offered or was sent, so offering never moves anyone to the front. Share of the cuts splits each extra person evenly between everyone listed on that shift.</p>' : '') +
+    (shortDates.length ? '<p class="subtle">' + shortDates.length + ' ' + word + ' shift' + (shortDates.length === 1 ? ' lists' : 's list') + ' fewer than usual: ' + h(shortDates.slice(0, 8).join(', ')) +
+      (shortDates.length > 8 ? ' and ' + (shortDates.length - 8) + ' more' : '') + '. Handwritten additions are not read, so check the page.</p>' : '') + '</div>';
 }
 
 function people() {
@@ -296,15 +330,31 @@ function dialogMarkup() {
       '<div class="actions">' + button('Start over', 'clear-draft', 'class="secondary"') +
       button('Publish to this workspace', 'publish', 'class="primary" ' + (!pending.assignments.length || unresolved ? 'disabled' : '')) + '</div>');
   }
+  if (type === 'over') {
+    const { date, shift } = ui.dialog;
+    const listed = state.assignments.filter(item => item.date === date && item.shift === shift && state.directory[normalizeName(item.person)]?.status !== 'Student');
+    const order = releaseOrder([...new Set(listed.map(item => item.person))], state.releases);
+    const first = firstInLine(order);
+    const usual = staffing(state.assignments, shift, state.directory).usual;
+    const done = state.releases.filter(item => item.date === date && item.shift === shift);
+    return shell('Low census · ' + shiftCaption({ date, shift }), '<p><b>' + order.length + '</b> people are listed and <b>' + usual + '</b> is usual.</p>' +
+      (first.length === 1 ? '<p>Next in line: <b>' + h(first[0]) + '</b>.</p>' : '<p>Tied for next: <b>' + h(first.join(', ')) + '</b>. They have lost the same hours, so this app has no basis to choose between them.</p>') +
+      (done.length ? '<p class="subtle">Recorded: ' + h(done.map(item => item.person + ', ' + item.hours + ' h, ' + (item.voluntary ? 'offered' + (item.inPlaceOf ? ' in place of ' + item.inPlaceOf : '') : 'sent home')).join('; ')) + '</p>' : '') +
+      '<div class="line-list">' + order.map(item => '<div><span><b>' + h(item.person) + '</b> <small>' + item.hours + ' hours lost so far' + (item.last ? ', last released ' + h(dayLabel(item.last, { month:'short', day:'numeric' })) : '') +
+        '</small></span>' + button('Went home', 'release', 'class="secondary" ' + valueAttr(listed.find(entry => isSame(entry.person, item.person)).key)) + '</div>').join('') + '</div>' +
+      '<p class="subtle">Whoever has lost the fewest hours goes first. Hours count the same whether a person offered or was sent.</p>');
+  }
   if (type === 'release') {
     const working = state.assignments.filter(item => item.date === row.date && item.shift === row.shift && state.directory[normalizeName(item.person)]?.status !== 'Student').map(item => item.person);
-    const order = releaseOrder(working, state.releases);
+    const order = releaseOrder([...new Set(working)], state.releases);
+    const first = firstInLine(order);
     return shell('Low census · ' + shiftCaption(row), '<p><b>' + h(row.person) + '</b> went home early.</p>' +
-      '<p class="subtle">Next in line for a cut on this shift: <b>' + h(order[0]?.person || '') + '</b> (' + (order[0]?.hours || 0) + ' hours so far). Hours count the same whether someone offered or was sent, so offering never moves a person to the front.</p>' +
+      '<p class="subtle">' + (first.length === 1 ? 'Next in line for a cut on this shift: <b>' + h(first[0]) + '</b> (' + order[0].hours + ' hours so far).' : 'Tied for next on this shift: <b>' + h(first.join(', ')) + '</b>.') +
+      ' Hours count the same whether someone offered or was sent, so offering never moves a person to the front.</p>' +
       '<form data-form="release"><input type="hidden" name="key" value="' + h(row.key) + '"><label>Hours not worked<input name="hours" type="number" min="0.5" max="12" step="0.5" required></label>' +
       '<label>How it happened<select name="how"><option value="voluntary">Offered to go home</option><option value="directed">Was sent home</option></select></label>' +
       '<label>If they offered, whose turn did they take?<select name="inPlaceOf"><option value="">Nobody else was up</option>' +
-      order.filter(item => !isSame(item.person, row.person)).map((item, index) => '<option' + (index === 0 && !isSame(order[0].person, row.person) ? ' selected' : '') + '>' + h(item.person) + '</option>').join('') +
+      order.filter(item => !isSame(item.person, row.person)).map(item => '<option' + (first.length === 1 && isSame(first[0], item.person) ? ' selected' : '') + '>' + h(item.person) + '</option>').join('') +
       '</select></label><div class="actions"><button class="primary">Save</button></div></form>');
   }
   if (type === 'people-review') {
@@ -408,7 +458,9 @@ function dialogMarkup() {
       '>Staff</option>' + ['Contract', 'PRN', 'Student'].map(status => '<option' + (profile.status === status ? ' selected' : '') + '>' + status + '</option>').join('') + '</select></label>' +
       '<label><span><input type="checkbox" name="day"' + (profile.skills.includes('D') ? ' checked' : '') + '> Qualified for day shift</span></label>' +
       '<label><span><input type="checkbox" name="night"' + (profile.skills.includes('N') ? ' checked' : '') + '> Qualified for night shift</span></label>' +
-      '<label><span><input type="checkbox" name="weekendOnly"' + (profile.arrangement === 'weekend-only' ? ' checked' : '') + '> Weekend-only position (left out of the weekend rotation)</span></label>' +
+      '<label>Weekends<select name="arrangement"><option value="">Regular rotation</option><option value="weekend-only"' + (profile.arrangement === 'weekend-only' ? ' selected' : '') +
+      '>Weekend-only position</option><option value="weekend-volunteer"' + (profile.arrangement === 'weekend-volunteer' ? ' selected' : '') + '>Regular position, taking extra weekends by choice</option></select></label>' +
+      '<p class="subtle">Either choice takes this person’s weekend shifts out of the rotation, so nobody else is measured against them. Extra weekends taken by choice are shown as credit.</p>' +
       '<button class="primary">Save staff details</button></form>');
   }
   if (type === 'data') return shell('Local workspace data', '<p>Clear the imported roster, source photos, messages and receipts from this browser and restore the sample workspace.</p>' +
@@ -670,6 +722,7 @@ async function act({action, value, kind}) {
     case 'audit': ui.dialog = { type:'audit' }; break;
     case 'pool': ui.pool = value; break;
     case 'release': if (row) ui.dialog = { type:'release', row }; break;
+    case 'over': { const [date, shift] = value.split('|'); ui.dialog = { type:'over', date, shift }; break; }
     case 'data': ui.dialog = { type:'data' }; break;
     case 'staff-setup': ui.dialog = { type:'staff-setup' }; break;
     case 'erase':
@@ -711,7 +764,8 @@ async function submit(form) {
       await commit('Board update', {}, previous => ({ ...previous, posts:[...previous.posts, { id:crypto.randomUUID(), ...message }] }));
       break;
     case 'profile': {
-      const profile = { person:data.person, status:data.status || null, skills:[data.day && 'D', data.night && 'N'].filter(Boolean), ...(data.weekendOnly ? { arrangement:'weekend-only' } : {}) };
+      const profile = { person:data.person, status:data.status || null, skills:[data.day && 'D', data.night && 'N'].filter(Boolean),
+        ...(['weekend-only', 'weekend-volunteer'].includes(data.arrangement) ? { arrangement:data.arrangement } : {}) };
       await commit('Staff details recorded', { ...profile }, previous => ({
         ...previous, directory:{ ...previous.directory, [normalizeName(profile.person)]:profile }
       }));

@@ -22,15 +22,17 @@ export function holidays(year) {
 export const isWeekendTurn = row => row.shift === 'N' ? [5, 6, 0].includes(weekday(row.date)) : [6, 0].includes(weekday(row.date));
 
 // One table for one pool (day shift or night shift).
-// directory: { name: { status, arrangement } }. Students are left out. People on a weekend-only arrangement are left out
-// of the weekend count, along with the weekend shifts they cover, so nobody else is measured against them.
+// directory: { name: { status, arrangement } }. Students are left out.
+// Two arrangements take a person, and the weekend shifts they work, out of the weekend rotation, so that nobody else
+// is measured against them: 'weekend-only' is a position, and 'weekend-volunteer' is someone on a regular position who
+// has offered to take extra weekends. The volunteer's turns beyond a regular share are shown as credit.
 export function ledger(assignments, shift, directory = {}) {
   const rows = assignments.filter(row => row.shift === shift && directory[key(row.person)]?.status !== 'Student');
   const named = new Map();
   for (const row of rows) {
     const id = key(row.person);
     if (!named.has(id)) named.set(id, { person: row.person, status: directory[id]?.status || null, weekendOnly: directory[id]?.arrangement === 'weekend-only',
-      shifts: 0, weekend: 0, charge: 0, icu: 0, extra: 0, holidays: [] });
+      weekendVolunteer: directory[id]?.arrangement === 'weekend-volunteer', shifts: 0, weekend: 0, charge: 0, icu: 0, extra: 0, holidays: [] });
     const entry = named.get(id);
     entry.shifts++;
     if (isWeekendTurn(row)) entry.weekend++;
@@ -46,14 +48,21 @@ export function ledger(assignments, shift, directory = {}) {
     const turns = pool.reduce((sum, entry) => sum + entry[field], 0), shifts = pool.reduce((sum, entry) => sum + entry.shifts, 0);
     for (const entry of pool) entry[field + 'Fair'] = shifts ? turns * entry.shifts / shifts : 0;
   };
+  // What a regular share would have been for a volunteer, had they stayed in the rotation.
   share(people.filter(entry => !entry.weekendOnly), 'weekend');
+  for (const entry of people) entry.weekendExtra = entry.weekendVolunteer ? Math.max(0, entry.weekend - entry.weekendFair) : 0;
+  const rotation = people.filter(entry => !entry.weekendOnly && !entry.weekendVolunteer);
+  const regularShare = new Map(people.map(entry => [entry, entry.weekendFair]));
+  share(rotation, 'weekend');
+  for (const entry of people) if (entry.weekendVolunteer) entry.weekendFair = regularShare.get(entry);
   share(people.filter(entry => entry.charge > 0), 'charge');
   share(people.filter(entry => entry.icu > 0), 'icu');
   const most = Math.max(0, ...people.map(entry => entry.shifts));
   for (const entry of people) {
     // Regulars set the picture. Someone who works a handful of shifts is listed but does not stretch the spread.
-    entry.regular = !entry.weekendOnly && (entry.status ? ['Staff', 'Contract'].includes(entry.status) && entry.shifts >= most * 0.4 : entry.shifts >= most * 0.6);
-    entry.weekendGap = entry.weekendOnly ? null : entry.weekend - entry.weekendFair;
+    entry.regular = !entry.weekendOnly && !entry.weekendVolunteer &&
+      (entry.status ? ['Staff', 'Contract'].includes(entry.status) && entry.shifts >= most * 0.4 : entry.shifts >= most * 0.6);
+    entry.weekendGap = entry.weekendOnly || entry.weekendVolunteer ? null : entry.weekend - entry.weekendFair;
     entry.chargeGap = entry.charge ? entry.charge - entry.chargeFair : null;
     entry.icuGap = entry.icu ? entry.icu - entry.icuFair : null;
   }
@@ -64,17 +73,68 @@ export function ledger(assignments, shift, directory = {}) {
     shift, people, from: dates[0] || null, to: dates.at(-1) || null,
     spread: gaps.length ? Math.max(...gaps) - Math.min(...gaps) : 0,
     withinOne: gaps.filter(gap => Math.abs(gap) < 1).length, regulars: gaps.length,
+    volunteers: people.filter(entry => entry.weekendVolunteer).map(entry => ({ person: entry.person, extra: entry.weekendExtra })),
     // Whoever is furthest below their share is first in line for the next weekend turn.
     next: people.filter(entry => entry.regular).sort((a, b) => a.weekendGap - b.weekendGap).slice(0, 3).map(entry => entry.person)
   };
 }
 
-// Low-census releases (VA). Voluntary and directed hours count together toward who is next, so that offering to go
-// home never puts someone first in line for a forced cut.
+// How many people a shift usually has, and the dates that have more or fewer. "Usual" is the most common headcount in
+// this roster, so nothing has to be configured. Students are not counted. A partial shift counts as a person.
+export function staffing(assignments, shift, directory = {}) {
+  const byDate = new Map();
+  for (const row of assignments) {
+    if (row.shift !== shift || directory[key(row.person)]?.status === 'Student') continue;
+    if (!byDate.has(row.date)) byDate.set(row.date, []);
+    if (!byDate.get(row.date).some(name => key(name) === key(row.person))) byDate.get(row.date).push(row.person);
+  }
+  const tally = new Map();
+  for (const names of byDate.values()) tally.set(names.length, (tally.get(names.length) || 0) + 1);
+  const usual = [...tally].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]?.[0] ?? 0;
+  const dates = [...byDate].map(([date, people]) => ({ date, shift, people, extra: people.length - usual })).sort((a, b) => a.date.localeCompare(b.date));
+  return { shift, usual, over: dates.filter(item => item.extra > 0), short: dates.filter(item => item.extra < 0) };
+}
+
+// Low-census releases (VA). Whoever has lost the fewest hours goes first. Voluntary and directed hours count together,
+// so that offering to go home never puts someone first in line for a forced cut. Between people with the same hours,
+// the one whose last release was longest ago goes first, again whether they offered or were sent. Anyone still level
+// is marked as tied: the app has no basis to pick.
 export function releaseOrder(working, releases = []) {
-  const hours = name => releases.filter(item => key(item.person) === key(name)).reduce((sum, item) => sum + Number(item.hours || 0), 0);
-  const last = name => releases.filter(item => key(item.person) === key(name) && !item.voluntary).map(item => item.date).sort().at(-1) || '';
-  return [...working].sort((a, b) => hours(a) - hours(b) || last(a).localeCompare(last(b)) || a.localeCompare(b)).map(person => ({ person, hours: hours(person) }));
+  const mine = name => releases.filter(item => key(item.person) === key(name));
+  const order = [...working].map(person => ({
+    person, hours: mine(person).reduce((sum, item) => sum + Number(item.hours || 0), 0),
+    last: mine(person).map(item => item.date).sort().at(-1) || ''
+  })).sort((a, b) => a.hours - b.hours || a.last.localeCompare(b.last) || a.person.localeCompare(b.person));
+  for (const item of order) item.first = item.hours === order[0].hours && item.last === order[0].last;
+  return order;
+}
+
+// Low census for one pool: the shifts that have more people than usual, how often each person is on one, and what each
+// person has given up so far. On a shift with four people where three are usual, each of the four carries a quarter of
+// that cut as their share (the carpool rule), so being scheduled on more of these shifts shows up as a larger share.
+export function census(assignments, shift, directory = {}, releases = [], today = '') {
+  const { usual, over, short } = staffing(assignments, shift, directory);
+  const named = new Map();
+  const entry = person => {
+    if (!named.has(key(person))) named.set(key(person), { person, onOver: 0, share: 0, turns: 0, hours: 0, offered: 0 });
+    return named.get(key(person));
+  };
+  for (const item of over) for (const person of item.people) { entry(person).onOver++; entry(person).share += item.extra / item.people.length; }
+  const pool = new Set(assignments.filter(row => row.shift === shift && directory[key(row.person)]?.status !== 'Student').map(row => key(row.person)));
+  for (const item of releases) {
+    if (item.shift !== shift || !pool.has(key(item.person))) continue;
+    const row = entry(item.person);
+    row.turns++; row.hours += Number(item.hours || 0);
+    if (item.voluntary) row.offered++;
+  }
+  const recorded = item => releases.some(release => release.date === item.date && release.shift === shift);
+  for (const item of over) { item.recorded = recorded(item); item.order = releaseOrder(item.people, releases); }
+  const people = [...named.values()].sort((a, b) => b.hours - a.hours || b.onOver - a.onOver || a.person.localeCompare(b.person));
+  return {
+    shift, usual, over, short, people,
+    upcoming: over.filter(item => !item.recorded && (!today || item.date >= today)),
+    unrecorded: over.filter(item => !item.recorded && today && item.date < today)
+  };
 }
 
 // One person's sheet: what they carried, and the times they helped someone else out.
@@ -89,6 +149,7 @@ export function statSheet(name, { assignments, requests = [], releases = [], dir
     person: name, shift, row,
     tradesAccepted: agreed.filter(request => request.kind === 'trade' && key(request.recipient) === key(name)).length,
     shiftsCovered: agreed.filter(request => request.kind === 'coverage' && key(request.recipient) === key(name)).length,
+    weekendExtra: row?.weekendExtra || 0,
     wentHomeForSomeone: own.filter(item => item.voluntary && item.inPlaceOf && key(item.inPlaceOf) !== key(name)).length,
     releasedHours: own.reduce((sum, item) => sum + Number(item.hours || 0), 0)
   };
