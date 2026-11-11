@@ -1,5 +1,5 @@
 import './style.css';
-import { SHIFTS, POLICY, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange } from './model.js';
+import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 
 const publicDemo = __PUBLIC_DEMO__;
@@ -30,7 +30,15 @@ const initial = {
   events: []
 };
 let state = loadState(storageKey, initial);
-let ui = { tab: 'schedule', date: '2026-11-13', view: 'weekend', dialog: null, pending: null, busy: null, notice: '' };
+// The starter rules live in code. A saved workspace picks up a new rule version on load.
+if (state.policy?.version !== POLICY.version) state = { ...state, policy: POLICY };
+const agreedRequestFor = row => state.requests.find(request => request.status === AGREED_STATUS &&
+  [request.from?.key, request.to?.key].includes(row.key));
+const checkChange = (details, exceptId = null) => evaluateChange({
+  roster: projectRoster(state.assignments, state.requests), directory: state.directory,
+  hoursVerified: state.hoursVerified, policy: state.policy, committed: committedKeys(state.requests, exceptId), ...details
+});
+let ui ={ tab: 'schedule', date: '2026-11-13', view: 'weekend', dialog: null, pending: null, busy: null, notice: '' };
 let sourceUrl = null;
 let writing = false;
 const h = value => String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -192,7 +200,9 @@ function dialogMarkup() {
   if (type === 'shift') return shell(shiftCaption(row), '<p><b>' + h(row.person) + '</b> · ' + h(row.date) + '</p>' +
     (row.sources.length ? '<p>' + button('See photo source', 'source', 'class="text-button" ' + valueAttr(row.key)) +
       ' <small>' + h(row.sources.length + ' source page(s)') + '</small></p>' : '<p class="subtle">Fictional starting roster. Import sample photos to see image evidence.</p>') +
-    (isMine(row) ? '<div class="actions">' + button('Trade this shift', 'matches', 'class="primary" data-kind="trade" ' + valueAttr(row.key)) +
+    (agreedRequestFor(row) ? '<p class="subtle">This shift is part of an agreed request that is queued for review. It cannot be offered again until that is settled.</p>' +
+      '<div class="actions">' + button('Open the request', 'thread', 'class="secondary" ' + valueAttr(agreedRequestFor(row).id)) + '</div>' :
+    isMine(row) ? '<div class="actions">' + button('Trade this shift', 'matches', 'class="primary" data-kind="trade" ' + valueAttr(row.key)) +
       button('Find coverage', 'matches', 'class="secondary" data-kind="coverage" ' + valueAttr(row.key)) + '</div>' : ''));
   if (type === 'source') return shell('Original photo', chosen ? imageMarkup(chosen, row.sources[0]) : '<p>The photo is unavailable in this browser.</p>');
   if (type === 'matches') {
@@ -257,9 +267,8 @@ function matches(row, kind) {
   const pool = kind === 'trade' ? state.assignments.filter(to => to.date !== row.date && !isSame(to.person,row.person)).map(to => ({
     to, recipient: to.person
   })) : Object.values(directory).filter(profile => !isSame(profile.person,row.person)).map(profile => ({ recipient: profile.person }));
-  return pool.map(match => ({ ...match, check: evaluateChange({
-    roster: state.assignments, from: row, kind, directory, hoursVerified: state.hoursVerified, policy: state.policy, ...match
-  }) })).filter(match => match.check.status !== 'blocked')
+  return pool.map(match => ({ ...match, check: checkChange({ from: row, kind, ...match }) }))
+    .filter(match => match.check.status !== 'blocked')
     .sort((a,b) => (a.check.status === b.check.status ? 0 : a.check.status === 'eligible' ? -1 : 1) ||
       (a.to && b.to ? Math.abs(toDate(a.to.date) - toDate(row.date)) - Math.abs(toDate(b.to.date) - toDate(row.date)) : 0) ||
       a.recipient.localeCompare(b.recipient)).slice(0,40);
@@ -399,11 +408,10 @@ async function act({action, value, kind}) {
       if (!request || !isSame(state.actor, request.recipient) || request.status !== 'Awaiting reply') return;
       const activeFrom = state.assignments.find(item => item.key === request.from.key);
       const activeTo = request.to ? state.assignments.find(item => item.key === request.to.key) : undefined;
-      const check = activeFrom && (!request.to || activeTo) ? evaluateChange({
-        roster:state.assignments, from:activeFrom, to:activeTo, recipient:request.recipient, kind:request.kind,
-        directory:state.directory, hoursVerified:state.hoursVerified, policy:state.policy
-      }) : { status:'blocked', reason:'An assignment changed after the request was opened.' };
-      const status = value === 'decline' ? 'Declined' : check.status === 'blocked' ? 'Blocked after recheck' : 'Both agreed · queued for review';
+      const check = activeFrom && (!request.to || activeTo) ? checkChange({
+        from:activeFrom, to:activeTo, recipient:request.recipient, kind:request.kind
+      }, request.id) : { status:'blocked', reason:'An assignment changed after the request was opened.' };
+      const status = value === 'decline' ? 'Declined' : check.status === 'blocked' ? 'Blocked after recheck' : AGREED_STATUS;
       await commit('Request response', { id:request.id, status, check }, previous => ({
         ...previous, requests:previous.requests.map(item => item.id === request.id ? { ...item, status, check } : item)
       }));
@@ -473,9 +481,15 @@ async function submit(form) {
     case 'request': {
       const { row, kind, chosen } = ui.dialog;
       if (!isMine(row)) return;
+      const check = checkChange({ from:row, to:chosen.to, recipient:chosen.recipient, kind });
+      if (check.status === 'blocked') throw new Error(check.reason);
+      if (state.requests.some(entry => entry.status === 'Awaiting reply' && entry.from.key === row.key &&
+          entry.to?.key === chosen.to?.key && isSame(entry.recipient, chosen.recipient))) {
+        throw new Error('You already sent this request to ' + chosen.recipient + '. Open it from Requests.');
+      }
       const id = crypto.randomUUID();
       const request = {
-        id, from:row, to:chosen.to, recipient:chosen.recipient, kind, check:chosen.check,
+        id, from:row, to:chosen.to, recipient:chosen.recipient, kind, check,
         status:'Awaiting reply', messages:body ? [message] : []
       };
       await commit('Request opened', { id, kind, from:assignmentKey(row), to:chosen.to?.key, recipient:chosen.recipient, check:chosen.check },

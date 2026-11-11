@@ -20,4 +20,4 @@ Build a simple private department app around a schedule, a department board, and
 
 ## Next work
 
-Reproduce the baseline and follow the owner's next instruction. The most recent discussed technical step is preparing iPhone and Android packages with Capacitor and verifying the existing photo import on each platform. Real schedule images were still pending at the original build checkpoint. Keep layout adaptation and phone import usability ahead of expanding settings or unrelated features.
+Reproduce the baseline and follow the owner's next instruction. Read `docs/DIRECTION.md` first. It records decisions made after the handoff and is newer than the handoff where the two differ. Native iPhone and Android packaging with Capacitor was the last step discussed before the handoff. It is deferred until the owner decides, in favor of a phone-first web app joined by a link. Real schedule images were still pending at the original build checkpoint. Keep layout adaptation and phone import usability ahead of expanding settings or unrelated features.
