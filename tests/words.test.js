@@ -36,7 +36,8 @@ test('shorthand and misspellings are read as known words, and the change is repo
 test('the department’s other words for a thing are added to what is looked for', () => {
   assert.ok(expand('how do i get pto').includes('leave'));
   assert.ok(expand('can i swap shifts').includes('trade'));
-  assert.ok(expand('who got called off').includes('low census'));
+  assert.ok(expand('who was sent home').includes('low census'));
+  assert.equal(expand('who called off sick').includes('low census'), false);
   assert.deepEqual(expand('where are the filters'), []);
   assert.ok(expand('codes', [['code blue', 'codes']]).includes('code blue'));
 });

@@ -22,9 +22,13 @@ The Fairness tab is a kept record of who carried what. Everyone sees their own s
 
 The first release uses an illustrative Indianapolis department profile with day and night shifts. Eligibility based on a photo import remains provisional until current hours and staff attributes can be checked. A request can reach both agreed and queued for review. Official roster edits and real coworker notifications require an authorized shared deployment and integration.
 
-**Ask**, in the header on every screen, looks up supported questions in the workspace's own records: when someone works, who is on, what is new on the board, what is due, how to reach someone, and matching passages in added documents. Answers name and open their sources. It uses question patterns and text matching, with no language model; unfamiliar wording can miss a record. Nothing typed into it leaves the device.
+**Ask**, in the header on every screen, looks up supported questions in the workspace's own records: when someone works, who is on, what is new on the board, what is due, how to reach someone, and matching passages in added documents. It reads shorthand and near-spellings, shows its interpretation, and retains the person/date/shift in short follow-ups. Answers name and open their sources. It uses question patterns and text matching, with no language model; unfamiliar wording can miss a record. Ambiguous staff names require clarification. Nothing is sent to an AI service.
 
-A line at the top of every screen says the app is not an official hospital product and that no patient information belongs in it, and a first-use notice has to be acknowledged. Writing that has the shape of patient information is stopped once before it is posted. Every change, post, file and question leaves a hash-linked receipt with a SHA-256 fingerprint. **Activity log** checks the whole chain and shows the latest fingerprint to keep elsewhere as a checkpoint.
+A notice on each screen and sheet says this is an independent staff project, not an official CRH product, and prohibits patient information. The first-use notice requires acknowledgement. A limited text screen blocks detected patient-detail patterns; pressing again does not override it. Media and uploaded document contents are not inspected. Hashing does not prevent disclosure, encrypt content or establish hospital approval.
+
+**Learning** is explicit relevance feedback, not policy approval. After opening a passage, **Yes, remember this wording** saves search words bound to that exact source version. A custodian can save human-written notes and their sources; stale linked notes stop matching, and notes cannot override live roster answers or restricted fairness lookups. Routine questions remain transient. Sending a question first opens a review that explains its words will be saved in the workspace and backups. Taught-note wording is saved only through the labelled learning action.
+
+**Activity log** checks receipt links and hashes, and separately checks retained posts, files and documents against their recorded fingerprints. Large files use a SHA-256 chunk-manifest fingerprint covering every byte. Older items and unavailable media are reported as unverified or unavailable. A complete fingerprint saved independently can expose tail deletion or history replacement. These are local, unsigned receipts using the selected profile and device clock, not authenticated identities or active monitoring.
 
 Controls are sized for phones: 60 px for a main action, 48 px for any other control and 16 px text, with an **Aa** button for larger text. `docs/USER-TEST.md` is a one-page sheet for watching coworkers try five tasks.
 
@@ -39,6 +43,10 @@ npm run build
 npm run build:demo
 npm run dev
 ```
+
+For simulated interface checks, run `npm run build`, install `jsdom@26.1.0` into a temporary directory and run `scripts/check-ask-ui.cjs` with its `node_modules` on `NODE_PATH`. This uses fictional data and the production bundle; it does not test a real browser, microphone or physical phone.
+
+An exported receipt history can be checked independently with `node scripts/verify-receipts.mjs EXPORT.json FULL_CHECKPOINT_HASH`. The optional checkpoint must come from a separately retained trusted copy. Without one, the check establishes internal consistency only. It does not authenticate a person, establish a trusted time or prove factual correctness.
 
 The normal build creates `dist/`. The public demo build creates `dist-demo/` and disables the private file input. The GitHub Actions workflow builds and deploys only `dist-demo/`. Set the repository's Pages source to GitHub Actions. Source and demo fixtures are synthetic. Keep employer screenshots and all private imports out of Git, issue attachments, and Pages.
 

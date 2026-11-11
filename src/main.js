@@ -7,8 +7,9 @@ import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, relea
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
 import { localBoard } from './backend.js';
 import { SUGGESTIONS, ask, pretty as prettyDate } from './ask.js';
-import { keywords } from './words.js';
+import { keywords, qualifiers } from './words.js';
 import { patientSigns } from './guard.js';
+import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
@@ -92,7 +93,7 @@ const checkChange = (details, exceptId = null) => evaluateChange({
   hoursVerified: state.hoursVerified, policy: state.policy, committed: committedKeys(state.requests, exceptId), ...details
 });
 // The notice is shown once on each device and answered with a press, before anything else.
-const noticeKey = 'department-hub-notice-v1';
+const noticeKey = 'department-hub-notice-v2';
 let noticeSeen = loadState(noticeKey, null);
 let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: noticeSeen ? null : { type:'notice' }, pending: loadDraft(), busy: null, notice: '', flash: '' };
 // Text size is a setting of this device, not of the workspace. It scales every rem in sizes.css.
@@ -120,6 +121,8 @@ const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Boar
   over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog' };
 // When the board was last opened on this device, so Ask can say what is new since then.
 const seenKey = storageKey + '-seen';
+let sourceVersions = {};
+const versionsFor = async documents => Object.fromEntries(await Promise.all(documents.map(async doc => [doc.id, await documentVersion(doc)])));
 let boardSeen = loadState(seenKey, null);
 function markBoardSeen(value = new Date().toISOString()) {
   boardSeen = value;
@@ -127,41 +130,37 @@ function markBoardSeen(value = new Date().toISOString()) {
 }
 const askWorld = () => ({ today: localToday(), now:new Date().toISOString(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
   documents: state.documents, releases: state.releases, requests: state.requests, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt,
-  answers: state.answers, learned: state.learned, last: ui.askContext });
-// A fingerprint is the SHA-256 of the content. It lets a receipt prove later what was posted or asked, and when, without
-// the receipt holding the words themselves.
-const sha256 = async data => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', typeof data === 'string' ? new TextEncoder().encode(data) : data))).map(byte => byte.toString(16).padStart(2, '0')).join('');
-async function fileFingerprint(file) {
-  const whole = file.size <= 64 * 1024 * 1024, part = 8 * 1024 * 1024;
-  const data = await (whole ? file : new Blob([file.slice(0, part), file.slice(-part)])).arrayBuffer();
-  return { bytes:file.size, sha256:await sha256(data), ...(whole ? {} : { covers:'the first and last 8 MB' }) };
+  answers: state.answers, learned: state.learned, last: ui.askContext, versions:sourceVersions });
+function currentAsk(dialog = ui.dialog) {
+  const signs = patientSigns(dialog?.q || '');
+  if (signs.length) return { title:'Remove patient details before asking.', lines:['The text screen flagged ' + signs.join(', ') + '. No records were searched.'],
+    items:[], source:'Patient-information screen; it cannot detect every disclosure.', empty:true, kind:'blocked', context:null };
+  return ask(dialog.q, { ...askWorld(), last:dialog.previousContext });
 }
 async function askAndLog(q) {
-  const result = ask(q, askWorld()), warned = patientSigns(q);
+  sourceVersions = await versionsFor(state.documents);
+  const dialog = { type:'ask', q, previousContext:ui.askContext }, result = currentAsk(dialog);
   ui.askContext = result.context;
-  ui.lastAsk = ui.dialog = { type:'ask', q, result, warned };
-  await commit('Question asked', { fingerprint:await sha256(q.trim().toLowerCase()), kind:result.kind, answered:!result.empty, opened:result.items.slice(0, 3).map(item => String(item.go || 'answer').split('|')[0]),
-    ...(warned.length ? { warned } : {}) }, previous => previous);
+  ui.lastAsk = ui.dialog = dialog;
+  await commit(result.kind === 'blocked' ? 'Question blocked by text screen' : 'Question asked', {
+    ...(result.kind === 'blocked' ? {} : { fingerprint:await sha256(q.trim().toLowerCase()) }),
+    engine:'ask-10-review-1', build:BUILD, kind:result.kind, answered:!result.empty,
+    resolved:result.context?.when || null,
+    sources:result.items.map(item => ({ reference:item.go || 'note',
+      ...(item.go?.startsWith('doc|') ? { version:sourceVersions[item.go.split('|')[1]] } : {}) })),
+    answerHash:await sha256(JSON.stringify({ title:result.title, lines:result.lines, items:result.items, source:result.source }))
+  }, previous => previous);
 }
-// Stops once when the words look like they describe a patient. A second press goes through, and the receipt says it did.
+// A repeated press never overrides this screen. Files' contents are not inspected; the visible notice explains that.
 function patientCheck(form, text) {
   const signs = patientSigns(text);
-  if (!signs.length || form.dataset.sure === text) return signs;
-  form.dataset.sure = text;
-  const note = form.querySelector('.refusal');
-  if (note) { note.textContent = 'Stop and check. This may include patient information: ' + signs.join(', ') + '. Take it out. If it is not about a patient, press the button again.'; note.scrollIntoView({ block:'nearest' }); }
+  if (!signs.length) return signs;
+  let note = form.querySelector('.refusal');
+  if (!note) { note = document.createElement('p'); note.className = 'refusal'; note.setAttribute('role', 'alert'); form.append(note); }
+  note.textContent = 'Remove possible patient details before saving: ' + signs.join(', ') + '. Repeated presses do not override this screen. It can miss other forms of patient information.';
+  note.scrollIntoView({ block:'nearest' });
+  void commit('Text screen blocked saving', { surface:form.dataset.form, signs }, previous => previous).catch(error => { note.textContent += ' The audit could not be saved: ' + error.message; });
   return null;
-}
-// Checks every receipt against its own fingerprint and against the one before it.
-async function verifyReceipts(events) {
-  let previous = null;
-  for (let index = 0; index < events.length; index++) {
-    const { hash, ...payload } = events[index];
-    if (payload.previousHash !== previous) return { ok:false, at:index + 1, why:'does not follow the receipt before it' };
-    if (await sha256(JSON.stringify(payload)) !== hash) return { ok:false, at:index + 1, why:'has been changed since it was written' };
-    previous = hash;
-  }
-  return { ok:true, count:events.length };
 }
 
 const DOC_LIMIT = 300000, DOC_TOTAL = 1500000;
@@ -187,7 +186,7 @@ function forgetMedia(ids) {
   for (const id of ids) { if (mediaUrls.get(id)) URL.revokeObjectURL(mediaUrls.get(id)); mediaUrls.delete(id); mediaBlobs.delete(id); }
 }
 let sourceUrl = null;
-let writing = false;
+let saveQueue = Promise.resolve();
 const h = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[char]);
@@ -229,25 +228,28 @@ const contactButtons = (person, body) => {
   return call ? '<a class="contact-link" href="' + h(call) + '">Call</a><a class="contact-link" href="' + h(text) + '">Text</a>' : '';
 };
 
-async function receipt(type, details) {
+async function receipt(type, details, actor) {
   const payload = {
     id: crypto.randomUUID(), time: new Date().toISOString(), type,
     rosterRevision: state.revision, policyVersion: state.policy.version,
-    previousHash: state.events.at(-1)?.hash || null, actor: state.actor, details
+    previousHash: state.events.at(-1)?.hash || null, actor, details
   };
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(payload)));
   return { ...payload, hash: Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('') };
 }
-async function commit(type, details, update) {
-  if (writing) throw new Error('Another change is still being saved.');
-  writing = true;
-  try {
-    const event = await receipt(type, details);
-    const next = update(state);
+function commit(type, details, update) {
+  const actor = state.actor, recorded = structuredClone(details);
+  const task = saveQueue.then(async () => {
+    const event = await receipt(type, recorded, actor);
+    const next = { ...update(state) };
     next.events = [...state.events, event];
+    const versions = next.documents !== state.documents ? await versionsFor(next.documents) : sourceVersions;
     saveState(storageKey, next);
     state = next;
-  } finally { writing = false; }
+    sourceVersions = versions;
+  });
+  saveQueue = task.catch(() => {});
+  return task;
 }
 
 function top() {
@@ -487,7 +489,7 @@ function render() {
   const playing = [...app.querySelectorAll('[data-media]')].filter(player => player.currentTime > 0 && !player.ended)
     .map(player => ({ id: player.dataset.media, time: player.currentTime, on: !player.paused }));
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
-  app.innerHTML = top() + '<main>' + button('<b>Not an official hospital product.</b> No patient information. Everything is logged. <u>Read more</u>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
+  app.innerHTML = top() + '<main>' + button('<b>Independent staff project—not an official CRH product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
     '<div class="top-tools">' + button('Aa', 'text-size', 'class="text-size" title="Text size" aria-label="Text size: ' + TEXT_NAMES[textSize] + '. Press to change."') +
     button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board or the documents"') +
     '<label class="actor">Viewing as <select id="actor" aria-label="Viewing as">' +
@@ -513,6 +515,7 @@ function render() {
 function shell(title, body) {
   return '<dialog data-dialog="' + ui.dialog.type + '" aria-labelledby="dialog-title"><div class="dialog-head"><h2 id="dialog-title">' +
     h(title) + '</h2>' + (ui.dialog.type === 'notice' && !noticeSeen ? '' : button('×', 'close', 'class="close" aria-label="Close dialog"')) + '</div><div class="dialog-body">' +
+    (ui.dialog.type === 'notice' ? '' : '<p class="subtle">Independent staff project—not an official CRH product. No patient information. Recorded actions use audit receipts.</p>') +
     (ui.flash ? '<p class="flash" role="status">' + h(ui.flash) + '</p>' : '') + body + '</div></dialog>';
 }
 
@@ -677,14 +680,14 @@ function dialogMarkup() {
   if (type === 'audit') {
     const head = state.events.at(-1)?.hash || '';
     const who = event => isKeeper() || isSame(event.actor, state.actor) ? ' · ' + event.actor : '';
-    return shell('Activity log', '<p class="subtle">Every change, post, upload, removal and question leaves a receipt: what it was, when, the name in use and a fingerprint. Each receipt carries the fingerprint of the one before it, so a changed or missing receipt shows when the log is checked. ' +
+    return shell('Activity log', '<p class="subtle">Changes, questions and recorded access requests leave hash-linked receipts. They record the selected profile, device time and source fingerprints. No authenticated identity or active human monitoring is provided. Internal changes and missing middle entries can be detected; detecting a missing tail or replaced log requires a checkpoint kept separately. ' +
       (isKeeper() ? 'You keep the record, so you see every name.' : 'You see your own name. Whoever keeps the record sees them all.') + '</p>' +
       (state.events.length ? '<p><b>' + state.events.length + ' receipts.</b> The newest 25:</p><ul class="compact">' + [...state.events].reverse().slice(0,25).map(event => '<li>' +
         h(event.type + who(event) + ' · ' + timeLabel(event.time) + ' · ' + event.hash.slice(0,12)) + '</li>').join('') + '</ul>' : '<p>Nothing recorded yet.</p>') +
-      '<div class="actions">' + button('Check every receipt', 'verify', 'class="secondary"') + button('Export receipts', 'export', 'class="secondary"') +
+      '<div class="actions">' + button('Check every receipt', 'verify', 'class="secondary"') + button('Check retained posts, files and documents', 'verify-content', 'class="secondary"') + (isKeeper() ? button('Export receipts', 'export', 'class="secondary"') : '') +
       (!publicDemo ? button('Backup and restore', 'data', 'class="text-button"') : '') + '</div>' +
       (head ? '<h3>Latest fingerprint</h3><p class="mark">' + h(head) + '</p><p class="subtle">Whoever holds this device could replace the whole log. A fingerprint kept somewhere else is what catches that. Copy this one and send it to yourself or a coworker now and then. ' +
-        'Later, paste it below. If it is still in the log, nothing up to that point was rewritten.</p><div class="actions">' + button('Copy the latest fingerprint', 'mark-copy', 'class="secondary"') + '</div>' +
+        'Later, paste the complete fingerprint below to check it against the whole current chain. This checks integrity, not the truth of the entries or the identity of a person.</p><div class="actions">' + button('Copy the latest fingerprint', 'mark-copy', 'class="secondary"') + '</div>' +
         '<form data-form="mark"><label>An earlier fingerprint<input name="mark" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="64" placeholder="Paste it here"></label>' +
         '<div class="actions inline"><button class="secondary">Look for it in the log</button></div></form>' : ''));
   }
@@ -733,15 +736,19 @@ function dialogMarkup() {
     button('Keep it', 'close', 'class="secondary"') + button('Remove it', 'remove-post-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
   if (type === 'notice') return shell('Before you use this', '<p><b>This is not an official hospital product.</b> It is run by department staff to make the schedule and department news easier to follow. The hospital’s own systems stay the official record.</p>' +
     '<p><b>Never put patient information here.</b> No names, faces, monitors, charts, record numbers or anything that could point to a patient, in a post, a picture, a video, a recording or a question.</p>' +
-    '<p><b>What you do here is logged.</b> Every post, upload, edit, removal and question leaves a dated receipt with the name in use. The receipts are chained with cryptographic fingerprints, and each post, file and question is fingerprinted too, so it can be shown later what was there and when, even after it is removed. This is for everyone’s safety.</p>' +
+    '<p><b>Recorded actions use cryptographic audit receipts.</b> Changes, question lookups and recorded access requests keep fingerprints and selected source versions. Routine receipts do not keep question text. Sending a reviewed question or remembering wording saves that text or its search words in this browser and in backups.</p>' +
+    '<p><b>Hashing does not protect patient information.</b> It is not encryption, a patient-information detector, hospital approval or proof of who acted. The text screen checks only some patterns; it does not inspect uploaded images, video, audio or document-file contents. No one is actively monitoring this device. Deleted content cannot be recovered from its fingerprint.</p>' +
+    '<p class="subtle">Receipts use the selected Viewing as profile and this device’s clock. Whoever controls this browser can replace the whole history; keep an independent checkpoint to detect replacement. Keep backups and exports private.</p>' +
     (noticeSeen ? '<p class="subtle">Acknowledged on this device ' + h(timeLabel(noticeSeen.at)) + ', viewing as ' + h(noticeSeen.by) + '.</p><div class="actions">' + button('Close', 'close', 'class="secondary"') + '</div>' :
       '<div class="actions">' + button('I understand', 'notice-ok', 'class="primary"') + '</div>'));
   if (type === 'teach') {
+    if (!isKeeper()) return shell('Record keeper access', '<p>Switch to the record keeper’s profile to manage taught answers. Profile selection is a local courtesy until accounts exist.</p>');
     const picked = state.unanswered.find(item => item.id === ui.dialog.pick);
     if (picked) return shell('Answer this once', '<p class="fair-line">' + h(picked.text) + '</p><form data-form="teach"><input type="hidden" name="id" value="' + h(picked.id) + '">' +
       '<label>The answer<textarea name="answer" rows="4" required maxlength="1200" placeholder="Write it the way you would say it to a coworker"></textarea></label>' +
       '<label>Who says so, or which document<input name="source" maxlength="120" autocomplete="off" placeholder="Lead, Nov 10. Or: Time off policy, section 3"></label>' +
-      '<p class="subtle">Ask will give this answer, with your name and the date, to questions like this one. ' + RULE + '</p><p class="refusal" role="alert"></p>' +
+      '<label>Link an added source document<select name="documentId"><option value="">General department note; no document authority</option>' + state.documents.map(doc => '<option value="' + h(doc.id) + '">' + h(doc.title) + '</option>').join('') + '</select></label>' +
+      '<p class="subtle">This is a human-written custodian note, not official policy approval. A linked note stops matching when its source changes or is removed. Live roster answers and document passages take precedence. ' + RULE + '</p><p class="refusal" role="alert"></p>' +
       '<div class="actions">' + button('Back', 'teach-list', 'class="secondary"') + '<button class="primary">Save the answer</button></div></form>');
     return shell('What Ask has been taught', '<h3>Waiting for an answer</h3>' + (state.unanswered.length ? '<div class="line-list">' + state.unanswered.map(item => '<div><span><b>' + h(item.text) + '</b> <small>sent ' + h(prettyDate(item.at.slice(0, 10))) +
         '</small></span><span class="pair">' + button('Answer it', 'teach-pick', 'class="secondary" ' + valueAttr(item.id)) + button('Dismiss', 'teach-drop', 'class="secondary" ' + valueAttr(item.id)) + '</span></div>').join('') + '</div>' : '<p class="subtle">Nothing is waiting.</p>') +
@@ -749,21 +756,31 @@ function dialogMarkup() {
         '</small></span>' + button('Remove', 'teach-remove', 'class="secondary" ' + valueAttr(item.id)) + '</div>').join('') + '</div>' : '<p class="subtle">None yet.</p>') +
       '<div class="actions">' + button('Back to Ask', 'ask-back', 'class="secondary"') + '</div>');
   }
+  if (type === 'note') {
+    const note = state.answers.find(entry => entry.id === id);
+    return shell('Custodian note', note ? '<p class="fair-line">' + h(note.answer) + '</p><p class="subtle">Recorded as ' + h(note.by) + ' · ' + h(timeLabel(note.at)) + '. Not official policy. ' + h(note.source || 'No source named.') + '</p>' +
+      (note.documentId ? '<p>' + button('Open linked document', 'doc-open', 'class="secondary" ' + valueAttr(note.documentId)) + '</p>' : '') +
+      '<p>' + button('Back to Ask', 'ask-back', 'class="secondary"') + '</p>' : '<p>This note has been removed.</p>');
+  }
+  if (type === 'send-question') return shell('Review the question to save', '<form data-form="send-question"><label>Question<textarea name="question" maxlength="200" required>' + h(ui.dialog.q || '') + '</textarea></label>' +
+    '<p class="subtle">Sending saves these exact words for the record keeper in this browser and in backups. They remain in a taught answer if the keeper answers it. Remove personal or patient details first. Everyone with control of this browser can access its data.</p><p class="refusal" role="alert"></p><div class="actions">' +
+    button('Cancel', 'ask-back', 'class="secondary"') + '<button class="primary">Save reviewed question</button></div><input type="hidden" name="teach" value="' + (ui.dialog.teach ? 'yes' : '') + '"></form>');
   if (type === 'ask') {
     const { q = '' } = ui.dialog;
     // Recheck the current records and viewer every time; never reopen a cached keeper-only answer.
-    const result = q ? ask(q, askWorld()) : null;
+    const result = q ? currentAsk() : null;
+    const canRemember = result?.taught || (ui.dialog.opened?.startsWith('doc|') && result?.items.some(entry => entry.go === ui.dialog.opened));
     const item = entry => '<div class="ask-item"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h(entry.sub) + '</small>' : '') + '</div>' +
       (entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
     return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
       '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
-      (ui.dialog.warned?.length ? '<p class="refusal shown" role="alert">That question looks like it has patient details in it (' + h(ui.dialog.warned.join(', ')) + '). Ask never needs them. The words were not kept, but the question was logged.</p>' : '') +
       (result ? '<div class="ask-answer" role="status">' + (result.read ? '<p class="subtle">Read as: “' + h(result.read) + '”</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') + result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.map(item).join('') +
         '<p class="subtle">From: ' + h(result.source) + '</p>' +
-        (ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' : ui.dialog.no || result.empty ? '<div class="actions wrap">' + button('Send it to whoever keeps the record', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
+        (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' : ui.dialog.no || result.empty ? '<div class="actions wrap">' + button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
           (isKeeper() ? button('Teach the answer', 'ask-teach', 'class="secondary"') : '') + '</div>' :
-          '<div class="actions wrap"><span class="subtle">Did that answer it?</span>' + button('Yes', 'ask-yes', 'class="secondary"') + button('No', 'ask-no', 'class="secondary"') + '</div>') + '</div>' :
-        '<p class="subtle">It looks up supported questions in this workspace and opens the records it finds. Nothing you type leaves this device. Each question is logged by its fingerprint, not its words.</p>') +
+          '<div class="actions wrap"><span class="subtle">Did that answer it?</span>' + button(canRemember ? 'Yes, remember this wording' : 'Yes', 'ask-yes', 'class="secondary"') + button('No', 'ask-no', 'class="secondary"') + '</div>' +
+          (canRemember ? '<p class="subtle">Remembering saves wording or search words in this browser and backups. It records relevance feedback, not policy approval.</p>' : '')) + '</div>' :
+        '<p class="subtle">It looks up supported questions and opens the records it finds. Nothing is sent to an AI service. Question text is not routinely saved; sending it or remembering wording saves a reviewed example. Receipts record fingerprints and source versions.</p>') +
       '<div class="chip-list"><span class="subtle">Try</span><div>' + SUGGESTIONS.map((text, index) => button(h(text), 'ask-try', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' +
       '<p>' + button('Documents it can search (' + state.documents.length + ')', 'docs', 'class="text-button"') + ' ' +
         (isKeeper() ? button('Taught answers (' + state.answers.length + '), waiting (' + state.unanswered.length + ')', 'teach-list', 'class="text-button"') : '') + '</p>');
@@ -974,6 +991,7 @@ app.addEventListener('change', event => {
   if (event.target.id === 'actor') {
     state = { ...state, actor: event.target.value };
     ui.lastAsk = null;
+    ui.askContext = null;
     ui.dialog = null;
     saveState(storageKey, state);
     render();
@@ -1074,10 +1092,15 @@ async function startVoice() {
   }
 }
 
-function fail(error) { ui.notice = error.message || String(error); ui.dialog = null; render(); }
+function fail(error) { ui.notice = error.message || String(error); ui.flash = ui.notice; ui.dialog = noticeSeen ? null : { type:'notice' }; render(); }
 
 async function act({action, value, kind}) {
+  if (!noticeSeen && !['notice-ok', 'notice'].includes(action)) { ui.dialog = { type:'notice' }; render(); return; }
   const row = state.assignments.find(item => item.key === value);
+  // A request to open or export is recorded, not a claim that an external share/download finished.
+  if (['shift', 'source', 'thread', 'doc-open', 'ask-go', 'share', 'copy-share', 'backup', 'export', 'export-record', 'audit', 'verify', 'verify-content', 'mark-copy'].includes(action)) {
+    void commit('Record access requested', { action, reference:value || null, ...(action === 'doc-open' ? { version:sourceVersions[value] || null } : {}) }, previous => previous).catch(fail);
+  }
   if (action === 'more-lines') {          // added in place, so nothing already typed is lost
     const rows = app.querySelector('dialog .name-rows');
     if (rows) rows.insertAdjacentHTML('beforeend', Array.from({ length: 3 }, (_, index) => nameLine(null, rows.children.length + index)).join(''));
@@ -1094,11 +1117,12 @@ async function act({action, value, kind}) {
     case 'ask-open': ui.dialog = ui.lastAsk || { type:'ask' }; break;
     case 'ask-back': ui.dialog = ui.lastAsk || { type:'ask' }; break;
     case 'ask-try': await askAndLog(SUGGESTIONS[Number(value)]); break;
-    case 'ask-post': ui.draftPost = ui.dialog.q || ''; ui.tab = 'board'; ui.boardFilter = 'all'; ui.dialog = null; ui.scrollTo = '.composer'; markBoardSeen(); break;
+    case 'ask-post': if (patientSigns(ui.dialog.q).length) return; ui.draftPost = ui.dialog.q || ''; ui.tab = 'board'; ui.boardFilter = 'all'; ui.dialog = null; ui.scrollTo = '.composer'; markBoardSeen(); break;
     case 'ask-go': {
       const [kind, first, second] = String(value).split('|');
       if (ui.dialog?.type === 'ask' && ui.lastAsk) ui.lastAsk = { ...ui.lastAsk, opened:value };      // the one they chose to read is the one a yes is about
       if (kind === 'doc') { ui.dialog = { type:'doc', id:first, at:Number(second) }; ui.scrollTo = '#doc-mark'; break; }
+      if (kind === 'note') { ui.dialog = { type:'note', id:first }; break; }
       ui.dialog = null;
       if (kind === 'date') { ui.tab = 'schedule'; ui.view = 'week'; ui.date = first; ui.scrollTo = '.day-card[data-date="' + first + '"]'; }
       else if (kind === 'post') { ui.tab = 'board'; ui.boardFilter = 'all'; ui.scrollTo = '[data-post="' + CSS.escape(first) + '"]'; markBoardSeen(); }
@@ -1111,7 +1135,8 @@ async function act({action, value, kind}) {
     case 'doc-remove-yes': {
       const doc = state.documents.find(entry => entry.id === value);
       if (!doc) return;
-      await commit('Document removed', { id:doc.id, title:doc.title }, previous => ({ ...previous, documents: previous.documents.filter(entry => entry.id !== value) }));
+      await commit('Document removed', { id:doc.id, title:doc.title, version:sourceVersions[doc.id] }, previous => ({ ...previous,
+        documents:previous.documents.filter(entry => entry.id !== value), learned:previous.learned.filter(link => !link.go.startsWith('doc|' + doc.id + '|')) }));
       ui.dialog = { type:'docs' };
       ui.flash = 'Removed ' + doc.title + '.';
       break;
@@ -1178,7 +1203,9 @@ async function act({action, value, kind}) {
       const { restore } = ui.dialog;
       if (!restore) return;
       state = prepare(restore.state);
+      sourceVersions = await versionsFor(state.documents);
       ui.lastAsk = null;
+      ui.askContext = null;
       ui.draftPost = '';
       markBoardSeen(null);
       saveState(storageKey, state);
@@ -1194,14 +1221,23 @@ async function act({action, value, kind}) {
     case 'notice': ui.dialog = { type:'notice' }; break;
     case 'close': if (ui.busy || (ui.dialog?.type === 'notice' && !noticeSeen)) return; clearPreview(); stopVoice(); ui.dialog = null; break;
     case 'notice-ok':
+      await commit('Notice acknowledged', { by:state.actor }, previous => previous);
       noticeSeen = { at:new Date().toISOString(), by:state.actor };
       try { localStorage.setItem(noticeKey, JSON.stringify(noticeSeen)); } catch { /* asked again next time */ }
-      await commit('Notice acknowledged', { by:state.actor }, previous => previous);
       ui.dialog = null;
       break;
     case 'verify': {
       const check = await verifyReceipts(state.events);
-      ui.flash = check.ok ? 'All ' + check.count + ' receipts check out. Each one matches its fingerprint and follows the one before it.' : 'Receipt ' + check.at + ' ' + check.why + '. The history from there on cannot be relied on.';
+      ui.flash = check.ok ? 'All ' + check.count + ' receipt links and hashes check out. A missing tail or replaced history cannot be detected without a separately saved checkpoint. Content and identities are not verified by this check.' : 'Receipt ' + check.at + ' ' + check.why + '. The history from there on cannot be relied on.';
+      break;
+    }
+    case 'verify-content': {
+      const chain = await verifyReceipts(state.events);
+      if (!chain.ok) { ui.flash = 'Check failed: receipt ' + chain.at + ' ' + chain.why + '.'; break; }
+      const check = await verifyContent({ events:state.events, posts:state.posts, documents:state.documents, file:id => boardStore.file(id) });
+      ui.flash = check.checked + ' retained items checked. ' + (check.issues.length ? check.issues.join(' ') : 'No content mismatches among checked items.') +
+        (check.unavailable.length ? ' Unavailable files (including files excluded from backups): ' + check.unavailable.length + '.' : '') +
+        (check.legacy.length ? ' Older or partially fingerprinted items not fully verified: ' + check.legacy.length + '.' : '') + ' This does not establish policy approval or recover deleted content.';
       break;
     }
     case 'mark-copy':
@@ -1210,24 +1246,26 @@ async function act({action, value, kind}) {
       break;
     case 'ask-no': ui.lastAsk = ui.dialog = { ...ui.dialog, no:true }; break;
     case 'ask-yes': {
-      const { q, result } = ui.dialog, top = ui.dialog.opened || result?.items[0]?.go || '';
+      const { q } = ui.dialog, result = currentAsk(), opened = ui.dialog.opened;
+      const top = result.items.some(item => item.go === opened) ? opened : '';
       if (!result || ui.dialog.yes) return;
-      const terms = keywords(q), same = link => link.go === top && link.terms.join(' ') === terms.join(' '), asked = q.trim();
+      if (result.kind === 'blocked') return;
+      const terms = keywords(result.read || q), documentId = top.startsWith('doc|') ? top.split('|')[1] : '', sourceHash = sourceVersions[documentId];
+      const same = link => link.go === top && link.terms.join(' ') === terms.join(' ') && link.sourceHash === sourceHash, asked = q.trim();
       // Two ways it learns from a yes: a confirmed passage comes first next time, and a taught answer picks up this wording.
-      await commit('Answer confirmed', { fingerprint:await sha256(asked.toLowerCase()), kind:result.kind, opened:result.taught ? 'taught' : top.split('|')[0] || 'answer' }, previous => ({ ...previous,
-        learned: !top.startsWith('doc|') || !terms.length ? previous.learned : previous.learned.some(same) ? previous.learned.map(link => same(link) ? { ...link, count:link.count + 1 } : link) : [...previous.learned, { terms, go:top, count:1 }].slice(-400),
+      await commit('Answer relevance feedback', { fingerprint:await sha256(asked.toLowerCase()), kind:result.kind, opened:result.taught || top || null, sourceHash:sourceHash || null,
+        wordingSaved:Boolean(result.taught || sourceHash) }, previous => ({ ...previous,
+        learned: !sourceHash || !terms.length ? previous.learned : previous.learned.some(same) ? previous.learned.map(link => same(link) ? { ...link, count:link.count + 1 } : link) : [...previous.learned, { terms, go:top, count:1, sourceHash, qualifiers:qualifiers(result.read || q) }].slice(-400),
         answers: !result.taught ? previous.answers : previous.answers.map(item => item.id !== result.taught || item.asks.some(text => text.toLowerCase() === asked.toLowerCase()) ? item : { ...item, asks:[...item.asks, asked].slice(-12) }) }));
-      ui.lastAsk = ui.dialog = { ...ui.dialog, yes:top.startsWith('doc|') ? 'Noted. That passage will come first for questions like this one.' : result.taught ? 'Noted. Ask will know this wording too.' : 'Noted. Thank you.' };
+      ui.lastAsk = ui.dialog = { ...ui.dialog, yes:sourceHash ? 'Search words remembered for this source version. This records relevance, not policy approval.' : result.taught ? 'Wording saved with the custodian note. This is not policy approval.' : 'Feedback recorded. Open a passage before remembering wording for it.' };
       break;
     }
     case 'ask-send': case 'ask-teach': {
       const q = (ui.dialog.q || '').trim();
       if (!q) return;
       if (patientSigns(q).length) { ui.flash = 'That question looks like it has patient details in it. Ask it again without them, and then send it.'; break; }     // a waiting question is kept as typed
-      const entry = state.unanswered.find(item => item.text.toLowerCase() === q.toLowerCase()) || { id:crypto.randomUUID(), text:q, at:new Date().toISOString() };
-      if (!state.unanswered.includes(entry)) await commit('Question sent to the record keeper', { fingerprint:await sha256(q.toLowerCase()) }, previous => ({ ...previous, unanswered:[...previous.unanswered, entry].slice(-200) }));
-      if (action === 'ask-teach') ui.dialog = { type:'teach', pick:entry.id };
-      else ui.flash = 'Sent. Whoever keeps the record can answer it once, and Ask will know it from then on.';
+      if (action === 'ask-teach' && !isKeeper()) return;
+      ui.dialog = { type:'send-question', q, teach:action === 'ask-teach' };
       break;
     }
     case 'teach-list': if (isKeeper()) ui.dialog = { type:'teach' }; break;
@@ -1369,7 +1407,9 @@ async function act({action, value, kind}) {
       forgetMedia([...mediaBlobs.keys()]);
       localStorage.removeItem(storageKey);
       state = withContacts(structuredClone(initial));
+      sourceVersions = {};
       ui.lastAsk = null;
+      ui.askContext = null;
       ui.draftPost = '';
       markBoardSeen(null);
       ui.pending = null;
@@ -1378,6 +1418,7 @@ async function act({action, value, kind}) {
       ui.notice = 'Local workspace cleared.';
       break;
     case 'export': {
+      if (!isKeeper()) return;
       const url = URL.createObjectURL(new Blob([JSON.stringify({ format:1, rules:state.policy, events:state.events }, null, 2)], { type:'application/json' }));
       const link = document.createElement('a');
       link.href = url;
@@ -1395,6 +1436,7 @@ app.addEventListener('submit', event => {
   const form = event.target.closest('[data-form]');
   if (!form) return;
   event.preventDefault();
+  if (!noticeSeen) { ui.dialog = { type:'notice' }; render(); return; }
   countPress('form:' + form.dataset.form);
   void submit(form).catch(fail).finally(saveDraft);
 });
@@ -1411,14 +1453,14 @@ async function submit(form) {
       if (refusal) { form.querySelector('.refusal').textContent = refusal; return; }     // said in place, so nothing typed is lost
       const media = files.map(file => ({ id:crypto.randomUUID(), name:file.name, type:file.type, size:file.size, kind:mediaKind(file.type, file.name) }));
       if (data.whenKind && !/^\d{4}-\d{2}-\d{2}$/.test(data.whenDate || '')) { form.querySelector('.refusal').textContent = 'Pick the date, or set it back to No date.'; return; }
-      const warned = patientCheck(form, body);
+      const warned = patientCheck(form, [body, ...files.map(file => file.name)].join('\n'));
       if (!warned) return;
       const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}),
         ...(data.whenKind ? { when:{ kind:data.whenKind, date:data.whenDate } } : {}) };
       const send = form.querySelector('button.primary');
       send.disabled = true;
       send.textContent = 'Posting…';
-      try { await boardStore.publish(post, media.map((item, index) => [item.id, files[index]]), { fingerprint:await sha256(body), files:await Promise.all(files.map(fileFingerprint)), ...(warned.length ? { warned } : {}) }); }
+      try { await boardStore.publish(post, media.map((item, index) => [item.id, files[index]]), { fingerprint:await sha256(body), postHash:await postVersion(post), files:await Promise.all(files.map(file => fileFingerprint(file))) }); }
       catch (error) { throw error.name === 'QuotaExceededError' ? new Error('This browser is out of room for files. Remove an old post with a large file, or post a smaller one.') : error; }
       media.forEach((item, index) => { mediaBlobs.set(item.id, files[index]); mediaUrls.set(item.id, URL.createObjectURL(files[index])); });
       ui.boardFilter = 'all';
@@ -1426,11 +1468,9 @@ async function submit(form) {
       break;
     }
     case 'mark': {
-      const mark = (data.mark || '').trim().toLowerCase(), at = mark.length < 12 ? -1 : state.events.findIndex(event => event.hash.startsWith(mark));
-      const sound = at >= 0 && (await verifyReceipts(state.events.slice(0, at + 1))).ok;
-      ui.flash = at < 0 ? 'That fingerprint is not in this log. Either it was taken on another device, or the log was replaced after it was taken.' :
-        sound ? 'Found. It is receipt ' + (at + 1) + ' of ' + state.events.length + ', written ' + timeLabel(state.events[at].time) + '. Everything up to it is as it was when that fingerprint was taken.' :
-        'Found at receipt ' + (at + 1) + ', but a receipt before it does not check out.';
+      const mark = (data.mark || '').trim().toLowerCase();
+      const check = await verifyReceipts(state.events, mark || 'invalid');
+      ui.flash = check.ok ? 'The complete chain checks out and includes the saved checkpoint at receipt ' + check.checkpoint + '. Integrity has been checked against that checkpoint; identity and factual correctness have not.' : 'Checkpoint check failed: ' + check.why + '.';
       break;
     }
     case 'ask': {
@@ -1443,12 +1483,22 @@ async function submit(form) {
       if (!isKeeper()) return;
       const waiting = state.unanswered.find(item => item.id === data.id), words = (data.answer || '').trim();
       if (!waiting || !words) return;
-      const warned = patientCheck(form, words);
+      const warned = patientCheck(form, [waiting.text, words, data.source || ''].join('\n'));
       if (!warned) return;
-      const entry = { id:crypto.randomUUID(), asks:[waiting.text], answer:words, source:(data.source || '').trim(), by:state.actor, at:new Date().toISOString() };
-      await commit('Answer taught', { id:entry.id, question:await sha256(waiting.text.toLowerCase()), answer:await sha256(words), ...(warned.length ? { warned } : {}) }, previous => ({ ...previous, answers:[...previous.answers, entry], unanswered:previous.unanswered.filter(item => item.id !== waiting.id) }));
+      const source = state.documents.find(doc => doc.id === data.documentId);
+      const entry = { id:crypto.randomUUID(), asks:[waiting.text], answer:words, source:(data.source || '').trim(), by:state.actor, at:new Date().toISOString(),
+        ...(source ? { documentId:source.id, sourceHash:sourceVersions[source.id] } : {}) };
+      await commit('Answer taught', { id:entry.id, question:await sha256(waiting.text.toLowerCase()), answer:await sha256(words), sourceHash:entry.sourceHash || null }, previous => ({ ...previous, answers:[...previous.answers, entry], unanswered:previous.unanswered.filter(item => item.id !== waiting.id) }));
       ui.dialog = { type:'teach' };
       ui.flash = 'Saved. Ask will give this answer to questions like it.';
+      break;
+    }
+    case 'send-question': {
+      const q = (data.question || '').trim().slice(0, 200);
+      if (!q || !patientCheck(form, q)) return;
+      const entry = state.unanswered.find(item => item.text.toLowerCase() === q.toLowerCase()) || { id:crypto.randomUUID(), text:q, at:new Date().toISOString() };
+      if (!state.unanswered.includes(entry)) await commit('Reviewed question saved', { id:entry.id, fingerprint:await sha256(q.toLowerCase()), textSaved:true }, previous => ({ ...previous, unanswered:[...previous.unanswered, entry].slice(-200) }));
+      ui.dialog = data.teach && isKeeper() ? { type:'teach', pick:entry.id } : { type:'ask', q, previousContext:ui.lastAsk?.previousContext, yes:'Reviewed question saved for the record keeper in this browser and backups.' };
       break;
     }
     case 'doc': {
@@ -1460,7 +1510,7 @@ async function submit(form) {
       if (text.length > DOC_LIMIT) throw new Error('That is ' + fileSize(text.length) + ' of text. One document can be up to ' + fileSize(DOC_LIMIT) + '. Add it in parts.');
       if (state.documents.reduce((sum, doc) => sum + doc.text.length, 0) + text.length > DOC_TOTAL) throw new Error('The documents together are at the limit this browser can keep. Remove one first.');
       const doc = { id:crypto.randomUUID(), title, kind:data.kind || 'Other', effective:/^\d{4}-\d{2}-\d{2}$/.test(data.effective || '') ? data.effective : '', added:new Date().toISOString(), by:state.actor, text };
-      await commit('Document added', { id:doc.id, title, kind:doc.kind, effective:doc.effective, characters:text.length, sha256:await sha256(text) }, previous => ({ ...previous, documents:[...previous.documents, doc] }));
+      await commit('Document added', { id:doc.id, title, kind:doc.kind, effective:doc.effective, characters:text.length, sha256:await sha256(text), version:await documentVersion(doc) }, previous => ({ ...previous, documents:[...previous.documents, doc] }));
       ui.dialog = { type:'docs' };
       ui.flash = 'Added ' + title + '. Ask can now search it.';
       break;
@@ -1473,7 +1523,7 @@ async function submit(form) {
       const item = { id:crypto.randomUUID(), name:'voice-message-' + localToday() + (/mp4/.test(recording.blob.type) ? '.m4a' : '.webm'), type:recording.blob.type, size:recording.blob.size, kind:'audio', seconds:recording.seconds };
       const file = new File([recording.blob], item.name, { type:recording.blob.type });
       const post = { id:crypto.randomUUID(), author:state.actor, body:(data.caption || '').trim(), created:new Date().toISOString(), voice:true, media:[item], ...(data.inside ? { inside:true } : {}) };
-      await boardStore.publish(post, [[item.id, file]], { fingerprint:await sha256(post.body), files:[await fileFingerprint(file)], ...(warned.length ? { warned } : {}) });
+      await boardStore.publish(post, [[item.id, file]], { fingerprint:await sha256(post.body), postHash:await postVersion(post), files:[await fileFingerprint(file)] });
       mediaBlobs.set(item.id, file);
       mediaUrls.set(item.id, recording.url);
       voice = null;
@@ -1596,6 +1646,7 @@ async function submit(form) {
       break;
     }
     case 'request': {
+      if (!patientCheck(form, body)) return;
       const { row, kind, chosen } = ui.dialog;
       if (!isMine(row)) return;
       const check = checkChange({ from:row, to:chosen.to, recipient:chosen.recipient, kind });
@@ -1617,6 +1668,7 @@ async function submit(form) {
     }
     case 'reply': {
       if (!body) return;
+      if (!patientCheck(form, body)) return;
       const id = ui.dialog.id;
       await commit('Thread reply', { id }, previous => ({
         ...previous, requests:previous.requests.map(item => item.id === id ? { ...item, messages:[...item.messages, message] } : item)
@@ -1627,5 +1679,6 @@ async function submit(form) {
   }
   render();
 }
+sourceVersions = await versionsFor(state.documents);
 render();
 void hydrateMedia();

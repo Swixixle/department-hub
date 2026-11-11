@@ -7,7 +7,7 @@
 // the person asking is allowed to see, which is why the filtering happens here, before anything else.
 import { holidays, staffing, statSheet } from './fairness.js';
 import { addDays, normalizeName, shiftInterval, weekStart } from './model.js';
-import { expand, keywords, nearest, stem, tidyQuestion } from './words.js';
+import { expand, keywords, nearest, qualifiers, stem, tidyQuestion } from './words.js';
 
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -85,7 +85,7 @@ export function findPeople(text, names) {
 // they do. The department's other words for a thing count too. Ranking is BM25, the measure search engines have used
 // for decades: a rare word counts for more than a common one, and a long passage is not favoured for being long.
 // `learned` holds passages people confirmed for earlier questions; a confirmed passage is lifted for a similar question.
-export function searchDocuments(question, documents = [], limit = 3, learned = []) {
+export function searchDocuments(question, documents = [], limit = 3, learned = [], versions = {}) {
   const asked = keywords(question);
   if (!asked.length) return [];
   const passages = [];
@@ -117,7 +117,8 @@ export function searchDocuments(question, documents = [], limit = 3, learned = [
     let score = hits.reduce((sum, term) => { const tf = passage.counts.get(term); return sum + weight.get(term) * tf * 2.2 / (tf + 1.2 * (0.25 + 0.75 * passage.length / average)); }, 0) +
       also.length * 0.35 + wanted.filter(term => passage.title.has(term)).length * 0.3;      // the asked words themselves count for more than other words for them
     let lifted = 0;
-    for (const link of learned) if (link.go === 'doc|' + passage.doc.id + '|' + passage.offset && overlap(link.terms, terms.split(' ')) >= 0.6) lifted += 2 * Math.min(3, link.count);
+    for (const link of learned) if (link.sourceHash && link.sourceHash === versions[passage.doc.id] && link.qualifiers === qualifiers(question) &&
+      link.go === 'doc|' + passage.doc.id + '|' + passage.offset && overlap(link.terms, terms.split(' ')) >= 0.6) lifted += 2 * Math.min(3, link.count);
     return { ...passage, hits, also, score: score + lifted, lifted };
   }).filter(passage => passage.lifted || passage.hits.length >= Math.min(2, wanted.length) || (passage.hits.length + passage.also.length >= 2) || (wanted.length <= 2 && passage.also.length >= 1))
     .sort((a, b) => b.score - a.score).slice(0, limit);
@@ -134,6 +135,7 @@ export function matchTaught(question, answers = [], { whole = false, tidy = text
   const asked = keywords(question);
   let best = null;
   for (const answer of answers) for (const variant of answer.asks || []) {
+    if (qualifiers(question) !== qualifiers(tidy(variant))) continue;
     const terms = keywords(tidy(variant)), shared = overlap(asked, terms);
     if (whole ? shared === 1 && asked.length === terms.length && asked.length > 0 :
       shared >= 0.6 && Math.min(asked.length, terms.length) * shared >= Math.min(2, terms.length)) if (!best || shared > best.shared) best = { answer, shared };
@@ -151,7 +153,8 @@ const snippet = (text, words, length = 260) => {
 // world: { today, now, actor, assignments, directory, people, links, posts, documents, releases, rules, keeper, seen,
 //          published, requests }. Returns { title, lines, items: [{ text, sub, go }], source, empty }.
 export function ask(question, world) {
-  const { today, actor, assignments, posts = [], documents = [] } = world;
+  const { today, actor, assignments, posts = [], documents:allDocuments = [] } = world;
+  const documents = allDocuments.filter(doc => doc.status !== 'withdrawn' && (!doc.effective || doc.effective <= today));
   const names = [...new Set(assignments.map(row => row.person))];
   const familiar = new Set([...documents.map(doc => doc.title + ' ' + doc.text), ...posts.map(post => post.body || '')].flatMap(text => keywords(text)));
   const tidy = tidyQuestion(question, names, familiar);
@@ -162,20 +165,26 @@ export function ask(question, world) {
   const self = has('i', 'me', 'my', 'am', 'mine');
   // A skills fair or a job fair is an event, not a question about fairness.
   const eventFair = / (skills?|competenc(y|ies)|job|career|health|wellness|benefits?|education|vendor|science|book|craft|county|state) fair /.test(q);
+  const rosterWho = has('who') && (has('work', 'shift', 'schedule', 'on', 'with') || (when && !has('leave', 'vacation', 'pto', 'request', 'approve', 'approval')));
   // Which kind of question this is, from the words in it. Order matters: the more particular kinds come first.
   let kind = has('number', 'phone', 'call', 'text', 'reach', 'contact', 'cell') && others.length ? 'contact' :
     has('fairness', 'unfair', 'share', 'carrying') || (has('fair') && !eventFair) || (has('many', 'much', 'count') && has('weekend', 'holiday', 'turn')) ? 'fair' :
     has('short', 'understaffed', 'overstaffed', 'census', 'four') || q.includes(' called off ') || (has('extra') && has('person', 'people')) ? 'staffing' :
     has('due', 'deadline', 'meeting', 'event', 'upcoming', 'calendar') || q.includes(' coming up ') ? 'dated' :
     / (miss|missed|news|latest|unread|announcements?|board) /.test(q) || / (is|anything) new /.test(q) || / new (post|message)/.test(q) ? 'news' :
-    has('who') || (has('with') && (self || when)) ? 'who' :
+    rosterWho || (has('with') && (self || when)) ? 'who' :
     (others.length && (when || has('work', 'shift', 'schedule', 'on', 'off', 'next'))) || has('shift', 'schedule') || (has('work') && (self || when)) || (has('on', 'off') && self && when) || (has('next') && self) || (when && self && tokens.size <= 5) ? 'when' : 'look';
   // A follow-up such as "and Saturday?" or "what about Avery?" keeps the last kind of question and changes one part.
   const last = world.last;
+  let followed = false;
   if (kind === 'look' && last?.kind && last.kind !== 'look' && (when || others.length) && tokens.size <= 6) {
+    followed = true;
     kind = last.kind;
     if (!when) when = last.when || null;
+    else if (when.bare && last.when) when = { ...last.when, shift:when.shift, bare:false };
+    else if (!when.shift && last.when?.shift) when = { ...when, shift:last.when.shift };
     if (!others.length && last.others?.length) others = last.others;
+    if (others.length && kind === 'who') kind = 'when';
   }
   const scheduleSource = world.published ? 'The schedule, published ' + pretty(world.published.slice(0, 10)) : 'The sample schedule';
   const inRange = row => !when || (row.date >= when.from && row.date <= when.to && (!when.shift || row.shift === when.shift));
@@ -186,17 +195,25 @@ export function ask(question, world) {
   const nextShift = name => shiftsOf(name).find(upcoming);
   const on = (date, shift) => assignments.filter(row => row.date === date && row.shift === shift);
   const answer = (title, items, source, extra = {}) => ({ title, items, source, lines: [], empty: !items.length && !extra.lines?.length, kind, read: tidy.changed ? tidy.text : '', changes: tidy.changes,
-    context: { kind, when, others }, ...extra });
+    context: { kind, when, others, withActor:kind === 'who' && (has('with') || (followed && Boolean(last?.withActor))) }, ...extra });
   const tidyText = text => tidyQuestion(text, names, familiar).text;
-  const taughtAnswer = taught => answer('An answer the department has on record', [{ text: taught.answer, sub: 'Answered by ' + taught.by + ' on ' + pretty(taught.at.slice(0, 10)) + (taught.source ? ' · ' + taught.source : ''), go: '' }],
-    'Taught answers. If it is out of date, tell whoever keeps the record.', { taught: taught.id });
+  const docQuestion = /\b(polic(?:y|ies)|procedures?|protocols?|manuals?|guidelines?|handbook)\b/.test(q);
+  const taughtAnswers = (world.answers || []).filter(note => note.documentId
+    ? Boolean(note.sourceHash && note.sourceHash === world.versions?.[note.documentId] && documents.some(doc => doc.id === note.documentId))
+    : !docQuestion);
+  const taughtAnswer = taught => answer('A custodian note, not official policy', [{ text: taught.answer,
+    sub:'Recorded as ' + taught.by + ' on ' + pretty(taught.at.slice(0, 10)) + (taught.source ? ' · ' + taught.source : ''), go:'note|' + taught.id }],
+    'Human-written guidance. The selected profile is not a verified identity; check the original source.', { taught:taught.id });
 
-  // 0. A question the department has already answered in these words gets that answer, whatever kind it is.
-  const settled = matchTaught(q, world.answers, { whole: true, tidy: tidyText });
-  if (settled) return taughtAnswer(settled);
+  if (tidy.ambiguous.length) return answer('Which staff name did you mean?', [], 'No person lookup was made.',
+    { lines:tidy.ambiguous.map(item => item.typed + ': ' + item.choices.join(' or ')), empty:true });
+  if (kind === 'who' && has('not', 'no', 'never', 'without')) return answer('Please clarify who you want listed.', [], scheduleSource,
+    { lines:['Ask who is scheduled, or name a person and ask whether they work that date.'], empty:true });
+  if (q.includes(' called off ') && !has('census', 'va')) return answer('Do you mean a low-census release?', [], 'Low census',
+    { lines:['This app records low-census releases. It does not track staff calling in sick.'], empty:true });
 
   // Explicit document questions take precedence over words such as "due", "call" or "short" inside a policy title.
-  if (/\b(polic(?:y|ies)|procedures?|protocols?|manuals?|guidelines?|handbook)\b/.test(q)) return documentAnswer();
+  if (docQuestion) return documentAnswer();
   if (when?.invalid) return answer('That is not a valid date.', [], 'No schedule lookup was made.', { lines:['Use a date such as Nov 26, 2027.'], empty:true });
 
   // 1. How to reach someone.
@@ -251,7 +268,7 @@ export function ask(question, world) {
 
   // 6. Who is on, or who the person is working with.
   if (kind === 'who') {
-    if (has('with')) {
+    if (has('with') || (followed && last?.withActor)) {
       const mine = shiftsOf(actor).filter(row => when ? inRange(row) : upcoming(row)).slice(0, when ? 4 : 1);
       if (!mine.length) return answer('You are not on the schedule ' + (when ? when.label : 'from today on'), [], scheduleSource);
       return answer('', mine.map(row => { const mates = on(row.date, row.shift).filter(mate => !same(mate.person, actor)); return { text: pretty(row.date) + ' ' + shiftWord(row.shift) + ': ' + (mates.length ? 'with ' + list(mates.map(tagged)) : 'nobody else is listed'), sub: row.role ? 'You are ' + (ROLES[row.role] || row.role) : '', go: 'date|' + row.date }; }), scheduleSource);
@@ -282,16 +299,16 @@ export function ask(question, world) {
   return documentAnswer();
 
   function documentAnswer() {
-  const taught = matchTaught(q, world.answers, { tidy: tidyText });
-  if (taught) return taughtAnswer(taught);
-  const found = searchDocuments(q, documents, 3, world.learned), wanted = keywords(q);
-  const mentions = wanted.length ? posts.filter(post => post.body && overlap(wanted, keywords(post.body)) >= (wanted.length > 2 ? 0.6 : 1)).slice(-3).reverse() : [];
-  if (found.length || mentions.length) {
-    return answer(found.length ? 'From the documents the department has added' : 'Nothing in the documents. On the board:', [
-      ...found.map(passage => ({ text: snippet(passage.text, [...passage.hits, ...passage.also]), sub: [passage.doc.title, passage.heading, passage.doc.kind, passage.doc.effective ? 'effective ' + passage.doc.effective : 'no effective date given'].filter(Boolean).join(' · '), go: 'doc|' + passage.doc.id + '|' + passage.offset })),
-      ...mentions.map(post => ({ ...postItem(post), sub: 'A post on the board by ' + post.author + ', not policy' }))
-    ], found.length ? 'Quoted from the document as added. Check its date, and ask the person responsible if it does not settle the question.' : 'The board. Posts are from coworkers and are not policy.');
-  }
+    const taught = matchTaught(q, taughtAnswers, { tidy: tidyText });
+    const found = searchDocuments(q, documents, 3, world.learned, world.versions), wanted = keywords(q);
+    if (!found.length && taught) return taughtAnswer(taught);
+    const mentions = wanted.length ? posts.filter(post => post.body && overlap(wanted, keywords(post.body)) >= (wanted.length > 2 ? 0.6 : 1)).slice(-3).reverse() : [];
+    if (found.length || mentions.length) {
+      return answer(found.length ? 'From the documents the department has added' : 'Nothing in the documents. On the board:', [
+        ...found.map(passage => ({ text: snippet(passage.text, [...passage.hits, ...passage.also]), sub: [passage.doc.title, passage.heading, passage.doc.kind, passage.doc.effective ? 'effective ' + passage.doc.effective : 'no effective date given'].filter(Boolean).join(' · '), go: 'doc|' + passage.doc.id + '|' + passage.offset })),
+        ...mentions.map(post => ({ ...postItem(post), sub: 'A post on the board by ' + post.author + ', not policy' }))
+      ], found.length ? 'Quoted from the document as added. Check its date, and ask the person responsible if it does not settle the question.' : 'The board. Posts are from coworkers and are not policy.');
+    }
     return answer('Nothing on record answers that.', [], documents.length ? 'Searched the board and ' + documents.length + ' added document' + (documents.length === 1 ? '' : 's') : 'Searched the board. No documents have been added yet.',
       { empty: true, lines: ['Ask the person responsible, or put the question on the board so the answer is on record for everyone.'] });
   }

@@ -32,8 +32,8 @@ Ask works today by looking things up, with no model. A model could broaden suppo
 
 There are two further steps, and they are different decisions.
 
-1. **A small embedding model in the browser.** It scores how close a question is in meaning to each passage and taught answer. Nothing leaves the device, nothing is paid for each question and it cannot invent an answer, because it only ranks what is already there. It needs no server. It costs a one-time download of tens of megabytes per device and some work to measure whether it helps on this department's real questions.
-2. **A language model on the hosted service.** It would take questions in any wording, summarise and put a policy into plain words. The key for it cannot sit in the app, so it runs on the server. Each question costs a little and sends the text of the records it uses to the company that runs the model. Hand the model only what `src/ask.js` finds for the person asking, keep the source and date on every answer, show the quoted passage beside anything the model wrote, and decide first whether the department's documents may be sent to an outside service at all.
+1. **A small embedding model in the browser.** It can rank existing passages by similarity of meaning. It does not generate text, but can still select the wrong passage. Bundle model and runtime assets locally, prohibit remote loading, apply source/role/version filters first, and measure accuracy, abstention, memory and latency on actual phones before enabling it. This remains unimplemented; no model assets are currently downloaded.
+2. **A language model through an approved processing route.** A hosted API requires its key on the server and incurs provider charges; selected records would be sent to that provider. A local generative model is another unimplemented option. Neither route guarantees understanding of every wording. Keep original passages beside generated explanations and verify their scope, authority, exceptions and dates.
 
 ## The log on the hosted service
 

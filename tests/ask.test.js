@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ask, findPeople, parseWhen, searchDocuments } from '../src/ask.js';
+import { ask, findPeople, matchTaught, parseWhen, searchDocuments } from '../src/ask.js';
+import { documentVersion } from '../src/audit.js';
 
 const row = (date, shift, person, role) => ({ date, shift, person, ...(role ? { role } : {}) });
 const today = '2026-11-11';                       // a Wednesday
@@ -90,6 +91,7 @@ test('documents are quoted with their title, section and date, and an unanswered
   assert.match(none.title, /Nothing on record answers that/);
   assert.match(ask('anything on weaning', { ...world, documents: [] }).source, /No documents have been added yet/);
   assert.deepEqual(searchDocuments('the and for', documents), []);
+  assert.match(reply('Who approves leave?').items[0].go, /^doc\|leave\|/);
 });
 
 test('the next shift itself can be opened, even when it is the only future shift', () => {
@@ -166,7 +168,7 @@ test('messy questions are read: shorthand, misspellings, bad grammar and follow-
   // A follow-up keeps the kind of question and changes the part that was named.
   const first = reply('who is on tonight');
   const then = ask('and friday?', { ...world, last: first.context });
-  assert.deepEqual(then.items.map(item => item.text.slice(0, 17)), ['Fri, Nov 13 day: ', 'Fri, Nov 13 night']);
+  assert.deepEqual(then.items.map(item => item.text.slice(0, 17)), ['Fri, Nov 13 night']);
   const person = ask('what about Morgan', { ...world, last: reply('when do I work next').context });
   assert.match(person.title, /^Morgan’s next shift is Wed, Nov 11, night \(charge\)\.$/);
 });
@@ -178,23 +180,63 @@ test('documents are found through other words for the same thing, misspellings a
   assert.equal(reply('ventilator weaning steps').empty, true);
 });
 
-test('a taught answer comes back for a question like the one it was taught for, and a confirmed passage is lifted', () => {
+test('a taught note is labelled and relevance feedback is bound to the source version', async () => {
   const answers = [{ id: 't1', asks: ['where do the dirty circuits go'], answer: 'The grey bin in the soiled utility room.', by: 'Avery', at: '2026-11-10T09:00:00Z', source: 'Lead, Nov 10' }];
   const taught = ask('where do dirty circuts go?', { ...world, answers });
   assert.equal(taught.items[0].text, 'The grey bin in the soiled utility room.');
-  assert.equal(taught.items[0].sub, 'Answered by Avery on Tue, Nov 10 · Lead, Nov 10');
+  assert.equal(taught.items[0].sub, 'Recorded as Avery on Tue, Nov 10 · Lead, Nov 10');
+  assert.match(taught.title, /not official policy/);
   assert.equal(taught.taught, 't1');
   assert.equal(ask('where is the supply room', { ...world, answers }).taught, undefined);
   // A question that would be read as another kind still gets the answer taught for those exact words, misspelled or not.
   const due = [{ id: 't2', asks: ['when is the skills fair due'], answer: 'It is not due. The skills fair is walk-in, any Tuesday.', by: 'Avery', at: '2026-11-10T09:00:00Z', source: '' }];
   assert.equal(ask('when is the skills fair due', { ...world }).kind, 'dated');
   assert.equal(ask('is my schedule fair', { ...world }).kind, 'fair');
-  assert.equal(ask('wen is the skills fair due?', { ...world, answers: due }).taught, 't2');
+  assert.equal(ask('wen is the skills fair due?', { ...world, answers: due }).taught, undefined);
   assert.equal(ask('what is due this week', { ...world, answers: due }).taught, undefined);
   const text = 'Holidays\n\nHoliday time off rotates each year between staff.\n\nRequests\n\nA holiday request is entered in the fall for the year ahead.';
   const docs = [{ id: 'h', title: 'Holidays', kind: 'Policy', effective: '', text }];
   const before = ask('holiday time off rule', { ...world, documents: docs }).items[0].go;
   const wanted = 'doc|h|' + text.indexOf('A holiday request');
   assert.notEqual(before, wanted);
-  assert.equal(ask('holiday time off rule', { ...world, documents: docs, learned: [{ terms: ['holiday', 'time', 'off', 'rule'], go: wanted, count: 3 }] }).items[0].go, wanted);
+  const version = await documentVersion(docs[0]);
+  const learned = [{ terms:['holiday', 'time', 'off', 'rule'], go:wanted, count:3, sourceHash:version, qualifiers:'' }];
+  assert.equal(ask('holiday time off rule', { ...world, documents:docs, versions:{h:version}, learned }).items[0].go, wanted);
+  assert.equal(ask('holiday time off rule', { ...world, documents:docs, versions:{h:'changed'}, learned }).items[0].go, before);
+  assert.equal(ask('holiday time off rule', { ...world, documents:docs, learned }).items[0].go, before);
+});
+
+test('taught wording cannot override live records or another person’s fairness restriction', () => {
+  const note = q => ({ id:'x', asks:[q], answer:'This answer must not override the live lookup.', by:'Jordan', at:'2026-11-10', source:'' });
+  assert.match(ask('When do I work next?', { ...world, answers:[note('When do I work next?')] }).title, /^Your next shift/);
+  const q = 'how many weekends has Morgan worked';
+  assert.match(ask(q, { ...world, keeper:false, answers:[note(q)] }).title, /whoever keeps the record/);
+});
+
+test('changed, missing, withdrawn and future sources cannot validate taught explanations', async () => {
+  const doc = documents[0], version = await documentVersion(doc), q = 'where do dirty circuits go';
+  const note = { id:'bound', asks:[q], answer:'Bound explanation', documentId:doc.id, sourceHash:version, by:'Jordan', at:today };
+  const base = { ...world, answers:[note], versions:{[doc.id]:version} };
+  assert.equal(ask(q, base).taught, 'bound');
+  for (const change of [{documents:[]}, {versions:{[doc.id]:'changed'}}, {documents:[{...doc,status:'withdrawn'}]}, {documents:[{...doc,effective:'2027-01-01'}]}])
+    assert.equal(ask(q, {...base,...change}).taught, undefined);
+});
+
+test('learning keeps negation and obligation separate and ambiguous names need clarification', () => {
+  const note = { id:'n', asks:['can we reuse circuits'], answer:'Only a note.' };
+  assert.equal(matchTaught('cannot we reuse circuits', [note]), null);
+  assert.equal(matchTaught('must we reuse circuits', [note]), null);
+  const result = ask('is kesha on tonight', {...world, assignments:[row(today,'N','Keshia'),row(today,'N','Keisha')]});
+  assert.equal(result.empty, true);
+  assert.match(result.title, /Which staff name/);
+  assert.equal(result.items.length, 0);
+});
+
+test('follow-ups retain the night pool but a fresh question resets coworker context', () => {
+  const first = reply('who is on tonight');
+  const next = ask('and friday?', {...world,last:first.context});
+  assert.equal(next.context.when.shift, 'N');
+  const withMe = reply('who am I working with on my next shift');
+  const fresh = ask('who is on tonight', {...world,last:withMe.context});
+  assert.match(fresh.items[0].text, /Morgan \(charge\), Parker and Quinn/);
 });

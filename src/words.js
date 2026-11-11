@@ -7,11 +7,12 @@ const SHORTHAND = { im: 'i am', whos: 'who is', whats: 'what is', wheres: 'where
   wk: 'week', wks: 'weeks', wkends: 'weekends', wknds: 'weekends', wrk: 'work', wrks: 'works', wrkn: 'working', wrking: 'working', '2morrow': 'tomorrow', '2moro': 'tomorrow', '2mrw': 'tomorrow', tmw: 'tomorrow', tom: 'tomorrow',
   any1: 'anyone', some1: 'someone', every1: 'everyone', ne1: 'anyone', hw: 'how', hrs: 'hours', hr: 'hour', ppl: 'people', dept: 'department', mgr: 'manager', vaca: 'vacation', vacay: 'vacation', req: 'request', reqs: 'requests',
   avail: 'available', info: 'information', doc: 'document', docs: 'documents', bc: 'because', cuz: 'because', abt: 'about', tho: 'though', thru: 'through', da: 'the', dis: 'this', dat: 'that', yr: 'year', mo: 'month',
+  cant:'cannot', dont:'do not', doesnt:'does not', isnt:'is not', arent:'are not', shouldnt:'should not', mustnt:'must not',
   pls: '', plz: '', thx: '', hey: '', hi: '', sat: 'saturday', sun: 'sunday', mon: 'monday', tues: 'tuesday', tue: 'tuesday', wed: 'wednesday', thur: 'thursday', thurs: 'thursday', fri: 'friday', xmas: 'christmas' };
 
 // Different words for one thing. Any word in a group finds the others.
 export const SYNONYMS = [
-  ['leave', 'time off', 'vacation', 'pto', 'day off', 'days off', 'absence'], ['low census', 'called off', 'sent home', 'volume adjusted', 'va'], ['trade', 'swap', 'switch'],
+  ['leave', 'time off', 'vacation', 'pto', 'day off', 'days off'], ['low census', 'sent home', 'volume adjusted', 'va'], ['trade', 'swap', 'switch'],
   ['coverage', 'cover', 'pick up', 'pickup'], ['meeting', 'huddle', 'inservice', 'in-service'], ['due', 'deadline', 'turn in'], ['ventilator', 'vent'], ['policy', 'rule'], ['protocol', 'guideline'],
   ['phone', 'number', 'cell'], ['request', 'ask for', 'apply'], ['overtime', 'ot', 'extra hours'], ['orientation', 'onboarding', 'new hire'], ['competency', 'competencies', 'check off', 'checkoff']
 ];
@@ -70,6 +71,9 @@ export function stem(word) {
 }
 
 const STOP = new Set('the and for are was were with that this from have has had not but you your our out who what when where how does did can could should would there their they them then than into about any all its his her she him also may must shall will been being more most some such only per get got need want know tell please thanks'.split(' '));
+export const QUALIFIERS = ['not', 'no', 'never', 'without', 'cannot', 'must', 'may', 'can', 'should'];
+for (const word of QUALIFIERS) STOP.delete(word);
+export const qualifiers = text => QUALIFIERS.filter(word => new RegExp('\\b' + word + '\\b').test(text.toLowerCase())).join('|');
 export const keywords = text => [...new Set((text.toLowerCase().match(/[a-z0-9]{2,}/g) || []).filter(word => word.length > 2 && !STOP.has(word)).map(stem))];
 
 // Shorthand is spelled out, then a word the app does not know is moved to the nearest one it does. `names` are people on
@@ -79,12 +83,18 @@ export function tidyQuestion(question, names = [], familiar = new Set()) {
   const nameWords = new Map(names.flatMap(name => name.toLowerCase().split(' ').filter(part => part.length > 2).map(part => [part, part])));
   const known = new Set([...CORE_WORDS, ...nameWords.keys()]);
   const changes = [];
+  const ambiguous = [];
   const words = question.toLowerCase().replace(/[’]/g, "'").replace(/w\//g, 'with ').replace(/[^a-z0-9'\/\s-]/g, ' ').split(/\s+/).filter(Boolean).map(word => {
     const bare = word.replace(/'/g, '');
     if (bare in SHORTHAND && !nameWords.has(bare)) return SHORTHAND[bare];
     const plain = bare.replace(/s$/, '');
     if (bare.length < 4 || /\d/.test(bare) || known.has(bare) || known.has(plain) || familiar.has(stem(bare)) || STOP.has(bare)) return word;
     const fixed = nearest(bare, known);
+    if (fixed && nameWords.has(fixed)) {
+      const distance = editDistance(bare, fixed);
+      const choices = [...nameWords.keys()].filter(name => editDistance(bare, name, distance) === distance);
+      if (choices.length > 1) { ambiguous.push({ typed:word, choices }); return word; }
+    }
     if (fixed && fixed !== bare) { changes.push([word, fixed]); return fixed; }
     return word;
   });
@@ -92,7 +102,7 @@ export function tidyQuestion(question, names = [], familiar = new Set()) {
   let text = words.filter(Boolean).join(' ');
   if (/\b(is|are|was|were|its|it|that) (?:[a-z'-]+ ){0,4}do$/.test(text)) { text = text.replace(/do$/, 'due'); changes.push(['do', 'due']); }
   const typed = question.toLowerCase().replace(/[’]/g, "'").replace(/[^a-z0-9'\/\s-]/g, ' ').split(/\s+/).filter(Boolean).join(' ');
-  return { text, changes, changed: text !== typed };
+  return { text, changes, ambiguous, changed: text !== typed };
 }
 
 // Every other way of saying what the question says, from the synonym groups and from anything the department has
