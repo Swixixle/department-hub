@@ -131,7 +131,7 @@ export function parseCalendar(words, source, context = {}) {
     cell.names = [];
     const region = { x0: cell.left, y0: cell.top, x1: cell.right, y1: cell.bottom };
     // The printed grid has long level lines too. They span the cell or sit on its lower edge.
-    const strokes = (context.strokesIn?.(region, textHeight * 2.2) || []).filter(stroke =>
+    const strokes = (context.strokesIn?.(region, textHeight * 1.9) || []).filter(stroke =>
       stroke.length < (cell.right - cell.left) * 0.85 && stroke.y < cell.bottom - textHeight * 0.3);
     cell.struck = strokes.length;
     for (const line of lines(cell.words)) {

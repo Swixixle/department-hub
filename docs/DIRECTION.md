@@ -69,11 +69,31 @@ The owner ran four real pages through the calendar reader and asked for two chan
 
 Checked in a browser on the same real page: 20 flags became 16 screens, each save advanced on its own, and the published roster matched the hand transcription 105 of 105.
 
+## Added on branch `claude/directory`
+
+The owner's direction on 2026-11-11: the department telephone list matters as much as the schedule. The app is meant to be how people in the department reach one another and stay informed. He wants the numbers in it, direct messages between coworkers, and a department feed with news.
+
+What this branch adds, all of it on one device with no server:
+
+- **Telephone list import** (`src/contacts.js`). The same import flow recognises a photographed telephone list. Table lines are erased, rows are followed along the tilt of the photo, and the page is read twice in two modes. A number is accepted only when both readings agree. The rest are shaded on a check screen that shows a strip of the photo above each person.
+- **Directory tab** with people grouped as on the list, and Call and Text links.
+- **Matching** of schedule names to people: first name plus last initial, then a unique first name, then short forms and shared openings, which are shown as guesses to confirm.
+- **Staff details fill themselves in.** Employment status comes from the list's section, and the shifts a person works come from the roster. Students are kept out of trades and coverage by a starter rule.
+- **Text a request.** A trade or coverage request can be sent from the phone's own Messages app with the wording filled in, because this app cannot notify anyone yet.
+- **Launcher.** `serve.py` opens the browser and replaces an older copy on the same port.
+- **Reading fixes** from three more real pages: pale green highlighter is recognised, and a strike through a short name is caught.
+
+Checked in a browser. Four real schedule pages against hand transcriptions: 327 of 361 printed names accepted, none wrong in name, role or hours, every other name inside a flagged cell, and all 21 crossed-out names flagged with two false alarms. Two real telephone lists: all 30 people found in the right groups, 20 numbers agreed by both readings and the other 10 shaded for checking. Number endings were compared with the photos by eye. Full numbers were not transcribed, so the owner's check on that screen is the real verification.
+
+Telephone numbers are personal data. They live only in the browser's storage on the device, they are left out of receipts, and no real name or number belongs in this repository, its fixtures or its demo. The demo uses invented people and 555-01xx numbers.
+
+**Next: the shared service.** Direct messages, a department feed and news need accounts and a server, which this app does not have. The telephone list gives a natural membership rule: only people on the list can join. That is the next large piece of work and it is not started.
+
 ## Still open from the review
 
 - Matches that are blocked are hidden with no reason given.
 - A date missing from an import is not detected, so weekly hours can be understated.
-- Names are checked against the rest of the batch but not yet against a saved staff list.
+- Schedule names are checked against the rest of the batch. They are matched to the telephone list only after import.
 - Import flags are cleared one at a time, and an unsupported layout offers no way to enter shifts by hand.
 - Source images from an abandoned import stay in browser storage until the workspace is erased.
 - Exported receipts have no checker.
