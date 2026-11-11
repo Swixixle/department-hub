@@ -9,7 +9,7 @@ Recorded 2026-11-10 from the owner's conversation with Claude. Read this after `
 - **Phone and touch first.** Tap a shift and it highlights. A short action sheet opens with the few things you can do.
 - **A scrolling department board** where schedule events appear as posts next to ordinary posts.
 - **Fairness tracking.** Keep track of seniority, call-offs, pickups and trades so that imbalances can be evened out on the next schedule. Seniority means time in the department.
-- **Check-ins at the middle and end of each schedule**, because by the end of a schedule most of what happened is forgotten. Schedules run about three months.
+- **Check-ins at the middle and end of each schedule**, because by the end of a schedule most of what happened is forgotten. Schedules run three to four months.
 - **Recognition** for people who carry extra load.
 - **Department example.** Four on days and three on nights, seven days a week, 12-hour shifts, three shifts a week for full time. Nights have seven or eight staff, seven of them full time. The day headcount is still to be counted.
 
@@ -88,6 +88,22 @@ Checked in a browser. Four real schedule pages against hand transcriptions: 327 
 Telephone numbers are personal data. They live only in the browser's storage on the device, they are left out of receipts, and no real name or number belongs in this repository, its fixtures or its demo. The demo uses invented people and 555-01xx numbers.
 
 **Next: the shared service.** Direct messages, a department feed and news need accounts and a server, which this app does not have. The telephone list gives a natural membership rule: only people on the list can join. That is the next large piece of work and it is not started.
+
+## Added on branch `claude/fairness`
+
+The owner's direction on 2026-11-11: easy controls, ways to track fairness, things kept documented, proof of shift-change agreements, and a way for the department to talk that does not depend on personal phone numbers, because people get left out. Helpful acts should be acknowledged, such as offering to go home in place of the person who was next for a low-census cut, or being the one who accepts a trade. He suggested a "stat sheet" like an athlete's line for a game. He agreed that surveys rating coworkers are a bad idea and that nobody should be singled out.
+
+The rule this branch follows: count what people carried and the times they helped. Never count call-offs, declined requests or opinions.
+
+- **Fairness tab** (`src/fairness.js`). For day shift or night shift, each person's shifts, weekend turns, fair share and the difference, with holidays, charge and ICU turns alongside. The headline says how many regulars are within one weekend turn of their share and who would be first in line for the next one. Fair share follows shifts worked. Students are left out. A weekend-only position, set in Staff details, is left out of the weekend pool.
+- **Stat sheet** for the person using the app: shifts, weekend turns against fair share, holidays, charge, ICU, trades accepted, shifts covered, times they went home for someone, and low-census hours.
+- **Low-census record** on any shift: hours, whether the person offered or was sent, and whose turn they took. Offered and directed hours count the same toward who is next, so offering never moves a person to the front of the line.
+
+Why "within one turn" is the target: for a single kind of turn handed out one at a time, a rotation exists that keeps everyone within 1 − 1/(2m−2) of their fair share at every point (Tijdeman, Meijer). When a schedule is planned ahead with known time off, within one is still achievable. When turns are decided day by day, the simple lowest-share-first rule is only guaranteed to stay within (n−1)/2 (Ajtai and others, the carpool problem). Several kinds of turn at once, with hours and rest limits, have no such guarantee. A simulation of lowest-share-first with seven people and three per night stayed within 0.86 of a turn over 144 weekend nights.
+
+On the owner's real November and December night pages, as printed, the weekend spread among the six regulars was 6.4 turns. The module reproduces a hand calculation of the same pages.
+
+Open design point for the shared version: the full table is a standings table. Each person should see their own sheet and the department spread. The full table belongs to whoever builds the schedule.
 
 ## Still open from the review
 
