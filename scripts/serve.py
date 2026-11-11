@@ -40,7 +40,8 @@ def is_department_hub():
 
 def stop_older_copy():
     try:
-        found = subprocess.run(["lsof", "-ti", f"tcp:{port}"], capture_output=True, text=True, timeout=5).stdout.split()
+        # Select listeners only; established browser/client sockets also name this port.
+        found = subprocess.run(["lsof", "-nP", f"-tiTCP:{port}", "-sTCP:LISTEN"], capture_output=True, text=True, timeout=5).stdout.split()
     except (OSError, subprocess.SubprocessError):
         return False
     for pid in found:

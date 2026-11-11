@@ -8,3 +8,4 @@ local-data/
 *.sqlite*
 .env*
 .DS_Store
+__pycache__/
