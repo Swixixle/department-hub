@@ -514,3 +514,9 @@ test('a rewording may end in "next", and still may not add or drop a day, a span
   const other = ask('when is parker back', { ...world, corrections });
   assert.deepEqual([other.read, other.kind, other.corrected.id], ['when does parker work next', 'when', 'back']);
 });
+
+test('a non-date slash expression does not hide an actual date later in the question', () => {
+  const result=parseWhen('In our 24/7 department, do I work 12/25?',today);
+  assert.equal(result?.from,'2026-12-25');
+  assert.equal(parseWhen('The split is 50/50; do I work 2/30?',today)?.invalid,true);
+});
