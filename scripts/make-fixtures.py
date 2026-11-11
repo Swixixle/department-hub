@@ -87,7 +87,7 @@ def calendar_pages():
                     draw.text((x + 12, ty), label, fill="#141414", font=font(27))
                     if offset % 11 == 6 and index == 2:
                         draw.line((x + 8, ty + 19, x + 18 + span, ty + 15), fill="#141414", width=3)
-                        draw.text((x + 26 + span, ty + 2), "Lee Jn", fill="#30303a", font=font(24))
+                        draw.text((x + 26 + span, ty + 2), "changed", fill="#30303a", font=font(24))
                         struck.append(day.isoformat() + "|" + shift)
                         continue
                     entry = {"date": day.isoformat(), "shift": shift, "person": name}
