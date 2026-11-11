@@ -30,6 +30,15 @@ There is no machine to run or look after.
 
 Ask works today by looking things up, with no model. A model could broaden supported wording and provide summaries. For a hosted API, keep the provider key on the server rather than in the app. That route would incur the provider's usage charges and send selected records to that provider. A local model is also possible but is not implemented. Hand a model only records the person asking is allowed to see, keep the source and date on every answer, and establish an approved processing route before sending department documents to an outside service.
 
+There are two further steps, and they are different decisions.
+
+1. **A small embedding model in the browser.** It scores how close a question is in meaning to each passage and taught answer. Nothing leaves the device, nothing is paid for each question and it cannot invent an answer, because it only ranks what is already there. It needs no server. It costs a one-time download of tens of megabytes per device and some work to measure whether it helps on this department's real questions.
+2. **A language model on the hosted service.** It would take questions in any wording, summarise and put a policy into plain words. The key for it cannot sit in the app, so it runs on the server. Each question costs a little and sends the text of the records it uses to the company that runs the model. Hand the model only what `src/ask.js` finds for the person asking, keep the source and date on every answer, show the quoted passage beside anything the model wrote, and decide first whether the department's documents may be sent to an outside service at all.
+
+## The log on the hosted service
+
+In the browser the log is as trustworthy as the device it sits on. On the hosted service the server should write each receipt, with the signed-in person's identity and the server's clock, into a table that the app can add to and never change. The latest fingerprint should be copied somewhere outside the service on a schedule, which makes the checkpoint automatic. Fingerprinting of posts and files stays as it is.
+
 ## Hosting
 
 The pick is Cloudflare: Workers for the service, D1 for the database, R2 for files. Figures read from their pricing pages on 2026-11-11:

@@ -146,3 +146,55 @@ test('matching a sample announcement without a timestamp still opens its source'
   assert.equal(answer.items[0].go, 'post|sample');
   assert.match(answer.source, /not policy/);
 });
+
+test('messy questions are read: shorthand, misspellings, bad grammar and follow-ups', () => {
+  assert.match(reply('wen do i work nxt').title, /^Your next shift is Fri, Nov 13, night \(charge\)\.$/);
+  assert.match(reply('me working thanksgivng??').title, /^You are on Thanksgiving, Thu, Nov 26:$/);
+  assert.equal(reply('who am i w/ fri nite').items[0].text, 'Fri, Nov 13 night: with Morgan (ICU), Parker and Quinn');
+  assert.deepEqual(reply('whos on 2nite').items.map(item => item.text), ['Wed, Nov 11 night: Morgan (charge), Parker and Quinn (ICU)']);
+  const fixed = reply('is Morgn workin firday');
+  assert.match(fixed.title, /^Morgan is on Fri, Nov 13:$/);
+  assert.equal(fixed.read, 'is morgan working friday');
+  assert.deepEqual(fixed.changes, [['morgn', 'morgan'], ['firday', 'friday']]);
+  assert.equal(reply('When do I work next?').read, '');
+  // Shorthand is spelled out and shown back, and a shift named without a day does not mean today only.
+  assert.equal(reply('whos workin tonite').read, 'who is working tonight');
+  assert.equal(reply('any short nites this wk').context.when.label, 'this week');
+  assert.match(reply('any short nights').title, /the next four weeks$/);
+  assert.equal(reply('wen r the competencies do').read, 'when are the competencies due');
+  assert.equal(reply('wen r the competencies do').kind, 'dated');
+  // A follow-up keeps the kind of question and changes the part that was named.
+  const first = reply('who is on tonight');
+  const then = ask('and friday?', { ...world, last: first.context });
+  assert.deepEqual(then.items.map(item => item.text.slice(0, 17)), ['Fri, Nov 13 day: ', 'Fri, Nov 13 night']);
+  const person = ask('what about Morgan', { ...world, last: reply('when do I work next').context });
+  assert.match(person.title, /^Morgan’s next shift is Wed, Nov 11, night \(charge\)\.$/);
+});
+
+test('documents are found through other words for the same thing, misspellings and word endings', () => {
+  for (const question of ['how do i get pto', 'requesting vacation', 'how to reqest leav', 'time off requests how', 'what are the rules for asking for days off'])
+    assert.match(reply(question).items[0]?.sub || '', /^Time off requests/, question);
+  assert.match(reply('How do I request leave?').items[0].text, /^A request for leave is entered/);
+  assert.equal(reply('ventilator weaning steps').empty, true);
+});
+
+test('a taught answer comes back for a question like the one it was taught for, and a confirmed passage is lifted', () => {
+  const answers = [{ id: 't1', asks: ['where do the dirty circuits go'], answer: 'The grey bin in the soiled utility room.', by: 'Avery', at: '2026-11-10T09:00:00Z', source: 'Lead, Nov 10' }];
+  const taught = ask('where do dirty circuts go?', { ...world, answers });
+  assert.equal(taught.items[0].text, 'The grey bin in the soiled utility room.');
+  assert.equal(taught.items[0].sub, 'Answered by Avery on Tue, Nov 10 · Lead, Nov 10');
+  assert.equal(taught.taught, 't1');
+  assert.equal(ask('where is the supply room', { ...world, answers }).taught, undefined);
+  // A question that would be read as another kind still gets the answer taught for those exact words, misspelled or not.
+  const due = [{ id: 't2', asks: ['when is the skills fair due'], answer: 'It is not due. The skills fair is walk-in, any Tuesday.', by: 'Avery', at: '2026-11-10T09:00:00Z', source: '' }];
+  assert.equal(ask('when is the skills fair due', { ...world }).kind, 'dated');
+  assert.equal(ask('is my schedule fair', { ...world }).kind, 'fair');
+  assert.equal(ask('wen is the skills fair due?', { ...world, answers: due }).taught, 't2');
+  assert.equal(ask('what is due this week', { ...world, answers: due }).taught, undefined);
+  const text = 'Holidays\n\nHoliday time off rotates each year between staff.\n\nRequests\n\nA holiday request is entered in the fall for the year ahead.';
+  const docs = [{ id: 'h', title: 'Holidays', kind: 'Policy', effective: '', text }];
+  const before = ask('holiday time off rule', { ...world, documents: docs }).items[0].go;
+  const wanted = 'doc|h|' + text.indexOf('A holiday request');
+  assert.notEqual(before, wanted);
+  assert.equal(ask('holiday time off rule', { ...world, documents: docs, learned: [{ terms: ['holiday', 'time', 'off', 'rule'], go: wanted, count: 3 }] }).items[0].go, wanted);
+});

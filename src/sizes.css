@@ -124,3 +124,10 @@ details>summary{cursor:pointer;font-weight:650;color:#276143}
 .pair{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 @media(max-width:780px){.ask-item{align-items:flex-start}.line-list>div{flex-wrap:wrap}}
 @media(max-width:780px){dialog form>.actions.inline{position:static;margin:0;padding:.4rem 0 0;box-shadow:none}}
+
+/* the standing notice */
+.unofficial{display:block;width:100%;min-height:var(--tap);text-align:left;border:0;border-bottom:1px solid #d9b25c;border-radius:0;background:#fff4d6;color:#5c3a00;padding:.5rem 1rem;font-size:.875rem;line-height:1.35;font-weight:400;cursor:pointer}
+.unofficial u{white-space:nowrap}
+@media(max-width:780px){.unofficial{padding:.5rem 14px}}
+.mark{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.875rem;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;background:#f0f5ee;border:1px solid var(--line);border-radius:8px;padding:.6rem}
+.refusal.shown{display:block}

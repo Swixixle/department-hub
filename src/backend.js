@@ -7,7 +7,7 @@
 //   shared            true when other people's devices see the same posts
 //   where             a few words for the person: where a post goes
 //   list()            every post, oldest first
-//   publish(post, files)   files: [[mediaId, Blob]]; resolves when the post and all its files are stored
+//   publish(post, files, record)   files: [[mediaId, Blob]]; record: fingerprints for the receipt; resolves when all is stored
 //   remove(postId)    takes a post and its files away
 //   file(mediaId)     the Blob for one attachment, or nothing if it is not available
 //   clear()           forget every file (used when the workspace is erased)
@@ -19,11 +19,11 @@ export function localBoard({ getPosts, change }) {
     shared: false,
     where: 'this browser only',
     async list() { return getPosts(); },
-    async publish(post, files = []) {
+    async publish(post, files = [], record = {}) {
       const stored = [];
       try {
         for (const [id, blob] of files) { await putMedia(id, blob); stored.push(id); }
-        await change('Board update', { id: post.id, attachments: files.length, voice: Boolean(post.voice) }, posts => [...posts, post]);
+        await change('Board update', { id: post.id, attachments: files.length, voice: Boolean(post.voice), ...record }, posts => [...posts, post]);
       } catch (error) {
         for (const id of stored) await deleteMedia(id).catch(() => {});      // no orphaned files if the post did not save
         throw error;

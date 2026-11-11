@@ -24,6 +24,8 @@ The first release uses an illustrative Indianapolis department profile with day 
 
 **Ask**, in the header on every screen, looks up supported questions in the workspace's own records: when someone works, who is on, what is new on the board, what is due, how to reach someone, and matching passages in added documents. Answers name and open their sources. It uses question patterns and text matching, with no language model; unfamiliar wording can miss a record. Nothing typed into it leaves the device.
 
+A line at the top of every screen says the app is not an official hospital product and that no patient information belongs in it, and a first-use notice has to be acknowledged. Writing that has the shape of patient information is stopped once before it is posted. Every change, post, file and question leaves a hash-linked receipt with a SHA-256 fingerprint. **Activity log** checks the whole chain and shows the latest fingerprint to keep elsewhere as a checkpoint.
+
 Controls are sized for phones: 60 px for a main action, 48 px for any other control and 16 px text, with an **Aa** button for larger text. `docs/USER-TEST.md` is a one-page sheet for watching coworkers try five tasks.
 
 ## Work on the source
