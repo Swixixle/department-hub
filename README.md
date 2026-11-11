@@ -2,6 +2,8 @@
 
 A small department workspace with a roster, a department board, and conversations attached to trade and coverage requests. The public demo uses fictional data. The standalone local build accepts PNG, JPEG, and WebP screenshots.
 
+The next rollout is a private pilot in the owner's department: one department workspace, one personal account per member, a shared feed and conversations, with feedback from coworkers. Cross-department switching and other jobs are outside scope. The owner plans to fund hosting. This is direction for the next stage; the current Version 12 remains a one-browser prototype. See [the shared pilot plan](docs/SERVER.md) for the preparation and launch checks.
+
 ## Try the public demo
 
 Open the GitHub Pages deployment. Choose **Import schedule** and **Read 10 sample screenshots**. Review and publish the 217 extracted assignments. Select **Weekend** and tap one of your shifts to start a trade or coverage request. Use **Viewing as** to simulate the recipient and respond. All demo interactions are stored in that browser.

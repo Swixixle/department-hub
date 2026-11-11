@@ -4,6 +4,20 @@ Recorded 2026-11-10 from the owner's conversation with Claude. Read this after `
 
 ## What the owner has decided
 
+### Current rollout scope, clarified 2026-11-11
+
+The owner plans to introduce the app through his own department, invite willing coworkers, ask for patience and feedback, and improve it around their daily use. He expects to pay for a server in a few weeks and wants preparation done beforehand.
+
+- One private workspace per department, accessible only to approved department members. Each person has their own department account, email and credentials; this is not a shared login.
+- One readily available place for the department's schedule, updates, due dates, meetings and conversations. Avoid proliferating channels and group-selection buttons.
+- Information ordinarily sent through email should be easier to consume here. Automatic mailbox integration and replacing email are not part of this direction.
+- Departments remain isolated. Another job, cross-department membership, a workspace switcher and broader organizational administration are outside the current scope.
+- The next milestone is useful adoption by this department, not a generalized enterprise scheduling product. Prepare shared accounts, storage, membership enforcement, synchronization and separate-person agreements against synthetic fixtures before the paid service is selected.
+
+`docs/SERVER.md` turns this direction into proposed implementation stages and launch checks. Its detailed authentication flow and privacy recommendations remain design proposals; they are not features already built. Existing local storage, the fictional public demo and the Version 12 runtime are unchanged by this planning update.
+
+### Earlier direction, retained for context
+
 - **The schedule is the way in.** A coworker opens a link and sees their own shifts and who they work with. The board and conversations grow out of schedule activity.
 - **Staff-run companion.** The employer's official scheduling and timekeeping system stays the source of truth. This app holds a dated copy of the schedule and helps people coordinate. It never claims to approve or confirm anything.
 - **Phone and touch first.** Tap a shift and it highlights. A short action sheet opens with the few things you can do.
