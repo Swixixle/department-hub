@@ -131,3 +131,8 @@ details>summary{cursor:pointer;font-weight:650;color:#276143}
 @media(max-width:780px){.unofficial{padding:.5rem 14px}}
 .mark{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.875rem;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;background:#f0f5ee;border:1px solid var(--line);border-radius:8px;padding:.6rem}
 .refusal.shown{display:block}
+
+/* ways off a shift, and exchanges */
+.option{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;background:#fbfdfb;display:grid;gap:4px}
+.option p{margin:0}.option .move{font-weight:650}
+.caution{color:#7a4b00}

@@ -8,6 +8,7 @@
 import { holidays, staffing, statSheet } from './fairness.js';
 import { addDays, normalizeName, shiftInterval, weekStart } from './model.js';
 import { expand, keywords, nearest, qualifiers, stem, tidyQuestion } from './words.js';
+import { checkExchange, describe, findOptions, shiftName, weekChanges } from './trades.js';
 
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -166,12 +167,16 @@ export function ask(question, world) {
   // A skills fair or a job fair is an event, not a question about fairness.
   const eventFair = / (skills?|competenc(y|ies)|job|career|health|wellness|benefits?|education|vendor|science|book|craft|county|state) fair /.test(q);
   const rosterWho = has('who') && (has('work', 'shift', 'schedule', 'on', 'with') || (when && !has('leave', 'vacation', 'pto', 'request', 'approve', 'approval')));
+  // Getting off one of your own shifts, or picking one up. Both are worked out with the trade rules, not looked up.
+  const pickUp = Boolean(world.trade) && self && !/ my /.test(q) && / (pick up|pickup|picking up|cover for|take over) /.test(q) && Boolean(when || others.length);
+  const wantsOff = Boolean(world.trade) && self && !pickUp && (has('trade', 'swap', 'switch', 'cover', 'coverage') || / (take|taking|pick up|give away|giving up) my /.test(q) || / (need|want|get|have) (\w+ ){0,3}off /.test(q)) && Boolean(when || has('next', 'shift'));
   // Which kind of question this is, from the words in it. Order matters: the more particular kinds come first.
   let kind = has('number', 'phone', 'call', 'text', 'reach', 'contact', 'cell') && others.length ? 'contact' :
     has('fairness', 'unfair', 'share', 'carrying') || (has('fair') && !eventFair) || (has('many', 'much', 'count') && has('weekend', 'holiday', 'turn')) ? 'fair' :
     has('short', 'understaffed', 'overstaffed', 'census', 'four') || q.includes(' called off ') || (has('extra') && has('person', 'people')) ? 'staffing' :
     has('due', 'deadline', 'meeting', 'event', 'upcoming', 'calendar') || q.includes(' coming up ') ? 'dated' :
     / (miss|missed|news|latest|unread|announcements?|board) /.test(q) || / (is|anything) new /.test(q) || / new (post|message)/.test(q) ? 'news' :
+    pickUp ? 'pickup' : wantsOff ? 'trade' :
     rosterWho || (has('with') && (self || when)) ? 'who' :
     (others.length && (when || has('work', 'shift', 'schedule', 'on', 'off', 'next'))) || has('shift', 'schedule') || (has('work') && (self || when)) || (has('on', 'off') && self && when) || (has('next') && self) || (when && self && tokens.size <= 5) ? 'when' : 'look';
   // A follow-up such as "and Saturday?" or "what about Avery?" keeps the last kind of question and changes one part.
@@ -266,6 +271,37 @@ export function ask(question, world) {
       dated.map(postItem), 'Dated posts on the board', { empty: false });
   }
 
+  // Ways off one of the person's own shifts.
+  const tradeSource = 'Worked out from the schedule and the trade rules entered. It does not know who is willing or who is on leave.';
+  if (kind === 'trade') {
+    const target = shiftsOf(actor).find(row => when && !when.bare ? inRange(row) && row.date >= today : upcoming(row) && (!when?.shift || row.shift === when.shift));
+    if (!target) return answer('You are not on the schedule ' + (when && !when.bare ? when.label : 'from today on') + '.', [], scheduleSource, { empty: false });
+    const found = findOptions({ ...world.trade, target }), some = (n, one, many) => n ? n + ' ' + (n === 1 ? one : many) : '';
+    if (found.blockedForMe.length) return answer(shiftName(target) + ' cannot be offered.', [{ text: found.blockedForMe.join(' '), sub: '', go: 'date|' + target.date }], tradeSource, { empty: false });
+    const counted = [some(found.counts.pickups, 'person could pick it up', 'people could pick it up'), some(found.counts.swaps, 'swap passes', 'swaps pass'), some(found.counts.chains, 'three-person chain passes', 'three-person chains pass')].filter(Boolean);
+    const items = ['pickups', 'swaps', 'chains'].flatMap(group => found[group].slice(0, group === 'pickups' ? 2 : 1)).map(option => {
+      const lines = describe(option, actor), split = lines.findIndex(line => /^(Hours|Nobody)/.test(line));
+      return { text: lines.slice(0, split).join(' '), sub: [lines[split], ...option.cautions].join(' '), go: 'options|' + target.key };
+    });
+    const first = found.pickups[0]?.moves[0].to || found.swaps[0]?.moves[0].to;
+    return answer(counted.length ? 'For ' + shiftName(target) + ': ' + counted.join(', ') + '.' : 'Nothing simple passes the rules for ' + shiftName(target) + '.',
+      items.length ? items : [{ text: 'Open the shift to look for three-person loops', sub: found.blockedForMe.join(' '), go: 'options|' + target.key }], tradeSource,
+      { empty: false, next: [first && 'How do I reach ' + first + '?', 'Who is on ' + pretty(target.date) + (target.shift === 'N' ? ' night' : ' day') + '?'].filter(Boolean) });
+  }
+  // Picking up a shift: would the rules allow it, and what would it do to the week.
+  if (kind === 'pickup') {
+    const mine = shiftsOf(actor), usual = mine.filter(row => row.shift === 'N').length * 2 > mine.length ? 'N' : 'D', span = when && !when.bare ? when : null;
+    const target = assignments.filter(row => !same(row.person, actor) && row.date >= today && (!span || (row.date >= span.from && row.date <= span.to)) && row.shift === (when?.shift || usual) &&
+      (!others.length || others.some(name => same(name, row.person)))).sort(byTime)[0];
+    if (!target) return answer('Nobody is listed on a shift you could pick up ' + (span ? span.label : 'from today on') + '.', [], scheduleSource, { empty: false });
+    if (on(target.date, target.shift).some(row => same(row.person, actor))) return answer('You are already on ' + shiftName(target) + '.', [], scheduleSource, { empty: false });
+    const result = checkExchange({ ...world.trade, moves: [{ key: target.key, to: actor }] }), me = result.people.find(part => same(part.person, actor)) || { weeks: [], problems: [], cautions: [], notes: [] };
+    const said = [...me.problems, ...me.cautions, ...me.notes].map(text => text.replace(new RegExp('^' + actor + ' would'), 'You would'));
+    return answer('Picking up ' + shiftName(target) + (result.status === 'blocked' ? ' does not pass the rules entered.' : result.status === 'check' ? ' passes, with something to check.' : ' passes the rules entered.'),
+      [{ text: ['Your hours: ' + (weekChanges(me) || 'no change') + '.', ...said].join(' '), sub: 'On that shift now: ' + list(on(target.date, target.shift).map(tagged)), go: 'date|' + target.date }], tradeSource,
+      { empty: false, next: ['When do I work next?', 'How many weekends have I worked?'] });
+  }
+
   // 6. Who is on, or who the person is working with.
   if (kind === 'who') {
     if (has('with') || (followed && last?.withActor)) {
@@ -292,7 +328,7 @@ export function ask(question, world) {
     }
     const coming = shiftsOf(subject).filter(row => upcoming(row) && (!when?.shift || row.shift === when.shift)).slice(0, 4);
     return answer(coming.length ? (same(subject, actor) ? 'Your' : subject + '’s') + ' next shift is ' + pretty(coming[0].date) + ', ' + shiftWord(coming[0].shift) + (coming[0].role ? ' (' + (ROLES[coming[0].role] || coming[0].role) + ')' : '') + '.' : whose + ' ' + be + ' not on the schedule from today on.',
-      coming.map(shiftItem), scheduleSource, { empty: false });
+      coming.map(shiftItem), scheduleSource, { empty: false, next: !coming.length ? [] : same(subject, actor) ? ['Who am I working with on my next shift?', ...(world.trade ? ['Who can take my next shift?'] : [])] : ['How do I reach ' + subject + '?'] });
   }
 
   // Search taught answers, document passages and board posts.
@@ -320,4 +356,4 @@ export function ask(question, world) {
   }
 }
 
-export const SUGGESTIONS = ['When do I work next?', 'Who am I working with on my next shift?', 'Who is on tonight?', 'What did I miss on the board?', 'What is coming up?', 'How many weekends have I worked?'];
+export const SUGGESTIONS = ['When do I work next?', 'Who am I working with on my next shift?', 'Who is on tonight?', 'What did I miss on the board?', 'What is coming up?', 'How many weekends have I worked?', 'Who can take my next shift?'];

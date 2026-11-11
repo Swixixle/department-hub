@@ -240,3 +240,21 @@ test('follow-ups retain the night pool but a fresh question resets coworker cont
   const fresh = ask('who is on tonight', {...world,last:withMe.context});
   assert.match(fresh.items[0].text, /Morgan \(charge\), Parker and Quinn/);
 });
+
+test('trade questions are worked out with the trade rules, and answers offer a next step', async () => {
+  const { projectRoster } = await import('../src/model.js');
+  const trade = { roster: projectRoster(world.assignments, []), directory: world.directory, policy: (await import('../src/model.js')).POLICY, committed: [], today: world.today, offers: [] };
+  const off = ask('who can take my next shift', { ...world, trade });
+  assert.equal(off.kind, 'trade');
+  assert.match(off.title, /^(For .+: .+\.|Nothing simple passes the rules for .+\.)$/);
+  assert.ok(off.items.every(item => item.go.startsWith('options|')));
+  assert.match(off.source, /does not know who is willing/);
+  assert.equal(ask('i need friday off', { ...world, trade }).kind, 'trade');
+  assert.equal(ask('whos workin tonite', { ...world, trade }).kind, 'who');                      // roster questions are untouched
+  assert.equal(ask('what is the trade policy', { ...world, trade }).kind, 'look');               // a policy question is still a document search
+  const up = ask('can i pick up saturday', { ...world, trade });
+  assert.equal(up.kind, 'pickup');
+  assert.match(up.title, /^(Picking up .+ (passes|does not pass)|You are already on|Nobody is listed)/);
+  assert.equal(ask('who can take my next shift', world).kind === 'trade', false);                // without the trade rules it does not pretend
+  assert.deepEqual(ask('When do I work next?', { ...world, trade }).next, ['Who am I working with on my next shift?', 'Who can take my next shift?']);
+});

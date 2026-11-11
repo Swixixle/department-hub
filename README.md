@@ -30,6 +30,8 @@ A notice on each screen and sheet says this is an independent staff project, not
 
 **Activity log** checks receipt links and hashes, and separately checks retained posts, files and documents against their recorded fingerprints. Large files use a SHA-256 chunk-manifest fingerprint covering every byte. Older items and unavailable media are reported as unverified or unavailable. A complete fingerprint saved independently can expose tail deletion or history replacement. These are local, unsigned receipts using the selected profile and device clock, not authenticated identities or active monitoring.
 
+**Find ways off this shift**, on any of your own shifts, works out who could pick it up, which swaps pass, and which three-person exchanges pass, under rules the record keeper can set (pay-week start, weekly hours, rest between shifts). Each option states what it does to everyone's weekly hours. An exchange needs every person in it to agree and is rechecked each time. Ask answers "who can take my Friday night" and "can I pick up Saturday" with the same arithmetic. None of it knows who is willing or on leave.
+
 Controls are sized for phones: 60 px for a main action, 48 px for any other control and 16 px text, with an **Aa** button for larger text. `docs/USER-TEST.md` is a one-page sheet for watching coworkers try five tasks.
 
 ## Work on the source
