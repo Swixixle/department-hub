@@ -5,6 +5,11 @@ const {pathToFileURL} = require('node:url');
 const assert = require('node:assert/strict');
 const {JSDOM} = require('jsdom');
 (async () => {
+  const RealDate = Date;
+  globalThis.Date = class extends RealDate {
+    constructor(...args) { super(...(args.length ? args : ['2026-11-11T12:00:00Z'])); }
+    static now() { return RealDate.parse('2026-11-11T12:00:00Z'); }
+  };
   const root = process.cwd();
   const model = await import(pathToFileURL(path.join(root, 'src/model.js')));
   const manifest = JSON.parse(fs.readFileSync('public/fixtures/manifest.json', 'utf8'));
@@ -31,8 +36,16 @@ const {JSDOM} = require('jsdom');
   const entry = fs.readdirSync('dist/assets').find(name => /^index-.*\.js$/.test(name));
   await import(pathToFileURL(path.join(root,'dist/assets',entry)));
   const settle = () => new Promise(resolve=>setTimeout(resolve,70));
+  const waitFor = async (ready,label) => {for(let i=0;i<150;i++) {if(ready()) {await settle(); return;} await new Promise(resolve=>setTimeout(resolve,20));} assert.fail('Timed out: '+label);};
   const click = async (action,value) => {const el=[...document.querySelectorAll('[data-action]')].find(el=>el.dataset.action===action && (value===undefined || el.dataset.value===value)); assert.ok(el,'Missing action '+action); el.click(); await settle();};
-  const ask = async q => {const form=document.querySelector('form[data-form="ask"]'); assert.ok(form); form.querySelector('[name=q]').value=q; form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true})); await settle(); return document.querySelector('.ask-answer').textContent;};
+  const ask = async q => {
+    const form=document.querySelector('form[data-form="ask"]'); assert.ok(form);
+    const digest=Buffer.from(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(q.trim().toLowerCase()))).toString('hex');
+    const previous=JSON.parse(localStorage.getItem(key)).events.at(-1)?.id;
+    form.querySelector('[name=q]').value=q; form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+    await waitFor(()=>{const event=JSON.parse(localStorage.getItem(key)).events.at(-1); return event?.id!==previous && (event?.details?.fingerprint===digest || event?.type==='Question blocked by text screen');},'question receipt');
+    return document.querySelector('.ask-answer').textContent;
+  };
   const actor = async name => {const el=document.querySelector('#actor'); el.value=name; el.dispatchEvent(new w.Event('change',{bubbles:true})); await settle();};
   assert.ok(document.querySelector('.app-top [data-action="ask-open"]'));
   assert.equal(document.querySelector('[data-action=close]'),null);
@@ -122,6 +135,40 @@ const {JSDOM} = require('jsdom');
   assert.match(document.querySelector('.flash').textContent,/not fully verified/);
   assert.equal(read().assignments.length,stored.assignments.length);
   assert.equal(fetches.length,1);
-  console.log('PASS: earlier Ask flows, notice acknowledgement, repeated patient-text blocking, transient questions, stable night follow-up, source-bound feedback/deletion, reviewed question saving, taught notes/aliases, chain checks and full checkpoints. No external requests; roster preserved.');
+  assert.doesNotMatch(document.body.textContent,/\bCRH\b/);
+  await click('close'); await actor('Jordan'); await click('ask-open');
+  assert.match(await ask('what days do I work the first week of December'),/shifts? from Dec 1 to Dec 7/);
+  const proposeNext = async () => {
+    await ask('Who can I trade my next shift with?');
+    const go=[...document.querySelectorAll('[data-action="ask-go"]')].find(el=>el.dataset.value.startsWith('options|'));
+    assert.ok(go,'Trade answer opens the ways off the shift');
+    await click('ask-go',go.dataset.value); await click('propose');
+    await waitFor(()=>document.querySelector('dialog')?.dataset.dialog==='exchange','proposal saved');
+    const exchange=read().exchanges.at(-1);
+    assert.ok(exchange.basis);
+    assert.equal(exchange.version,await audit.sha256(exchange.basis));
+    return exchange;
+  };
+  const stale=await proposeNext();
+  await click('close'); await click('tab','requests'); await click('trade-rules');
+  await submitForm('trade-rules',{weekStartsOn:'1',limit:'40',overLimit:'warn',rest:'8',row:'0'});
+  await actor(stale.parties.find(name=>name!=='Jordan'));
+  await click('exchange',stale.id); await click('exchange-agree');
+  assert.equal(read().exchanges.find(item=>item.id===stale.id).status,'No longer possible');
+  assert.equal(model.committedKeys(read().exchanges).length,0);
+  await click('close'); await actor('Jordan'); await click('ask-open');
+  assert.match(await ask('How many hours do I have next week?'),/week of Mon, Nov 16/);
+  const exchange=await proposeNext();
+  for(const name of exchange.parties.filter(name=>name!=='Jordan')) {
+    await click('close'); await actor(name); await click('exchange',exchange.id); await click('exchange-agree');
+  }
+  assert.equal(read().exchanges.at(-1).status,model.EXCHANGE_AGREED);
+  assert.deepEqual(model.committedKeys(read().exchanges),exchange.moves.map(move=>move.key));
+  const projected=model.projectRoster(read().assignments,read().exchanges);
+  for(const move of exchange.moves) assert.equal(projected.find(row=>row.key===move.key).person,move.to);
+  assert.equal((await audit.verifyReceipts(read().events)).ok,true);
+  assert.equal(read().assignments.length,stored.assignments.length);
+  assert.equal(fetches.length,1);
+  console.log('PASS: previous Ask/audit flows, Version 12 date questions, configured pay weeks, source-bound exchange proposals, stale agreement rejection, multi-party agreement and projected reservations. No external requests; roster preserved.');
   dom.window.close();
 })().catch(error=>{console.error(error.stack);process.exitCode=1;});

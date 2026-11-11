@@ -45,7 +45,7 @@ test('schedule questions are answered from the roster and say so', () => {
   assert.equal(reply('Who am I working with on my next shift?').items[0].text, 'Fri, Nov 13 night: with Morgan (ICU), Parker and Quinn');
   assert.deepEqual(reply('Who is on tonight?').items.map(item => item.text), ['Wed, Nov 11 night: Morgan (charge), Parker and Quinn (ICU)']);
   assert.deepEqual(reply('who is on today').items.length, 2);
-  assert.match(reply('Is Morgan working this weekend?').title, /^Morgan is on this weekend:$/);
+  assert.match(reply('Is Morgan working this weekend?').title, /^Morgan has \d+ shifts? this weekend:$/);
   assert.match(reply('Am I working Thanksgiving?').title, /^You are on Thanksgiving, Thu, Nov 26:$/);
   assert.match(reply('am i working tomorrow').title, /^You are not on the schedule tomorrow\.$/);
   assert.match(reply('when does Jordan K work').title, /^Jordan K’s next shift is Wed, Nov 18, night\.$/);
@@ -226,7 +226,7 @@ test('learning keeps negation and obligation separate and ambiguous names need c
   const note = { id:'n', asks:['can we reuse circuits'], answer:'Only a note.' };
   assert.equal(matchTaught('cannot we reuse circuits', [note]), null);
   assert.equal(matchTaught('must we reuse circuits', [note]), null);
-  const result = ask('is kesha on tonight', {...world, assignments:[row(today,'N','Keshia'),row(today,'N','Keisha')]});
+  const result = ask('is maria on tonight', {...world, assignments:[row(today,'N','Marian'),row(today,'N','Marina')]});
   assert.equal(result.empty, true);
   assert.match(result.title, /Which staff name/);
   assert.equal(result.items.length, 0);
@@ -239,4 +239,89 @@ test('follow-ups retain the night pool but a fresh question resets coworker cont
   const withMe = reply('who am I working with on my next shift');
   const fresh = ask('who is on tonight', {...world,last:withMe.context});
   assert.match(fresh.items[0].text, /Morgan \(charge\), Parker and Quinn/);
+});
+
+test('trade questions are worked out with the trade rules, and answers offer a next step', async () => {
+  const { projectRoster } = await import('../src/model.js');
+  const trade = { roster: projectRoster(world.assignments, []), directory: world.directory, policy: (await import('../src/model.js')).POLICY, committed: [], today: world.today, offers: [] };
+  const off = ask('who can take my next shift', { ...world, trade });
+  assert.equal(off.kind, 'trade');
+  assert.match(off.title, /^For .+: .+(keeps?|keeps everyone|hours).+\.$/);
+  assert.ok(off.items.every(item => item.go.startsWith('options|')));
+  assert.match(off.source, /does not know who is willing/);
+  assert.equal(ask('i need friday off', { ...world, trade }).kind, 'trade');
+  assert.equal(ask('whos workin tonite', { ...world, trade }).kind, 'who');                      // roster questions are untouched
+  assert.equal(ask('what is the trade policy', { ...world, trade }).kind, 'look');               // a policy question is still a document search
+  const up = ask('can i pick up saturday', { ...world, trade });
+  assert.equal(up.kind, 'pickup');
+  assert.match(up.title, /^(Picking up .+ (passes|does not pass)|You are already on|Nobody is listed)/);
+  assert.equal(ask('who can take my next shift', world).kind === 'trade', false);                // without the trade rules it does not pretend
+  assert.deepEqual(ask('When do I work next?', { ...world, trade }).next, ['Who am I working with on my next shift?', 'Who can I trade my next shift with?']);
+  assert.match(ask('can someone cover my next shift', { ...world, trade }).title, /could cover it|cannot be offered|keeps? everyone|nothing left/);
+});
+
+test('ordinary schedule questions: which days, date ranges, days off and hours', () => {
+  const when = text => { const found = parseWhen(text, today); return found && [found.from, found.to, found.shift, found.label]; };
+  // "What days" asks which days. It is not a question about the day shift.
+  assert.deepEqual(when('what days do i work the first week of december'), ['2026-12-01', '2026-12-07', null, 'from Dec 1 to Dec 7']);
+  assert.deepEqual(when('what days do i work next week').slice(2), [null, 'next week']);
+  assert.equal(when('who is on days friday')[2], 'D');
+  assert.equal(when('do i work days or nights next week')[2], null);
+  assert.deepEqual(when('my schedule for december'), ['2026-12-01', '2026-12-31', null, 'in December']);
+  assert.deepEqual(when('my schedule next month').slice(0, 2), ['2026-12-01', '2026-12-31']);
+  assert.deepEqual(when('do i work the 19th').slice(0, 2), ['2026-11-19', '2026-11-19']);
+  assert.deepEqual(when('am i working on the 3rd').slice(0, 2), ['2026-12-03', '2026-12-03']);                 // the 3rd has passed, so the next one
+  assert.deepEqual(when('shifts the week of nov 15').slice(0, 2), ['2026-11-15', '2026-11-21']);
+  assert.deepEqual(when('when do i work in the next two weeks').slice(0, 2), ['2026-11-11', '2026-11-24']);
+  assert.deepEqual(when('the rest of this week').slice(0, 2), ['2026-11-11', '2026-11-14']);
+  assert.equal(when('may i ask something'), null);                                                              // "may" alone is not the month
+  assert.deepEqual(when('fourth of july')[3], 'Independence Day, Sun, Jul 4, 2027');
+  // The answers.
+  assert.match(reply('What days do I work the first week of december?').title, /^You have (\d+|no) shifts? from Dec 1 to Dec 7[:.]$/);
+  assert.match(reply('what days do i work next week').title, /^You have (\d+|no) shifts? next week[:.]$/);
+  assert.match(reply('whats my schedule for december').title, /^You have (\d+|no) shifts? in December[:.]$/);
+  assert.match(reply('am i off friday').title, /^(Yes\. You are off Fri, Nov 13\.|No\. You work Fri, Nov 13:)$/);
+  assert.match(reply('what days am i off next week').title, /^You are off \d recorded days? next week[:.]$/);
+  assert.match(reply('when is my next day off').title, /^You are off \d+ recorded days? in the next 14 days[:.]$/);
+  assert.equal(reply('how do i get time off').kind, 'look');                                                    // still a question for the documents
+  const hours = ask('how many hours do i have this week', { ...world, trade: { policy: { weekStartsOn: 0, overtimeLimitMinutes: 2400 } } });
+  assert.equal(hours.kind, 'hours');
+  assert.match(hours.title, /^You are scheduled for [\d.]+ hours in the week of Sun, Nov 8\.$/);
+  assert.match(hours.source, /The pay week starts on Sunday and the limit entered is 40 hours\./);
+  // Someone who works only nights and asks about day shifts is told so, and still shown their schedule.
+  const nightsOnly = { ...world, assignments: world.assignments.filter(item => item.shift === 'N' || item.person !== world.actor) };
+  if (nightsOnly.assignments.some(item => item.person === world.actor && item.date >= today)) assert.match(ask('do i work days', nightsOnly).title, /^You have no day shifts from today on\.$/);
+});
+
+test('month-week dates respect explicit years and pay-week questions respect the configured boundary', () => {
+  const december = parseWhen('the first week of December 2027', today);
+  assert.deepEqual([december.from,december.to], ['2027-12-01','2027-12-07']);
+  const trade = {policy:{weekStartsOn:1,overtimeLimitMinutes:2400}};
+  const hours = ask('how many hours do I have next week', {...world,trade});
+  assert.equal(hours.items.length, 1);
+  assert.match(hours.title, /week of Mon, Nov 16/);
+});
+
+test('missing roster dates are unknown, rather than confirmed days off', () => {
+  const absent = ask('am I off December 10', world);
+  assert.equal(absent.empty, true);
+  assert.doesNotMatch(absent.title, /^Yes/);
+  assert.match(absent.source + absent.lines.join(' '), /missing|not on record/i);
+  const empty = ask('what days am I off next week', {...world,assignments:[]});
+  assert.equal(empty.empty, true);
+  const mixed = {...world,assignments:[row('2026-11-13','D','Jordan'),row('2026-11-13','N','Morgan')]};
+  assert.match(ask('am I off Friday night',mixed).title, /^Yes/);
+  assert.equal(ask('am I off Friday night',{...mixed,assignments:mixed.assignments.slice(0,1)}).empty,true);
+});
+
+test('hours use agreed assignments and a trade follow-up uses the target week', async () => {
+  const {assignmentKey,POLICY} = await import('../src/model.js');
+  const dated = [row('2026-11-18','N','Jordan'),row('2026-11-20','N','Morgan')].map(item=>({...item,key:assignmentKey(item)}));
+  const projected = dated.map(item=>item.person==='Morgan'?{...item,person:'Jordan'}:item);
+  const trade = {roster:projected,directory:{},policy:POLICY,committed:[],today,offers:[]};
+  assert.match(ask('how many hours do I have next week',{...world,assignments:dated,trade}).title, /24 hours/);
+  const first = ask('who can trade my next shift',{...world,assignments:dated,trade:{...trade,roster:dated}});
+  assert.equal(first.context.when.from,'2026-11-18');
+  const next = ask('how many hours do I have that week',{...world,assignments:dated,trade:{...trade,roster:dated},last:first.context});
+  assert.match(next.title, /week of Sun, Nov 15/);
 });

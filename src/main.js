@@ -1,12 +1,13 @@
 import './style.css';
 import './sizes.css';
-import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
+import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
 import { localBoard } from './backend.js';
 import { SUGGESTIONS, ask, pretty as prettyDate } from './ask.js';
+import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, parties, shiftName } from './trades.js';
 import { keywords, qualifiers } from './words.js';
 import { patientSigns } from './guard.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
@@ -14,7 +15,7 @@ import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, v
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
 const draftKey = storageKey + '-draft';
-const BUILD = 10;
+const BUILD = 12;
 const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
@@ -47,6 +48,8 @@ const initial = {
   answers: [],
   unanswered: [],
   learned: [],
+  exchanges: [],
+  offers: [],
   assignments: staffSample,
   directory: sampleDirectory,
   hoursVerified: true,
@@ -63,7 +66,7 @@ const initial = {
 function prepare(loaded) {
   let next = loaded;
   if (!next.people) next = { ...next, people: next.mode === 'sample' ? samplePeople : [], peopleSource: next.mode === 'sample' ? 'sample' : 'import', manualLinks: {} };
-  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}], ['history', []], ['documents', []], ['answers', []], ['unanswered', []], ['learned', []],
+  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}], ['history', []], ['documents', []], ['answers', []], ['exchanges', []], ['offers', []], ['unanswered', []], ['learned', []],
     ['custodians', next.mode === 'sample' ? ['jordan'] : []], ['holidayRules', { off: [], extra: [] }]]) if (!next[field]) next = { ...next, [field]: empty };
   next = withContacts(next);
   // The starter rules live in code. A saved workspace picks up a new rule version on load.
@@ -88,10 +91,30 @@ function saveDraft() {
 }
 const agreedRequestFor = row => state.requests.find(request => request.status === AGREED_STATUS &&
   [request.from?.key, request.to?.key].includes(row.key));
-const checkChange = (details, exceptId = null) => evaluateChange({
-  roster: projectRoster(state.assignments, state.requests), directory: state.directory,
-  hoursVerified: state.hoursVerified, policy: state.policy, committed: committedKeys(state.requests, exceptId), ...details
-});
+// Trades between any number of people. The rules are the starting ones with whatever the department has entered on top.
+const tradeRules = () => ({ ...state.policy, ...(state.tradeRules || {}) });
+const allRequests = () => [...state.requests, ...state.exchanges];
+const creditRequests = () => [...state.requests, ...exchangeCredits(state.exchanges)];
+const tradeWorld = (exceptId = null) => ({ roster: projectRoster(state.assignments, allRequests().filter(item => item.id !== exceptId)), directory: state.directory, policy: tradeRules(),
+  committed: committedKeys(allRequests(), exceptId), today: localToday(), now:new Date().toISOString() });
+const exchangeFor = row => state.exchanges.find(item => item.status === EXCHANGE_AGREED && item.moves.some(move => move.key === row.key));
+const pendingOf = exchange => exchange.parties.filter(name => !exchange.accepted[normalizeName(name)]);
+const namesList = names => names.length < 2 ? names.join('') : names.slice(0, -1).join(', ') + ' and ' + names.at(-1);
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const rulesLine = () => { const rules = tradeRules(); return 'the week starts on ' + WEEKDAYS[rules.weekStartsOn || 0] + ', ' + rules.overtimeLimitMinutes / 60 + ' hours a week (going over is ' + (rules.overLimit === 'warn' ? 'flagged' : 'refused') + '), ' +
+  rules.minimumRestMinutes / 60 + ' hours between shifts' + (rules.maxInARow ? ', a warning above ' + rules.maxInARow + ' days in a row' : ''); };
+const optionsFor = (target, loops = false) => findOptions({ ...tradeWorld(), target, offers: state.offers, loops });
+const checkChange = (details, exceptId = null) => {
+  const {from,to,recipient,kind} = details, second = kind === 'trade' ? to?.person : recipient;
+  const moves = [{key:from.key,to:second}, ...(kind === 'trade' && to ? [{key:to.key,to:from.person}] : [])];
+  const result = checkExchange({...tradeWorld(exceptId),moves});
+  if (result.status === 'blocked') return {status:'blocked',reason:result.problems.join(' ')};
+  const unknown = result.people.some(part => !state.directory[normalizeName(part.person)]?.status);
+  const cautions = [...result.cautions, ...(unknown ? ['Employment status and qualifications need verification.'] : []),
+    ...(!state.hoursVerified ? ['Hours and pickups outside this roster need verification.'] : [])];
+  return {status:cautions.length ? 'review' : 'eligible',reason:cautions.join(' ') || 'Roster-based checks passed.',
+    projections:result.people.map(part=>({person:part.person,weeks:part.weeks}))};
+};
 // The notice is shown once on each device and answered with a press, before anything else.
 const noticeKey = 'department-hub-notice-v2';
 let noticeSeen = loadState(noticeKey, null);
@@ -115,7 +138,8 @@ function countPress(action, value) {
   } catch { /* counting must never get in the way */ }
 }
 const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory',
-  shift:'Opened a shift', 'ask-yes':'Said an answer helped', 'ask-no':'Said an answer did not help', 'ask-send':'Sent a question to the record keeper', verify:'Checked the receipts', 'notice-ok':'Acknowledged the notice', notice:'Opened the notice', 'mark-copy':'Copied the latest fingerprint', 'form:mark':'Looked for an earlier fingerprint', 'form:teach':'Taught an answer', 'ask-open':'Opened Ask', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
+  shift:'Opened a shift', options:'Looked for ways off a shift', 'options-loops':'Looked for three-person loops', propose:'Proposed an exchange', 'exchange-agree':'Agreed to an exchange', 'exchange-decline':'Declined an exchange',
+  'form:offer':'Said they could pick up a shift', 'form:trade-rules':'Changed the trade rules', 'ask-next':'Pressed a next-step question', 'ask-yes':'Said an answer helped', 'ask-no':'Said an answer did not help', 'ask-send':'Sent a question to the record keeper', verify:'Checked the receipts', 'notice-ok':'Acknowledged the notice', notice:'Opened the notice', 'mark-copy':'Copied the latest fingerprint', 'form:mark':'Looked for an earlier fingerprint', 'form:teach':'Taught an answer', 'ask-open':'Opened Ask', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
   import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
   over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog' };
@@ -129,7 +153,7 @@ function markBoardSeen(value = new Date().toISOString()) {
   try { value ? localStorage.setItem(seenKey, JSON.stringify(value)) : localStorage.removeItem(seenKey); } catch { /* only affects what is new */ }
 }
 const askWorld = () => ({ today: localToday(), now:new Date().toISOString(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
-  documents: state.documents, releases: state.releases, requests: state.requests, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt,
+  documents: state.documents, releases: state.releases, requests: creditRequests(), trade: { ...tradeWorld(), offers: state.offers }, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt,
   answers: state.answers, learned: state.learned, last: ui.askContext, versions:sourceVersions });
 function currentAsk(dialog = ui.dialog) {
   const signs = patientSigns(dialog?.q || '');
@@ -144,7 +168,7 @@ async function askAndLog(q) {
   ui.lastAsk = ui.dialog = dialog;
   await commit(result.kind === 'blocked' ? 'Question blocked by text screen' : 'Question asked', {
     ...(result.kind === 'blocked' ? {} : { fingerprint:await sha256(q.trim().toLowerCase()) }),
-    engine:'ask-10-review-1', build:BUILD, kind:result.kind, answered:!result.empty,
+    engine:'ask-12-review-1', build:BUILD, kind:result.kind, answered:!result.empty,
     resolved:result.context?.when || null,
     sources:result.items.map(item => ({ reference:item.go || 'note',
       ...(item.go?.startsWith('doc|') ? { version:sourceVersions[item.go.split('|')[1]] } : {}) })),
@@ -368,7 +392,7 @@ function fairness() {
   const mine = rows.filter(row => isSame(row.person, state.actor));
   const pool = ui.pool || (mine.filter(row => row.shift === 'N').length > mine.length / 2 ? 'N' : 'D');
   const table = ledger(rows, pool, state.directory, rules), stand = standing(table), tracker = holidayTracker(rows, state.directory, rules);
-  const sheet = statSheet(state.actor, { ...state, assignments: rows, rules }), me = sheet.row;
+  const sheet = statSheet(state.actor, { ...state, requests: creditRequests(), assignments: rows, rules }), me = sheet.row;
   const line = (label, value) => '<div><b>' + h(value) + '</b><span>' + h(label) + '</span></div>';
   const verdict = !me ? '' : me.weekendOnly ? 'Weekend-only position.' :
     me.weekendVolunteer ? 'You have taken ' + sheet.weekendExtra.toFixed(1) + ' weekend turns beyond a regular share by choice.' :
@@ -475,9 +499,25 @@ function requests() {
     '</span><h3>' + h(request.kind === 'trade' ? 'Shift trade' : 'Coverage request') + '</h3><p>' + h(request.from.person + ' → ' + request.recipient) +
     ' · ' + h(shiftCaption(request.from)) + '</p></div>' +
     button('Open thread', 'thread', 'class="secondary" ' + valueAttr(request.id)) + '</article>').join('');
+  const exchanges = [...state.exchanges].reverse().map(exchange => {
+    const forMe = exchange.status.startsWith('Waiting') && pendingOf(exchange).some(name => isSame(name, state.actor));
+    return '<article class="panel request"><div><span class="badge' + (forMe ? ' dated' : '') + '">' + h(forMe ? 'Needs your answer' : exchange.status) + '</span><h3>' +
+      h(exchange.parties.length > 2 ? 'Exchange between ' + exchange.parties.length + ' people' : exchange.moves.length > 1 ? 'Swap' : 'Pick-up') + '</h3><p>' + h(namesList(exchange.parties)) + ' · ' +
+      h(exchange.moves.map(shiftName).join(', ')) + '</p></div>' + button('Open', 'exchange', 'class="secondary" ' + valueAttr(exchange.id)) + '</article>';
+  }).join('');
+  const today = localToday(), coming = state.offers.filter(offer => offer.date >= today).sort((a, b) => a.date.localeCompare(b.date) || a.shift.localeCompare(b.shift));
+  const mine = coming.filter(offer => isSame(offer.person, state.actor)), theirs = new Map();
+  for (const offer of coming) if (!isSame(offer.person, state.actor)) theirs.set(offer.date + offer.shift, [...(theirs.get(offer.date + offer.shift) || [shiftName(offer)]), offer.person]);
+  const offers = '<div class="panel"><h3>Shifts I could pick up</h3><p class="subtle">Say which shifts you would be open to working. When someone looks for a way off one of them, you are shown first. It is not a promise.</p>' +
+    (mine.length ? '<div class="line-list">' + mine.map(offer => '<div><span><b>' + h(shiftName(offer)) + '</b></span>' + button('Remove', 'offer-remove', 'class="secondary" ' + valueAttr(offer.id)) + '</div>').join('') + '</div>' : '') +
+    '<form data-form="offer" class="cell-when"><label>Date<input name="date" type="date" required min="' + today + '"></label><label>Shift<select name="shift"><option value="D">Day</option><option value="N">Night</option></select></label>' +
+    '<button class="secondary">Add</button></form>' + (theirs.size ? '<h3>Others who said they could</h3>' + [...theirs.values()].map(([shift, ...names]) => '<p><b>' + h(shift) + ':</b> ' + h(namesList(names)) + '</p>').join('') : '') + '</div>';
+  const rules = '<div class="panel"><h3>Trade rules in use</h3><p>' + h(rulesLine()[0].toUpperCase() + rulesLine().slice(1)) + '.</p><p class="subtle">' +
+    (state.tradeRules ? 'Entered by ' + h(state.tradeRules.by) + ' on ' + h(prettyDate(state.tradeRules.at.slice(0, 10))) + '.' : 'These are starting values, not your department’s confirmed rules.') + ' ' +
+    (isKeeper() ? '' : 'Whoever keeps the record can change them.') + '</p>' + (isKeeper() ? button('Change the rules', 'trade-rules', 'class="secondary"') : '') + '</div>';
   return '<section class="intro"><div><div class="eyebrow">SHIFT COORDINATION</div><h1>Requests</h1><p>Follow trades and coverage without changing the official roster.</p></div></section>' +
-    (list || '<div class="panel empty"><strong>No shift requests yet.</strong><p>Open one of your shifts to start a request.</p>' +
-      button('Go to schedule', 'tab', 'class="secondary" data-value="schedule"') + '</div>');
+    (exchanges + list || '<div class="panel empty"><strong>No shift requests yet.</strong><p>Open one of your shifts to find the ways off it.</p>' +
+      button('Go to schedule', 'tab', 'class="secondary" data-value="schedule"') + '</div>') + offers + rules;
 }
 
 function shiftCaption(row) {
@@ -489,7 +529,7 @@ function render() {
   const playing = [...app.querySelectorAll('[data-media]')].filter(player => player.currentTime > 0 && !player.ended)
     .map(player => ({ id: player.dataset.media, time: player.currentTime, on: !player.paused }));
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
-  app.innerHTML = top() + '<main>' + button('<b>Independent staff project—not an official CRH product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
+  app.innerHTML = top() + '<main>' + button('<b>Independent staff project—not an official hospital product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
     '<div class="top-tools">' + button('Aa', 'text-size', 'class="text-size" title="Text size" aria-label="Text size: ' + TEXT_NAMES[textSize] + '. Press to change."') +
     button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board or the documents"') +
     '<label class="actor">Viewing as <select id="actor" aria-label="Viewing as">' +
@@ -515,7 +555,7 @@ function render() {
 function shell(title, body) {
   return '<dialog data-dialog="' + ui.dialog.type + '" aria-labelledby="dialog-title"><div class="dialog-head"><h2 id="dialog-title">' +
     h(title) + '</h2>' + (ui.dialog.type === 'notice' && !noticeSeen ? '' : button('×', 'close', 'class="close" aria-label="Close dialog"')) + '</div><div class="dialog-body">' +
-    (ui.dialog.type === 'notice' ? '' : '<p class="subtle">Independent staff project—not an official CRH product. No patient information. Recorded actions use audit receipts.</p>') +
+    (ui.dialog.type === 'notice' ? '' : '<p class="subtle">Independent staff project—not an official hospital product. No patient information. Recorded actions use audit receipts.</p>') +
     (ui.flash ? '<p class="flash" role="status">' + h(ui.flash) + '</p>' : '') + body + '</div></dialog>';
 }
 
@@ -645,8 +685,55 @@ function dialogMarkup() {
       button('Edit names on this shift', 'edit-shift', 'class="text-button" ' + valueAttr(row.date + '|' + row.shift)) + '</p>' +
     (agreedRequestFor(row) ? '<p class="subtle">This shift is part of an agreed request that is queued for review. It cannot be offered again until that is settled.</p>' +
       '<div class="actions">' + button('Open the request', 'thread', 'class="secondary" ' + valueAttr(agreedRequestFor(row).id)) + '</div>' :
-    isMine(row) ? '<div class="actions">' + button('Trade this shift', 'matches', 'class="primary" data-kind="trade" ' + valueAttr(row.key)) +
+    exchangeFor(row) ? '<p class="subtle">This shift is part of an agreed exchange that is queued for review. It cannot be offered again until that is settled.</p>' +
+      '<div class="actions">' + button('Open the exchange', 'exchange', 'class="secondary" ' + valueAttr(exchangeFor(row).id)) + '</div>' :
+    isMine(row) ? '<div class="actions">' + button('Find ways off this shift', 'options', 'class="primary" ' + valueAttr(row.key)) +
+      button('Trade this shift', 'matches', 'class="secondary" data-kind="trade" ' + valueAttr(row.key)) +
       button('Find coverage', 'matches', 'class="secondary" data-kind="coverage" ' + valueAttr(row.key)) + '</div>' : ''));
+  if (type === 'options') {
+    const { found } = ui.dialog, kinds = ['keep', 'keepLoops', 'swaps', 'pickups', 'chains', 'loops'];
+    const lines = item => describe(item, state.actor).map(line => '<p class="' + (item.cautions.includes(line) ? 'caution' : item.notes.includes(line) || /^(Hours|Nobody|Rest)/.test(line) ? 'subtle' : 'move') + '">' + h(line) + '</p>').join('');
+    const group = (kind, title, blurb) => found[kind].length ? '<h3>' + title + '</h3><p class="subtle">' + blurb + (found.counts[kind] > found[kind].length ? ' ' + found.counts[kind] + ' pass the rules. These are the ' + found[kind].length + ' simplest.' : '') + '</p>' +
+      found[kind].map((item, index) => '<div class="option">' + (item.said ? '<span class="badge learning">Said they could work this</span>' : '') + lines(item) +
+        '<div class="actions inline">' + button('Propose this', 'propose', 'class="secondary" ' + valueAttr(kind + '|' + index)) + '</div></div>').join('') : '';
+    return shell('Ways off ' + shiftCaption(row), '<p class="subtle">Checked against this schedule and the rules entered. It does not know who is willing or who is on leave.</p>' +
+      (found.blockedForMe.length ? '<p class="caution">' + h(found.blockedForMe.join(' ')) + '</p>' : '') +
+      (found.keep.length || found.keepLoops.length ? '' : '<p><b>Nothing left in this pay week keeps everyone’s hours.</b> ' + (found.sameWeekLeft ? 'The ' + found.sameWeekLeft + ' other shifts still to come in it do not pass the rules.' : 'No other shift in it is still to come.') + ' The options below change someone’s weekly hours.</p>') +
+      group('keep', 'Swap and keep your hours', 'You each take one of the other’s shifts in the same pay week, so nobody’s weekly hours change.') +
+      group('keepLoops', 'Three people, everyone keeps their hours', 'Each of you hands a shift to the next, all in the same pay week.') +
+      group('swaps', 'Swap that moves hours between weeks', 'You each take one of the other’s shifts, in different pay weeks.') +
+      group('pickups', 'Someone covers it', 'They take the shift and give nothing back. You lose the hours.') +
+      group('chains', 'Cover through a third person', 'Someone can take yours only because a third person picks up one of theirs. You lose the hours.') +
+      (ui.dialog.loops ? group('loops', 'Other three-person exchanges', 'Each of you hands a shift to the next. These change someone’s weekly hours.') || '<p class="subtle">No other three-person exchange passes the rules.</p>' : '') +
+      (kinds.some(kind => found[kind].length) ? '' : '<p><b>Nothing ' + (ui.dialog.loops ? '' : 'simpler ') + 'passes the rules entered.</b></p>') +
+      '<p class="subtle">Rules in use: ' + h(rulesLine()) + '. Hours come from this schedule only, so a pick-up that is not on it is not counted.</p>' +
+      '<div class="actions">' + (ui.dialog.loops ? '' : button('Look for more three-person exchanges', 'options-loops', 'class="secondary"')) + button('Back to the shift', 'shift', 'class="secondary" ' + valueAttr(row.key)) + '</div>');
+  }
+  if (type === 'exchange') {
+    const exchange = state.exchanges.find(item => item.id === id);
+    if (!exchange) return shell('Exchange', '<p>This exchange is no longer here.</p>');
+    const open = exchange.status.startsWith('Waiting'), waiting = pendingOf(exchange), agreed = exchange.parties.filter(name => exchange.accepted[normalizeName(name)]);
+    const result = open ? checkExchange({ ...tradeWorld(exchange.id), moves: exchange.moves, basis:exchange.basis || '' }) : null;
+    const text = (result ? describe(result, state.actor) : exchange.summary).map(line => '<p class="' + (/^(Hours|Nobody|Rest)/.test(line) ? 'subtle' : result?.cautions.includes(line) || result?.problems.includes(line) ? 'caution' : 'move') + '">' + h(line) + '</p>').join('');
+    const reach = waiting.filter(name => contactFor(name)?.cell).map(name => '<p class="person-lines"><span>' + h(name) + '</span>' + contactButtons(contactFor(name), state.actor + ' is asking about an exchange in Department Hub: ' + exchange.summary.slice(0, 3).join(' ')) + '</p>').join('');
+    return shell(exchange.parties.length > 2 ? 'Exchange between ' + exchange.parties.length + ' people' : exchange.moves.length > 1 ? 'Swap' : 'Pick-up', '<p><span class="badge">' + h(exchange.status) + '</span></p><div class="option">' + text + '</div>' +
+      '<p class="subtle">Asked by ' + h(exchange.by) + ' on ' + h(timeLabel(exchange.created)) + '. Agreed so far: ' + h(namesList(agreed)) + '.' + (open ? ' Nothing changes until everyone has agreed, and it is checked again each time.' : '') + '</p>' +
+      (open && result.status === 'blocked' ? '<p class="caution"><b>This no longer works on the schedule as it stands.</b></p>' : '') +
+      (open && isSame(exchange.by, state.actor) && reach ? '<p class="subtle">This app cannot notify anyone yet. Send it from your phone:</p>' + reach : '') +
+      (exchange.status === EXCHANGE_AGREED ? '<p class="subtle">Agreement recorded here. A coordinator can review and enter it in the official system.</p>' : '') +
+      (open ? '<div class="actions">' + (isSame(exchange.by, state.actor) ? button('Withdraw it', 'exchange-withdraw', 'class="secondary"') : '') +
+        (waiting.some(name => isSame(name, state.actor)) ? button('Decline', 'exchange-decline', 'class="secondary"') + button('I agree', 'exchange-agree', 'class="primary"') : '') + '</div>' : ''));
+  }
+  if (type === 'trade-rules') {
+    const rules = tradeRules(), pick = (value, current, label) => '<option value="' + value + '"' + (String(value) === String(current) ? ' selected' : '') + '>' + label + '</option>';
+    return shell('Trade rules', '<p class="subtle">Every trade, swap and pick-up is checked against these. Enter what your department actually uses. Changing them is recorded.</p><form data-form="trade-rules">' +
+      '<label>The pay week starts on<select name="weekStartsOn">' + WEEKDAYS.map((day, index) => pick(index, rules.weekStartsOn || 0, day)).join('') + '</select></label>' +
+      '<label>Hours in a week before overtime<input name="limit" type="number" inputmode="decimal" min="1" max="168" step="0.5" required value="' + rules.overtimeLimitMinutes / 60 + '"></label>' +
+      '<label>A change that would go over that<select name="overLimit">' + pick('block', rules.overLimit || 'block', 'Is refused') + pick('warn', rules.overLimit || 'block', 'Is allowed, with a warning') + '</select></label>' +
+      '<label>Fewest hours between two shifts<input name="rest" type="number" inputmode="decimal" min="0" max="48" step="0.5" required value="' + rules.minimumRestMinutes / 60 + '"></label>' +
+      '<label>Warn above this many days in a row (0 for no warning)<input name="row" type="number" inputmode="numeric" min="0" max="14" step="1" required value="' + (rules.maxInARow || 0) + '"></label>' +
+      '<div class="actions">' + button('Cancel', 'close', 'class="secondary"') + '<button class="primary">Save the rules</button></div></form>');
+  }
   if (type === 'source') return shell('Original photo', chosen ? imageMarkup(chosen, row.sources[0]) : '<p>The photo is unavailable in this browser.</p>');
   if (type === 'matches') {
     const list = matches(row, kind);
@@ -776,6 +863,7 @@ function dialogMarkup() {
       '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
       (result ? '<div class="ask-answer" role="status">' + (result.read ? '<p class="subtle">Read as: “' + h(result.read) + '”</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') + result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.map(item).join('') +
         '<p class="subtle">From: ' + h(result.source) + '</p>' +
+        (result.next?.length ? '<div class="chip-list"><span class="subtle">Next</span><div>' + result.next.map((text, index) => button(h(text), 'ask-next', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' : '') +
         (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' : ui.dialog.no || result.empty ? '<div class="actions wrap">' + button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
           (isKeeper() ? button('Teach the answer', 'ask-teach', 'class="secondary"') : '') + '</div>' :
           '<div class="actions wrap"><span class="subtle">Did that answer it?</span>' + button(canRemember ? 'Yes, remember this wording' : 'Yes', 'ask-yes', 'class="secondary"') + button('No', 'ask-no', 'class="secondary"') + '</div>' +
@@ -1117,12 +1205,14 @@ async function act({action, value, kind}) {
     case 'ask-open': ui.dialog = ui.lastAsk || { type:'ask' }; break;
     case 'ask-back': ui.dialog = ui.lastAsk || { type:'ask' }; break;
     case 'ask-try': await askAndLog(SUGGESTIONS[Number(value)]); break;
+    case 'ask-next': { const next = ui.dialog?.type === 'ask' && ui.dialog.q ? currentAsk().next?.[Number(value)] : null; if (next) await askAndLog(next); break; }
     case 'ask-post': if (patientSigns(ui.dialog.q).length) return; ui.draftPost = ui.dialog.q || ''; ui.tab = 'board'; ui.boardFilter = 'all'; ui.dialog = null; ui.scrollTo = '.composer'; markBoardSeen(); break;
     case 'ask-go': {
       const [kind, first, second] = String(value).split('|');
       if (ui.dialog?.type === 'ask' && ui.lastAsk) ui.lastAsk = { ...ui.lastAsk, opened:value };      // the one they chose to read is the one a yes is about
       if (kind === 'doc') { ui.dialog = { type:'doc', id:first, at:Number(second) }; ui.scrollTo = '#doc-mark'; break; }
       if (kind === 'note') { ui.dialog = { type:'note', id:first }; break; }
+      if (kind === 'options') { const target = state.assignments.find(item => item.key === String(value).slice(8)); if (target && isMine(target)) ui.dialog = { type:'options', row:target, found:optionsFor(target) }; break; }
       ui.dialog = null;
       if (kind === 'date') { ui.tab = 'schedule'; ui.view = 'week'; ui.date = first; ui.scrollTo = '.day-card[data-date="' + first + '"]'; }
       else if (kind === 'post') { ui.tab = 'board'; ui.boardFilter = 'all'; ui.scrollTo = '[data-post="' + CSS.escape(first) + '"]'; markBoardSeen(); }
@@ -1374,6 +1464,49 @@ async function act({action, value, kind}) {
     case 'shift': ui.dialog = { type:'shift', row }; break;
     case 'source': ui.dialog = { type:'source', row, chosen:await showSource(row.sources[0]) }; break;
     case 'matches': if (row && isMine(row)) ui.dialog = { type:'matches', row, kind }; break;
+    case 'options': if (row && isMine(row)) ui.dialog = { type:'options', row, found:optionsFor(row) }; break;
+    case 'options-loops': if (ui.dialog?.type === 'options') ui.dialog = { ...ui.dialog, loops:true, found:optionsFor(ui.dialog.row, true) }; break;
+    case 'propose': {
+      const [group, index] = String(value).split('|'), option = ui.dialog?.found?.[group]?.[Number(index)], target = ui.dialog?.row;
+      if (!option || !target || !isMine(target)) return;
+      const world = tradeWorld(), rows = new Map(world.roster.map(item => [item.key, item]));
+      if (option.moves.some(move => !rows.has(move.key))) { ui.flash = 'The schedule changed. Find the options again.'; break; }
+      const moves = option.moves.map(move => { const item = rows.get(move.key); return { key:move.key, to:move.to, from:item.person, date:item.date, shift:item.shift, ...(item.role ? { role:item.role } : {}), ...(item.hours ? {hours:item.hours} : {}) }; });
+      const result = checkExchange({ ...world, moves });
+      if (result.status === 'blocked') { ui.flash = 'That no longer passes. ' + result.problems.join(' '); break; }
+      const people = parties(moves, rows), now = new Date().toISOString();
+      const basis = exchangeBasis(world,moves);
+      const exchange = { id:crypto.randomUUID(), by:state.actor, created:now, moves, parties:people, accepted:{ [normalizeName(state.actor)]:now }, summary:describe(result), basis,
+        status:'Waiting for ' + namesList(people.filter(name => !isSame(name, state.actor))), version:await sha256(basis) };
+      await commit('Exchange proposed', { id:exchange.id, version:exchange.version, people:people.length, moves:moves.map(move => [move.key, move.to]), check:result.status, rules:tradeRules() }, previous => ({ ...previous, exchanges:[...previous.exchanges, exchange] }));
+      ui.dialog = { type:'exchange', id:exchange.id };
+      break;
+    }
+    case 'exchange': ui.dialog = { type:'exchange', id:value }; break;
+    case 'exchange-agree': case 'exchange-decline': case 'exchange-withdraw': {
+      const exchange = state.exchanges.find(item => item.id === ui.dialog?.id);
+      if (!exchange || !exchange.status.startsWith('Waiting')) return;
+      const update = change => previous => ({ ...previous, exchanges:previous.exchanges.map(item => item.id === exchange.id ? { ...item, ...change } : item) });
+      if (action === 'exchange-withdraw') { if (isSame(exchange.by, state.actor)) await commit('Exchange withdrawn', { id:exchange.id }, update({ status:'Withdrawn' })); break; }
+      if (!pendingOf(exchange).some(name => isSame(name, state.actor))) return;
+      if (action === 'exchange-decline') { await commit('Exchange declined', { id:exchange.id }, update({ status:'Declined' })); break; }
+      // Checked again on the schedule as it stands now, with everything agreed since counted in.
+      const result = checkExchange({ ...tradeWorld(exchange.id), moves:exchange.moves, basis:exchange.basis || '' });
+      if (result.status === 'blocked') { await commit('Exchange blocked after recheck', { id:exchange.id, version:exchange.version }, update({ status:'No longer possible', summary:describe(result) })); break; }
+      const accepted = { ...exchange.accepted, [normalizeName(state.actor)]:new Date().toISOString() }, left = exchange.parties.filter(name => !accepted[normalizeName(name)]);
+      await commit(left.length ? 'Exchange accepted' : 'Exchange agreed by everyone', { id:exchange.id, version:exchange.version, check:result.status }, previous => {
+        const latest = checkExchange({...tradeWorld(exchange.id),moves:exchange.moves,basis:exchange.basis || ''});
+        if (latest.status === 'blocked') throw new Error('The exchange changed while saving. Reopen it and review the current result.');
+        return update({ accepted, summary:describe(latest), status:left.length ? 'Waiting for ' + namesList(left) : EXCHANGE_AGREED })(previous);
+      });
+      break;
+    }
+    case 'trade-rules': if (isKeeper()) ui.dialog = { type:'trade-rules' }; break;
+    case 'offer-remove': {
+      const offer = state.offers.find(item => item.id === value);
+      if (offer && isSame(offer.person, state.actor)) await commit('Pick-up day removed', { date:offer.date, shift:offer.shift }, previous => ({ ...previous, offers:previous.offers.filter(item => item.id !== value) }));
+      break;
+    }
     case 'choose': {
       const current = ui.dialog;
       const chosen = matches(current.row, current.kind)[Number(value)];
@@ -1599,6 +1732,24 @@ async function submit(form) {
       await nextFlag(index);
       const notes = tidyNotes({ ...tidy, fresh: [] });
       if (notes.length) ui.flash = 'On ' + dayLabel(date, { month:'short', day:'numeric' }) + ': ' + notes.join(' ');
+      break;
+    }
+    case 'offer': {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(data.date || '') || data.date < localToday() || !SHIFTS[data.shift]) return;
+      if (state.offers.some(offer => isSame(offer.person, state.actor) && offer.date === data.date && offer.shift === data.shift)) break;
+      const offer = { id:crypto.randomUUID(), person:state.actor, date:data.date, shift:data.shift, at:new Date().toISOString() };
+      await commit('Pick-up day added', { date:offer.date, shift:offer.shift }, previous => ({ ...previous, offers:[...previous.offers, offer].slice(-400) }));
+      break;
+    }
+    case 'trade-rules': {
+      if (!isKeeper()) return;
+      const limit = Number(data.limit), rest = Number(data.rest), row = Math.round(Number(data.row));
+      if (!(limit >= 1 && limit <= 168) || !(rest >= 0 && rest <= 48) || !(row >= 0 && row <= 14)) throw new Error('Check the numbers and try again.');
+      const rules = { weekStartsOn:Math.min(6, Math.max(0, Math.round(Number(data.weekStartsOn)) || 0)), overtimeLimitMinutes:Math.round(limit * 60), overLimit:data.overLimit === 'warn' ? 'warn' : 'block',
+        minimumRestMinutes:Math.round(rest * 60), maxInARow:row, by:state.actor, at:new Date().toISOString() };
+      await commit('Trade rules changed', rules, previous => ({ ...previous, tradeRules:rules }));
+      ui.dialog = null;
+      ui.notice = 'Trade rules saved. Every check uses them from now on.';
       break;
     }
     case 'holidays': {

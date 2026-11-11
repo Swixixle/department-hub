@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { editDistance, expand, keywords, nearest, stem, tidyQuestion } from '../src/words.js';
 
 test('edit distance counts inserts, deletes, substitutions and swapped neighbours', () => {
-  assert.deepEqual([editDistance('friday', 'friday'), editDistance('firday', 'friday'), editDistance('tomorow', 'tomorrow'), editDistance('keshia', 'kesha'), editDistance('cat', 'dog', 2)], [0, 1, 1, 1, 3]);
+  assert.deepEqual([editDistance('friday', 'friday'), editDistance('firday', 'friday'), editDistance('tomorow', 'tomorrow'), editDistance('morgan', 'morgn'), editDistance('cat', 'dog', 2)], [0, 1, 1, 1, 3]);
   assert.equal(nearest('firday', ['monday', 'friday', 'fridge']), 'friday');
   assert.equal(nearest('schedual', ['schedule', 'scheduled']), 'schedule');
   assert.equal(nearest('zebra', ['monday', 'friday']), null);

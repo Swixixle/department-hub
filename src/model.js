@@ -67,9 +67,12 @@ export function shiftInterval(item) {
   return [zonedInstant(item.date, shift.start), zonedInstant(endDate, shift.end)];
 }
 
-export function minutesByWeek(item) {
+// The pay week a date falls in, named by its first day. startDay is 0 for Sunday through 6 for Saturday.
+export const payWeekStart = (date, startDay = 0) => addDays(date, -((new Date(date + 'T12:00:00Z').getUTCDay() - startDay + 7) % 7));
+
+export function minutesByWeek(item, startDay = 0) {
   const [start, end] = shiftInterval(item);
-  const week = weekStart(item.date);
+  const week = payWeekStart(item.date, startDay);
   const next = addDays(week, 7);
   const boundary = zonedInstant(next, '00:00');
   if (end <= boundary) return [[week, (end - start) / 60000]];
@@ -173,11 +176,14 @@ export function verifyRoster(rows, policy = POLICY) {
 const same = (left, right) => normalizeName(left) === normalizeName(right);
 
 export const AGREED_STATUS = 'Both agreed · queued for review';
+// An exchange is a request with any number of moves, each handing one assignment to one person. Everyone in it agrees.
+export const EXCHANGE_AGREED = 'All agreed · queued for review';
+const isAgreed = request => request.status === AGREED_STATUS || request.status === EXCHANGE_AGREED;
 
 // Assignment keys that already belong to an agreed request. A shift can be agreed once.
 export function committedKeys(requests = [], exceptId = null) {
-  return requests.filter(request => request.status === AGREED_STATUS && request.id !== exceptId)
-    .flatMap(request => [request.from?.key, request.to?.key]).filter(Boolean);
+  return requests.filter(request => isAgreed(request) && request.id !== exceptId)
+    .flatMap(request => request.moves ? request.moves.map(move => move.key) : [request.from?.key, request.to?.key]).filter(Boolean);
 }
 
 // The imported roster with every agreed request applied. Each row keeps its original key,
@@ -185,7 +191,9 @@ export function committedKeys(requests = [], exceptId = null) {
 export function projectRoster(roster, requests = []) {
   const holder = new Map();
   for (const request of requests) {
-    if (request.status !== AGREED_STATUS || !request.from?.key) continue;
+    if (!isAgreed(request)) continue;
+    if (request.moves) { for (const move of request.moves) holder.set(move.key, move.to); continue; }
+    if (!request.from?.key) continue;
     holder.set(request.from.key, request.recipient);
     if (request.to?.key) holder.set(request.to.key, request.from.person);
   }
@@ -229,9 +237,9 @@ export function evaluateChange({ roster, from, to, recipient, kind, directory, h
     }
     const totals = new Map();
     for (const item of [...source, incoming]) {
-      for (const [week, minutes] of minutesByWeek(item)) totals.set(week, (totals.get(week) || 0) + minutes);
+      for (const [week, minutes] of minutesByWeek(item, policy.weekStartsOn || 0)) totals.set(week, (totals.get(week) || 0) + minutes);
     }
-    const touched = new Set([...minutesByWeek(incoming), ...(outgoing ? minutesByWeek(outgoing) : [])].map(([week]) => week));
+    const touched = new Set([...minutesByWeek(incoming, policy.weekStartsOn || 0), ...(outgoing ? minutesByWeek(outgoing, policy.weekStartsOn || 0) : [])].map(([week]) => week));
     const relevant = [...totals].filter(([week]) => touched.has(week)).sort();
     if (relevant.some(([, minutes]) => minutes > policy.overtimeLimitMinutes) &&
         !(kind === 'trade' ? policy.allowOvertimeTrade : policy.allowOvertimeCoverage)) {
