@@ -1,0 +1,5 @@
+Continue Department Hub from https://github.com/Swixixle/department-hub.
+
+Read CLAUDE.md, docs/CLAUDE-HANDOFF.md, and README.md first. Inspect the current source and reproduce the relevant baseline checks. Keep the existing design and continue this project from its working build. Our next discussed step is iPhone and Android packaging with the existing on-device photo importer. The real schedule screenshots may still need a layout adapter when I provide them. Most scheduling rules are provisional considerations.
+
+Use this repository through my authorized GitHub connection. Work on a reviewable branch and give me concrete working changes with the relevant verification. Preserve the fictional public demo and keep any real workplace data in an approved private workflow. Tell me which account-side step is needed only when that step is actually reached.
