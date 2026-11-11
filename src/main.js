@@ -3,11 +3,13 @@ import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, norma
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { census, ledger, releaseOrder, staffing, statSheet } from './fairness.js';
+import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
+import { localBoard } from './backend.js';
 
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
 const draftKey = storageKey + '-draft';
-const BUILD = 6;
+const BUILD = 7;
 const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
@@ -78,6 +80,27 @@ const checkChange = (details, exceptId = null) => evaluateChange({
   hoursVerified: state.hoursVerified, policy: state.policy, committed: committedKeys(state.requests, exceptId), ...details
 });
 let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: null, pending: loadDraft(), busy: null, notice: '', flash: '' };
+// Attachments on board posts: the files themselves, and addresses the page can show them from.
+const mediaBlobs = new Map(), mediaUrls = new Map();
+// The one place the board keeps posts and files. A hosted service replaces this line (see src/backend.js).
+const boardStore = localBoard({
+  getPosts: () => state.posts,
+  change: (type, details, update) => commit(type, details, previous => ({ ...previous, posts: update(previous.posts) }))
+});
+let voice = null;         // a voice message being recorded or reviewed
+async function hydrateMedia() {
+  const wanted = state.posts.flatMap(post => post.media || []).filter(item => !mediaBlobs.has(item.id));
+  if (!wanted.length) return;
+  for (const item of wanted) {
+    const blob = await boardStore.file(item.id).catch(() => null);
+    mediaBlobs.set(item.id, blob);
+    if (blob) mediaUrls.set(item.id, URL.createObjectURL(blob));
+  }
+  render();
+}
+function forgetMedia(ids) {
+  for (const id of ids) { if (mediaUrls.get(id)) URL.revokeObjectURL(mediaUrls.get(id)); mediaUrls.delete(id); mediaBlobs.delete(id); }
+}
 let sourceUrl = null;
 let writing = false;
 const h = value => String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -202,13 +225,44 @@ function schedule() {
     '<p class="calendar-foot">Night shifts appear on their start date. Payroll checks split hours at the workweek boundary.</p>';
 }
 
+const RULE = 'No patients, monitors, charts or names in pictures, video or recordings.';
+function postMarkup(post) {
+  const link = videoLink(post.body);
+  const words = post.body ? '<p>' + linkParts(post.body).map(part => part.href ?
+    '<a href="' + h(part.href) + '" target="_blank" rel="noopener noreferrer">' + h(part.text) + '</a>' : h(part.text)).join('') + '</p>' : '';
+  const piece = item => {
+    const url = mediaUrls.get(item.id);
+    if (!mediaBlobs.has(item.id)) return '<p class="subtle">Loading ' + h(item.name) + '…</p>';
+    if (!url) return '<p class="subtle">' + h(item.name) + ' is not in this browser.</p>';
+    if (item.kind === 'image') return '<a href="' + url + '" target="_blank" rel="noopener"><img class="post-image" src="' + url + '" alt="' + h(item.name) + '" loading="lazy"></a>';
+    if (item.kind === 'video') return '<video class="post-video" data-media="' + h(item.id) + '" src="' + url + '" controls playsinline preload="metadata"></video>';
+    if (item.kind === 'audio') return '<audio class="post-audio" data-media="' + h(item.id) + '" src="' + url + '" controls preload="metadata"></audio>' + (post.voice ? '' : '<small>' + h(item.name) + '</small>');
+    return '<a class="post-file" href="' + url + '" download="' + h(item.name) + '"><b>' + h(item.name) + '</b><span>' + fileSize(item.size) + ' · Download</span></a>';
+  };
+  return '<article class="panel post"><div class="post-head">' + avatar(post.author) +
+    '<div><b>' + h(post.author) + '</b><small>' + h(post.created ? timeLabel(post.created) : 'Sample announcement') +
+    (post.voice ? ' · Voice message' + (post.media?.[0]?.seconds ? ' · ' + clock(post.media[0].seconds) : '') : '') + '</small></div>' +
+    (post.learning ? '<span class="badge learning">Learning</span>' : '') + '</div>' + words +
+    (post.media?.length ? '<div class="post-media">' + post.media.map(piece).join('') + '</div>' : '') +
+    (link ? '<div class="link-player" data-embed="' + h(link.embed) + '">' + button('▶ Play here · ' + h(link.site), 'play-link', 'class="play-link"') + '</div>' : '') +
+    '<div class="post-actions">' + (post.inside ? '<span class="subtle">Department only</span>' : button('Share', 'share', 'class="text-button" ' + valueAttr(post.id))) +
+    (post.created && isSame(post.author, state.actor) ? button('Remove', 'remove-post', 'class="text-button" ' + valueAttr(post.id)) : '') + '</div></article>';
+}
+
 function board() {
-  return '<section class="intro"><div><div class="eyebrow">TEAM SPACE</div><h1>Department board</h1><p>Announcements and updates for the whole workspace.</p></div></section>' +
-    '<form data-form="post" class="panel form-panel"><label for="post-text">Write an update</label>' +
-    '<textarea id="post-text" name="body" maxlength="1200" required placeholder="Share something with the department"></textarea><button class="primary">Post update</button></form>' +
-    '<div class="post-list">' + [...state.posts].reverse().map(post => '<article class="panel post"><div class="post-head">' + avatar(post.author) +
-      '<div><b>' + h(post.author) + '</b><small>' + h(post.created ? timeLabel(post.created) : 'Sample announcement') +
-      '</small></div></div><p>' + h(post.body) + '</p></article>').join('') + '</div>';
+  const filter = ui.boardFilter || 'all';
+  const shown = [...state.posts].reverse().filter(post => matchesFilter(post, filter));
+  return '<section class="intro"><div><div class="eyebrow">TEAM SPACE</div><h1>Department board</h1><p>News, pictures, files, video and voice for the whole department.</p></div>' +
+    button('🎙 Voice message to everyone', 'voice', 'class="primary voice-start"') + '</section>' +
+    (boardStore.shared ? '' : '<div class="roster-status"><span class="status-dot"></span><b>Kept in ' + h(boardStore.where) + '</b><span>Nobody else sees a post until the shared version is switched on. Share sends one out now.</span></div>') +
+    '<form data-form="post" class="panel form-panel composer"><label for="post-text">Write to the department</label>' +
+    '<textarea id="post-text" name="body" maxlength="2000" placeholder="Share something with the department. A YouTube or Vimeo link plays right on the board."></textarea>' +
+    '<label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple></label>' +
+    '<label><span><input type="checkbox" name="learning"> Add to Learning (instructional, CEU-type)</span></label>' +
+    '<label><span><input type="checkbox" name="inside"> Keep inside the department (no Share button)</span></label>' +
+    '<p class="subtle">' + RULE + '</p><p class="refusal" role="alert"></p><button class="primary">Post</button></form>' +
+    '<div class="calendar-toolbar board-bar"><div class="segments">' + FILTERS.map(([id, label]) => button(label, 'board-filter', 'class="' + (filter === id ? 'selected' : '') + '" ' + valueAttr(id))).join('') + '</div></div>' +
+    '<div class="post-list">' + (shown.map(postMarkup).join('') || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>';
 }
 
 function fairness() {
@@ -306,6 +360,8 @@ function shiftCaption(row) {
 
 function render() {
   const focus = document.activeElement;
+  const playing = [...app.querySelectorAll('[data-media]')].filter(player => player.currentTime > 0 && !player.ended)
+    .map(player => ({ id: player.dataset.media, time: player.currentTime, on: !player.paused }));
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
   app.innerHTML = top() + '<main><header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
     '<label class="actor">Viewing as <select id="actor" aria-label="Viewing as">' +
@@ -316,6 +372,10 @@ function render() {
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
     ' · No payroll or official schedule changes · Version ' + BUILD + '</span><span>' + (publicDemo ? '' : button('Backup and restore', 'data', 'class="text-button"') + ' ') +
     button('Decision history', 'audit', 'class="text-button"') + '</span></footer></div></main>' + dialogMarkup();
+  for (const item of playing) {
+    const player = app.querySelector('[data-media="' + CSS.escape(item.id) + '"]');
+    if (player) { player.currentTime = item.time; if (item.on) player.play().catch(() => {}); }
+  }
   const dialog = app.querySelector('dialog');
   if (dialog) {
     dialog.showModal();
@@ -508,6 +568,32 @@ function dialogMarkup() {
       '<p class="subtle">Either choice takes this person’s weekend shifts out of the rotation, so nobody else is measured against them. Extra weekends taken by choice are shown as credit.</p>' +
       '<button class="primary">Save staff details</button></form>');
   }
+  if (type === 'voice') {
+    const body = !voice || voice.state === 'asking' ? '<p>Allow the microphone when the browser asks. Recording starts right away.</p>' :
+      voice.state === 'error' ? '<p>' + h(voice.message) + '</p><div class="actions">' + button('Try again', 'voice', 'class="primary"') + '</div>' :
+      voice.state === 'recording' ? '<div class="recording"><span class="rec-dot"></span><b id="voice-clock">0:00</b></div>' +
+        '<div class="actions center">' + button('■ Stop', 'voice-stop', 'class="primary big"') + '</div><p class="subtle center">Stops by itself at ' + clock(VOICE_LIMIT_SECONDS) + '. ' + RULE + '</p>' :
+      '<audio class="post-audio" data-media="voice-preview" src="' + voice.url + '" controls></audio><form data-form="voice">' +
+        '<label>What is it about? (optional)<input name="caption" maxlength="200" autocomplete="off" placeholder="Shift change at 7, new filters in the supply room"></label>' +
+        '<label><span><input type="checkbox" name="inside"> Keep inside the department (no Share button)</span></label>' +
+        '<p class="subtle">' + clock(voice.seconds) + ' recorded. ' + RULE + '</p>' +
+        '<div class="actions">' + button('Record again', 'voice', 'class="secondary"') + '<button class="primary">Send to the department</button></div></form>';
+    return shell('Voice message to everyone', body);
+  }
+  if (type === 'share') {
+    const post = state.posts.find(item => item.id === id);
+    if (!post) return '';
+    const text = shareText(post), files = (post.media || []).filter(item => mediaUrls.get(item.id));
+    return shell('Share this post', '<p class="subtle">On a phone, Share opens the phone’s own share sheet, which sends the file itself to Messages, Mail, YouTube or any other app. Here, use these.</p>' +
+      '<textarea id="share-text" readonly rows="3">' + h(text) + '</textarea>' +
+      '<div class="actions wrap">' + button('Copy the words', 'copy-share', 'class="secondary" ' + valueAttr(post.id)) +
+      '<a class="secondary link-button" href="mailto:?subject=' + encodeURIComponent('From the department board') + '&body=' + encodeURIComponent(text) + '">Email</a>' +
+      '<a class="secondary link-button" href="sms:?&body=' + encodeURIComponent(text) + '">Text message</a></div>' +
+      (files.length ? '<h3>Files</h3><p class="subtle">Email and text carry the words only. Download the file, then attach or upload it wherever it needs to go.</p>' +
+        files.map(item => '<a class="post-file" href="' + mediaUrls.get(item.id) + '" download="' + h(item.name) + '"><b>' + h(item.name) + '</b><span>' + fileSize(item.size) + ' · Download</span></a>').join('') : ''));
+  }
+  if (type === 'remove-post') return shell('Remove this post?', '<p>It is taken off the board together with its files. This cannot be undone.</p><div class="actions">' +
+    button('Keep it', 'close', 'class="secondary"') + button('Remove it', 'remove-post-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
   if (type === 'edit-shift') {
     const { date, shift } = ui.dialog;
     const rows = state.assignments.filter(item => item.date === date && item.shift === shift);
@@ -519,7 +605,7 @@ function dialogMarkup() {
     const { restore, confirmErase } = ui.dialog;
     return shell('Workspace data', '<p>This workspace is kept in this browser only, at <b>' + h(location.host) + '</b>. A different browser, or a different address, starts with sample names.</p>' +
       '<p><b>' + state.assignments.length + '</b> shifts · <b>' + state.people.length + '</b> contacts · ' + h(state.mode === 'sample' ? 'sample workspace' : 'published ' + timeLabel(state.importedAt)) + ' · version ' + BUILD + '</p>' +
-      '<h3>Backup</h3><p class="subtle">A backup file holds the schedule, the contacts with their phone numbers, requests and history. Photos are not included. Keep the file somewhere private.</p>' +
+      '<h3>Backup</h3><p class="subtle">A backup file holds the schedule, the contacts with their phone numbers, requests and history. Photos, videos and recordings are not included. Keep the file somewhere private.</p>' +
       '<p>' + button('Save a backup file', 'backup', 'class="primary"') + '</p>' +
       '<label class="drop"><b>Restore from a backup file</b><span>Choose a file saved with the button above</span><input id="backup-file" type="file" accept="application/json,.json"></label>' +
       (restore ? '<div class="flag"><p><b>' + h(restore.name) + '</b> holds ' + restore.state.assignments.length + ' shifts and ' + (restore.state.people || []).length + ' contacts' +
@@ -652,6 +738,16 @@ async function importFiles(files, sampleImport = false) {
 app.addEventListener('click', event => {
   const control = event.target.closest('[data-action]');
   if (!control || control.disabled) return;
+  if (control.dataset.action === 'play-link') {
+    const box = control.closest('.link-player'), frame = document.createElement('iframe');
+    frame.src = box.dataset.embed;
+    frame.title = 'Video player';
+    frame.allow = 'autoplay; fullscreen; picture-in-picture';
+    frame.allowFullscreen = true;
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    box.replaceChildren(frame);
+    return;
+  }
   void act(control.dataset).catch(error => {
     ui.notice = error.message || String(error);
     if (!ui.busy) ui.dialog = null;
@@ -684,6 +780,15 @@ async function readBackup(file) {
   ui.dialog = { type:'data', restore:{ name:file.name, savedAt:parsed.savedAt || saved.importedAt || null, state:saved } };
   render();
 }
+// A recording made in the browser often carries no length, so the player cannot show one or seek. Asking it to jump far
+// past the end makes the browser work the length out. Media events do not bubble, so this listens on the way down.
+app.addEventListener('loadedmetadata', event => {
+  const player = event.target;
+  if (!player.matches?.('audio, video') || Number.isFinite(player.duration)) return;
+  const back = () => { player.removeEventListener('timeupdate', back); player.currentTime = 0; };
+  player.addEventListener('timeupdate', back);
+  player.currentTime = 1e101;
+}, true);
 app.addEventListener('dragover', event => { if (event.target.closest('#drop-zone')) event.preventDefault(); });
 app.addEventListener('drop', event => {
   if (!event.target.closest('#drop-zone')) return;
@@ -693,8 +798,57 @@ app.addEventListener('drop', event => {
 app.addEventListener('cancel', event => {
   if (event.target.tagName !== 'DIALOG') return;
   event.preventDefault();
-  if (!ui.busy) { clearPreview(); ui.dialog = null; render(); }
+  if (!ui.busy) { clearPreview(); stopVoice(); ui.dialog = null; render(); }
 }, true);
+// Voice message: one tap starts, one tap stops, then send.
+// AAC in an .m4a plays almost anywhere, so it comes first. Plain "audio/mp4" comes last: Safari makes AAC from it, but
+// Chrome would put Opus inside the mp4, which few other players open.
+const voiceType = () => ['audio/mp4;codecs=mp4a.40.2', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(type => window.MediaRecorder?.isTypeSupported?.(type)) || '';
+function stopVoice() {
+  if (!voice) return;
+  const session = voice;
+  voice = null;
+  clearInterval(session.timer);
+  try { if (session.recorder?.state === 'recording') session.recorder.stop(); } catch { /* already stopped */ }
+  session.stream?.getTracks().forEach(track => track.stop());
+  if (session.url) URL.revokeObjectURL(session.url);
+}
+async function startVoice() {
+  stopVoice();
+  const session = voice = { state: 'asking' };
+  ui.dialog = { type:'voice' };
+  ui.notice = '';
+  render();
+  try {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('This browser cannot record on this page. A voice message needs a microphone and a secure address.');
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (voice !== session) { stream.getTracks().forEach(track => track.stop()); return; }      // closed while the browser was asking
+    const type = voiceType(), recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined), chunks = [];
+    Object.assign(session, { state: 'recording', stream, recorder, started: performance.now() });
+    recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach(track => track.stop());
+      clearInterval(session.timer);
+      if (voice !== session) return;
+      const blob = new Blob(chunks, { type: recorder.mimeType || type || 'audio/webm' });
+      voice = { state: 'review', blob, url: URL.createObjectURL(blob), seconds: Math.max(1, Math.round((performance.now() - session.started) / 1000)) };
+      if (ui.dialog?.type === 'voice') render();
+    };
+    recorder.start();
+    session.timer = setInterval(() => {
+      const elapsed = (performance.now() - session.started) / 1000, shown = document.getElementById('voice-clock');
+      if (shown) shown.textContent = clock(elapsed);
+      if (elapsed >= VOICE_LIMIT_SECONDS && recorder.state === 'recording') recorder.stop();
+    }, 250);
+    render();
+  } catch (error) {
+    if (voice !== session) return;
+    voice = { state: 'error', message: error.name === 'NotAllowedError' ? 'The microphone was not allowed. Allow it for this page in the browser’s site settings, then try again.' :
+      error.name === 'NotFoundError' ? 'No microphone was found on this device.' : error.message || String(error) };
+    if (ui.dialog?.type === 'voice') render();
+  }
+}
+
 function fail(error) { ui.notice = error.message || String(error); ui.dialog = null; render(); }
 
 async function act({action, value, kind}) {
@@ -730,6 +884,7 @@ async function act({action, value, kind}) {
       state = prepare(restore.state);
       saveState(storageKey, state);
       await commit('Workspace restored from a backup', { savedAt:restore.savedAt || null, assignmentCount:state.assignments.length }, previous => previous);
+      void hydrateMedia();
       ui.pending = null;
       ui.dialog = null;
       ui.date = startDate();
@@ -737,7 +892,40 @@ async function act({action, value, kind}) {
       ui.notice = 'Backup restored: ' + state.assignments.length + ' shifts and ' + state.people.length + ' contacts.';
       break;
     }
-    case 'close': if (ui.busy) return; clearPreview(); ui.dialog = null; break;
+    case 'close': if (ui.busy) return; clearPreview(); stopVoice(); ui.dialog = null; break;
+    case 'board-filter': ui.boardFilter = value; break;
+    case 'voice': void startVoice(); return;
+    case 'voice-stop': if (voice?.recorder?.state === 'recording') voice.recorder.stop(); return;
+    case 'share': {
+      const post = state.posts.find(item => item.id === value);
+      if (!post || post.inside) return;
+      // Everything up to navigator.share stays synchronous, so the browser still counts it as the person's own tap.
+      const files = (post.media || []).map(item => mediaBlobs.get(item.id) ? new File([mediaBlobs.get(item.id)], item.name, { type: item.type || mediaBlobs.get(item.id).type }) : null).filter(Boolean);
+      if (navigator.share) {
+        const words = { title: 'Department Hub', text: shareText(post) };
+        try { await navigator.share(files.length && navigator.canShare?.({ files }) ? { ...words, files } : words); return; }
+        catch (error) { if (error.name === 'AbortError') return; }
+      }
+      ui.dialog = { type:'share', id:post.id };
+      break;
+    }
+    case 'copy-share': {
+      const post = state.posts.find(item => item.id === value);
+      if (!post) return;
+      try { await navigator.clipboard.writeText(shareText(post)); ui.flash = 'Copied.'; }
+      catch { ui.flash = 'Select the words in the box and copy them.'; }
+      break;
+    }
+    case 'remove-post': ui.dialog = { type:'remove-post', id:value }; break;
+    case 'remove-post-yes': {
+      const post = state.posts.find(item => item.id === value);
+      if (!post || !isSame(post.author, state.actor)) return;
+      await boardStore.remove(post.id);
+      forgetMedia((post.media || []).map(item => item.id));
+      ui.dialog = null;
+      ui.notice = 'Post removed.';
+      break;
+    }
     case 'import': ui.dialog = { type:'import' }; break;
     case 'samples': {
       ui.busy = 'Opening fictional screenshots…';
@@ -838,6 +1026,8 @@ async function act({action, value, kind}) {
     case 'staff-setup': ui.dialog = { type:'staff-setup' }; break;
     case 'erase':
       await clearSources();
+      await boardStore.clear();
+      forgetMedia([...mediaBlobs.keys()]);
       localStorage.removeItem(storageKey);
       state = withContacts(structuredClone(initial));
       ui.pending = null;
@@ -871,10 +1061,38 @@ async function submit(form) {
   const body = (data.body || '').trim();
   const message = { author:state.actor, body, created:new Date().toISOString() };
   switch (form.dataset.form) {
-    case 'post':
-      if (!body) return;
-      await commit('Board update', {}, previous => ({ ...previous, posts:[...previous.posts, { id:crypto.randomUUID(), ...message }] }));
+    case 'post': {
+      const files = [...(form.querySelector('#post-files')?.files || [])];
+      if (!body && !files.length) return;
+      const refusal = refuseFiles(files);
+      if (refusal) { form.querySelector('.refusal').textContent = refusal; return; }     // said in place, so nothing typed is lost
+      const media = files.map(file => ({ id:crypto.randomUUID(), name:file.name, type:file.type, size:file.size, kind:mediaKind(file.type, file.name) }));
+      const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}) };
+      const send = form.querySelector('button.primary');
+      send.disabled = true;
+      send.textContent = 'Posting…';
+      try { await boardStore.publish(post, media.map((item, index) => [item.id, files[index]])); }
+      catch (error) { throw error.name === 'QuotaExceededError' ? new Error('This browser is out of room for files. Remove an old post with a large file, or post a smaller one.') : error; }
+      media.forEach((item, index) => { mediaBlobs.set(item.id, files[index]); mediaUrls.set(item.id, URL.createObjectURL(files[index])); });
+      ui.boardFilter = 'all';
       break;
+    }
+    case 'voice': {
+      if (voice?.state !== 'review') return;
+      const recording = voice;
+      const item = { id:crypto.randomUUID(), name:'voice-message-' + localToday() + (/mp4/.test(recording.blob.type) ? '.m4a' : '.webm'), type:recording.blob.type, size:recording.blob.size, kind:'audio', seconds:recording.seconds };
+      const file = new File([recording.blob], item.name, { type:recording.blob.type });
+      const post = { id:crypto.randomUUID(), author:state.actor, body:(data.caption || '').trim(), created:new Date().toISOString(), voice:true, media:[item], ...(data.inside ? { inside:true } : {}) };
+      await boardStore.publish(post, [[item.id, file]]);
+      mediaBlobs.set(item.id, file);
+      mediaUrls.set(item.id, recording.url);
+      voice = null;
+      ui.dialog = null;
+      ui.tab = 'board';
+      ui.boardFilter = 'all';
+      ui.notice = 'Voice message posted to the board.' + (boardStore.shared ? '' : ' It is in this browser only for now. Press Share on it to send it out.');
+      break;
+    }
     case 'profile': {
       const profile = { person:data.person, status:data.status || null, skills:[data.day && 'D', data.night && 'N'].filter(Boolean),
         ...(['weekend-only', 'weekend-volunteer'].includes(data.arrangement) ? { arrangement:data.arrangement } : {}) };
@@ -1005,3 +1223,4 @@ async function submit(form) {
   render();
 }
 render();
+void hydrateMedia();

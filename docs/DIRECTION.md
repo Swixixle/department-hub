@@ -135,6 +135,23 @@ Checked in a browser: the editor with a doubled name, several names on one line 
 
 Still missing: the launcher takes a port number and the workspace is tied to it. Start it without a number every time. A shared service is what removes the problem for good.
 
+## Added on branch `claude/board-media`
+
+The owner's direction on 2026-11-11, after seeing the hosting comparison: leave the server for now, but have the app ready so that switching it on is easy. He described the board as a social app built around the department and the profession. Posts should carry pictures, files, messages and video. Educational, CEU-type videos should play on the scrolling board. Anything on the board should be shareable to phones, websites, YouTube, email or wherever it is needed. And sending a voice message to the whole department should be quick and streamlined.
+
+- **Posts carry files.** Up to ten per post. Pictures show in the feed, video and audio play there with the browser's own player, and anything else is a download. A video or recording that is playing keeps playing when the page redraws.
+- **YouTube and Vimeo links play on the board** after a tap. Nothing loads from those sites until then.
+- **Learning.** A post can be marked as instructional, and the board has filters: All, Learning, Voice, Photos and video, Files.
+- **Voice message to everyone.** One button on the board. Recording starts as soon as the microphone is allowed, one tap stops it, the recording can be played back, and one tap sends it. It stops by itself at three minutes.
+- **Share** on every post. On a phone it opens the phone's own share sheet and hands over the file itself. Where a browser has no share sheet, it offers copy, email, text message and a download for each file. The poster can keep a post inside the department, which removes the Share button. That is a courtesy, not a lock: a screenshot gets around it.
+- **Remove**, for the person who posted.
+- **The rule on patient information** is shown at every upload and recording.
+- **The plug-in point** (`src/backend.js`). The board reaches posts and files through six functions. Today they keep everything in this browser. A hosted service provides the same six. `docs/SERVER.md` has the plan, the hosting figures and the risks.
+
+Checked in a browser with a simulated microphone and real files: a post with a picture, a video and a document; playback surviving a redraw; a voice message recorded, played back and sent; the share sheet receiving the recording as a file; the fallback choices; a post kept inside the department; a reload; and removal taking the files with it. Not checked: real phones, the real share sheet, playback of recordings between different kinds of phone, and the YouTube and Vimeo players against the live sites.
+
+Until the shared version is on, a post, a voice message or an upload stays in the browser it was made in. The board says so.
+
 ## Still open from the review
 
 - Matches that are blocked are hidden with no reason given.
