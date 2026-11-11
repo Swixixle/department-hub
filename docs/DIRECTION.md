@@ -310,6 +310,16 @@ Review reproduced and corrected five additional failures: a rewording could add 
 
 Independent validation: 110 Node tests, two launcher integration checks and both production builds pass. The production-bundle simulated-DOM suite covers the earlier Ask/audit/exchange flows, reviewed reading corrections, passage selection/removal with source fingerprints, ordinary posts and blocked patient contact numbers. It preserves the fixture roster and makes no external requests in those flows. Current tracked text and generated public app files are scanned for the removed employer identifier. The author's real-photo/361-assignment replay and question accuracy figures were not independently reproduced; the text fixtures do not establish a real-world detection rate. Media/document contents, unlabeled identifying details and some ordinary-number ambiguities remain limitations. No physical-phone or coworker test was performed here.
 
+## Partial-answer disclosure and next milestone, 2026-11-11
+
+The latest review reports that all 15 compound questions tried against the owner's schedule dropped part of the request. The existing **Understood as** line does disclose the chosen scope, but the answer can read as complete. The date kept is not consistently the first one: Friday and Saturday keeps Friday, Saturday and Sunday keeps Sunday, and this week and next week keeps next week.
+
+Ask now adds **Partial answer** above the interpretation and answer when separately recognized date scopes are joined in a question. It names the requested dates and the actual interpretation, and suggests asking each date separately. The lookup, date-selection order and short follow-up behavior are unchanged. Ordinary conjunctions between names or day/night labels do not trigger this date-specific notice. This is a bounded disclosure, not comprehensive compound-question handling or a confidence measure. The answer fingerprint covers the notice; raw questions remain transient unless explicitly reviewed and saved.
+
+Prioritize the authenticated shared pilot in `docs/SERVER.md`: accounts and access boundaries first, shared schedule/feed next, then participant-only messaging and authenticated exchanges. These remain unbuilt; the local board adapter alone cannot supply them. Further broad Ask work should follow unseen questions from coworkers rather than another round written by its developers. No uncertainty-based clarification system, personal memory or outside model was added in this change.
+
+Validation: 115 Node tests and both production builds pass. The production-bundle simulated-DOM check confirms the notice is first in the answer, ordinary questions do not show it, follow-ups retain their shift context, and the question's raw wording is absent from saved state. Earlier Ask/audit/exchange flows pass. This is regression evidence, not a coworker question-accuracy measurement or a physical-phone check.
+
 ## Still open from the review
 
 - Matches that are blocked are hidden with no reason given.

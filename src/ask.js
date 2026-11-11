@@ -270,6 +270,22 @@ const snippet = (text, words, length = 260) => {
 // world: { today, now, actor, assignments, directory, people, links, posts, documents, releases, rules, keeper, seen,
 //          published, requests }. Returns { title, lines, items: [{ text, sub, go }], source, empty }.
 export function ask(question, world) {
+  const result = lookup(question, world);
+  // This is a disclosure for explicitly joined, recognized dates, not an uncertainty score or a new date parser.
+  // Keep the existing lookup and expose its actual scope beside the answer when the question names several scopes.
+  if (!['when', 'who', 'off', 'offlist', 'run', 'hours', 'trade', 'pickup', 'staffing', 'dated'].includes(result.kind) ||
+      !result.context?.when?.from || !result.understood) return result;
+  const names = [...new Set(world.assignments.map(row => row.person))];
+  const text = tidyQuestion(question.replace(/[&,;?]/g, ' and '), names).text;
+  const dates = text.split(/\b(?:and|or|also|as well as)\b/).map(part => parseWhen(part, world.today, world.rules))
+    .filter(date => date?.from && !date.bare);
+  const distinct = [...new Map(dates.map(date => [[date.from, date.to, date.shift || ''].join('|'), date])).values()];
+  const covered = result.context.when;
+  if (distinct.length < 2 || distinct.every(date => date.from >= covered.from && date.to <= covered.to && (!covered.shift || date.shift === covered.shift))) return result;
+  return { ...result, partial: 'You asked about ' + list(distinct.map(date => date.label)) + '. This answer covers only: ' + result.understood + '. Ask each date separately.' };
+}
+
+function lookup(question, world) {
   const { today, actor, assignments, posts = [], documents:allDocuments = [] } = world;
   const documents = allDocuments.filter(doc => doc.status !== 'withdrawn' && (!doc.effective || doc.effective <= today));
   const names = [...new Set(assignments.map(row => row.person))];
