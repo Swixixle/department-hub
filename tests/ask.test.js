@@ -520,3 +520,30 @@ test('a non-date slash expression does not hide an actual date later in the ques
   assert.equal(result?.from,'2026-12-25');
   assert.equal(parseWhen('The split is 50/50; do I work 2/30?',today)?.invalid,true);
 });
+
+test('joined dates disclose partial coverage without changing which date the existing lookup selects', () => {
+  for (const [question, covered, from] of [
+    ['Do I work Friday and Saturday?', 'Fri, Nov 13', '2026-11-13'],
+    ['Do I work Saturday and Sunday?', 'Sun, Nov 15', '2026-11-15'],
+    ['What days do I work this week and next week?', 'next week', '2026-11-15'],
+    ['Who is working Friday & Saturday?', 'Fri, Nov 13', '2026-11-13'],
+    ['Do I work Friday or Saturday?', 'Fri, Nov 13', '2026-11-13'],
+    ['Do I work 11/13 and 11/14?', 'Fri, Nov 13', '2026-11-13']
+  ]) {
+    const result = reply(question);
+    assert.match(result.partial, /^You asked about .+\. This answer covers only: /, question);
+    assert.ok(result.partial.includes(result.understood), question);
+    assert.ok(result.partial.includes(covered), question);
+    assert.equal(result.context.when.from, from, question);
+  }
+});
+
+test('the partial-date disclosure leaves ordinary conjunctions and short follow-ups alone', () => {
+  for (const question of ['Do I work Friday?', 'Who is working days and nights Friday?', 'Are Morgan and Parker working Friday?',
+    'Do I work Friday and Friday?', 'What days do I work this week and Friday?', 'What is the policy for holidays and weekends?', 'Who is working tonight?'])
+    assert.equal(reply(question).partial, undefined, question);
+  const first = reply('Who is working tonight?');
+  const next = ask('and Friday?', { ...world, last: first.context });
+  assert.equal(next.partial, undefined);
+  assert.equal(next.context.when.shift, 'N');
+});

@@ -169,11 +169,11 @@ async function askAndLog(q) {
   ui.lastAsk = ui.dialog = dialog;
   await commit(result.kind === 'blocked' ? 'Question blocked by text screen' : 'Question asked', {
     ...(result.kind === 'blocked' ? {} : { fingerprint:await sha256(q.trim().toLowerCase()) }),
-    engine:'ask-13-review-1', build:BUILD, kind:result.kind, answered:!result.empty, ...(result.corrected ? { correction:result.corrected.id } : {}),
+    engine:'ask-13-partial-scope-1', build:BUILD, kind:result.kind, answered:!result.empty, ...(result.corrected ? { correction:result.corrected.id } : {}),
     resolved:result.context?.when || null,
     sources:result.items.map(item => ({ reference:item.go || 'note',
       ...(item.go?.startsWith('doc|') ? { version:sourceVersions[item.go.split('|')[1]] } : {}) })),
-    answerHash:await sha256(JSON.stringify({ title:result.title, lines:result.lines, items:result.items, source:result.source }))
+    answerHash:await sha256(JSON.stringify({ title:result.title, lines:result.lines, items:result.items, source:result.source, ...(result.partial ? { partial:result.partial } : {}) }))
   }, previous => previous);
 }
 // A repeated press never overrides this screen. Files' contents are not inspected; the visible notice explains that.
@@ -842,7 +842,7 @@ function dialogMarkup() {
     if (picked) {
       // What Ask says for it now decides which corrections can do anything.
       const now = currentAsk({ q:picked.text }), answered = now.kind !== 'blocked' && !now.empty && !now.taught;
-      const brief = result => (result.understood ? '<p class="subtle">Understood as: ' + h(result.understood) + '.</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') +
+      const brief = result => (result.partial ? '<p class="fair-line"><strong>Partial answer.</strong> ' + h(result.partial) + '</p>' : '') + (result.understood ? '<p class="subtle">Understood as: ' + h(result.understood) + '.</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') +
         result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.slice(0, 3).map(entry => '<p><b>' + h(entry.text) + '</b>' + (entry.sub ? ' <small>' + h(entry.sub) + '</small>' : '') + '</p>').join('');
       const reads = ui.dialog.reads || '', screened = reads && patientSigns(reads).length > 0;
       const tried = reads && !screened ? ask(reads, { ...askWorld(), last:null, uncorrected:true }) : null;
@@ -901,7 +901,7 @@ function dialogMarkup() {
       (entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
     return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
       '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
-      (result ? '<div class="ask-answer" role="status">' + (result.read || result.understood ? '<p class="subtle">' + h([result.read ? 'Read as: “' + result.read + '”' + (result.corrected?.kind === 'reading' ? ', a correction by ' + result.corrected.by + ' as record keeper' : '') : '',
+      (result ? '<div class="ask-answer" role="status">' + (result.partial ? '<p class="fair-line"><strong>Partial answer.</strong> ' + h(result.partial) + '</p>' : '') + (result.read || result.understood ? '<p class="subtle">' + h([result.read ? 'Read as: “' + result.read + '”' + (result.corrected?.kind === 'reading' ? ', a correction by ' + result.corrected.by + ' as record keeper' : '') : '',
           result.understood ? 'Understood as: ' + result.understood : ''].filter(Boolean).join('. ')) + '.</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') + result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.map(item).join('') +
         '<p class="subtle">From: ' + h(result.source) + '</p>' +
         (result.next?.length ? '<div class="chip-list"><span class="subtle">Next</span><div>' + result.next.map((text, index) => button(h(text), 'ask-next', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' : '') +
