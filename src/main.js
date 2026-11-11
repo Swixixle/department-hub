@@ -53,6 +53,7 @@ const valueAttr = value => 'data-value="' + h(value) + '"';
 const actorNames = () => [...new Set([...state.assignments.map(row => row.person), ...Object.values(state.directory).map(profile => profile.person)])].sort((a,b) => a.localeCompare(b));
 const isSame = (a,b) => normalizeName(a) === normalizeName(b);
 const isMine = row => isSame(row.person, state.actor);
+const ROLE_LABELS = { charge: 'Charge', icu: 'ICU', extra: 'Extra' };
 
 async function receipt(type, details) {
   const payload = {
@@ -98,8 +99,10 @@ function schedule() {
       const rows = state.assignments.filter(row => row.date === date && row.shift === shift);
       return '<section class="shift"><div class="shift-label ' + (shift === 'N' ? 'night' : 'day') + '"><b>' + def.label + '</b><span>' +
         (shift === 'N' ? '7 PM – 7 AM' : '7 AM – 7 PM') + '</span></div>' +
-        (rows.length ? rows.map(row => button(avatar(row.person) + '<span>' + h(row.person) + '</span>' +
-          (isMine(row) ? '<em>You</em>' : ''), 'shift', 'class="staff ' + (isMine(row) ? 'mine' : '') + '" ' + valueAttr(row.key))).join('') :
+        (rows.length ? rows.map(row => button(avatar(row.person) + '<span class="name">' + h(row.person) + '</span>' +
+          (row.hours ? '<i class="tag">' + h(row.hours) + '</i>' : '') +
+          (isMine(row) ? '<em>You</em>' : ''), 'shift', 'class="staff ' + (isMine(row) ? 'mine ' : '') + h(row.role || '') + '" ' +
+          (row.role ? 'title="' + h(ROLE_LABELS[row.role] || row.role) + '" ' : '') + valueAttr(row.key))).join('') :
           '<p class="empty-shift">No assignments in this roster.</p>') + '</section>';
     }).join('') + '</article>').join('');
   return '<section class="intro"><div><div class="eyebrow">TEAM ROSTER</div><h1>Schedule</h1><p>See who’s working. Start a trade or find coverage from your shift.</p></div>' +
@@ -113,6 +116,8 @@ function schedule() {
     '<div class="segments">' + button('‹', 'navigate', 'aria-label="Previous week" data-value="-7"') +
     button('›', 'navigate', 'aria-label="Next week" data-value="7"') + '</div></div></div>' +
     '<div class="calendar ' + ui.view + '">' + cells + '</div>' +
+    (state.assignments.some(row => row.role) ? '<p class="calendar-foot legend"><span class="name charge">Pink</span> charge <span class="name icu">Green</span> ICU' +
+      (state.assignments.some(row => row.role === 'extra') ? ' <span class="name extra">Yellow</span> extra' : '') + '</p>' : '') +
     '<p class="calendar-foot">Night shifts appear on their start date. Payroll checks split hours at the workweek boundary.</p>';
 }
 
@@ -177,8 +182,11 @@ function dialogMarkup() {
     return shell('Review import', '<div class="import-stats"><b>' + pending.pages.length + ' pages</b><b>' + pending.assignments.length +
       ' assignments</b><b>' + (unresolved + pending.issues.length) + ' to review</b></div>' +
       '<p>Review the flagged cells and check the date span. Duplicate assignments are combined with their source references.</p>' +
-      '<details><summary>Pages and extracted dates</summary><ul class="compact">' + pending.pages.map(page => '<li>' +
-        h(page.name + ' · ' + page.status + (page.dates.length ? ' · ' + page.dates.at(0) + ' to ' + page.dates.at(-1) : '')) + '</li>').join('') + '</ul></details>' +
+      '<details' + (pending.pages.some(page => page.shift) ? ' open' : '') + '><summary>Pages and extracted dates</summary><ul class="compact">' + pending.pages.map(page => '<li>' +
+        h(page.name + ' · ' + page.status + (page.dates.length ? ' · ' + page.dates.at(0) + ' to ' + page.dates.at(-1) : '')) +
+        (page.shift ? ' · <b>' + (page.shift === 'N' ? 'Night' : 'Day') + ' schedule</b>' + (page.shiftGuessed ? ' (guessed) ' : ' ') +
+          button('Switch to ' + (page.shift === 'N' ? 'Day' : 'Night'), 'flip-page', 'class="text-button" ' + valueAttr(page.page)) : '') +
+        '</li>').join('') + '</ul></details>' +
       (pending.flags.length ? '<div class="flags">' + pending.flags.map((flag, index) => '<div class="flag"><p>' + h(flag.message) + '</p><small>' +
         h(flag.source.file + ' · ' + flag.status) + '</small> ' +
         button('Review', 'flag', 'class="text-button" ' + valueAttr(index)) + '</div>').join('') + '</div>' : '') +
@@ -197,7 +205,8 @@ function dialogMarkup() {
       button('Mark as non-assignment', 'dismiss-flag', 'class="secondary" ' + valueAttr(id)) +
       '<button class="primary">Save correction</button></div></form>');
   }
-  if (type === 'shift') return shell(shiftCaption(row), '<p><b>' + h(row.person) + '</b> · ' + h(row.date) + '</p>' +
+  if (type === 'shift') return shell(shiftCaption(row), '<p><b>' + h(row.person) + '</b> · ' + h(row.date) +
+    (row.role ? ' · ' + h(ROLE_LABELS[row.role] || row.role) : '') + (row.hours ? ' · ' + h(row.hours) : '') + '</p>' +
     (row.sources.length ? '<p>' + button('See photo source', 'source', 'class="text-button" ' + valueAttr(row.key)) +
       ' <small>' + h(row.sources.length + ' source page(s)') + '</small></p>' : '<p class="subtle">Fictional starting roster. Import sample photos to see image evidence.</p>') +
     (agreedRequestFor(row) ? '<p class="subtle">This shift is part of an agreed request that is queued for review. It cannot be offered again until that is settled.</p>' +
@@ -363,6 +372,20 @@ async function act({action, value, kind}) {
       return;
     }
     case 'clear-draft': ui.pending = null; break;
+    case 'flip-page': {
+      // A calendar page is all days or all nights. Switching moves every row and flag that came only from that page.
+      const draft = ui.pending;
+      const page = draft.pages.find(entry => entry.page === value);
+      if (!page?.shift) return;
+      const from = page.shift, to = from === 'N' ? 'D' : 'N';
+      page.shift = to;
+      page.shiftGuessed = false;
+      draft.assignments = mergeAssignments(draft.assignments.map(item =>
+        item.shift === from && item.sources.every(source => source.page === value) ? { ...item, shift: to } : item));
+      for (const flag of draft.flags) if (flag.source.page === value && flag.draft.shift === from) flag.draft.shift = to;
+      draft.issues = verifyRoster(draft.assignments);
+      break;
+    }
     case 'flag': ui.dialog = { type:'flag', id:Number(value), chosen:await showSource(ui.pending.flags[value].source) }; break;
     case 'dismiss-flag': ui.pending.flags[value].status = 'dismissed'; ui.dialog = { type:'import' }; clearPreview(); break;
     case 'publish': {
@@ -469,8 +492,10 @@ async function submit(form) {
       const flag = ui.pending.flags[Number(form.dataset.index)];
       const person = data.person.trim();
       if (!person || !/^\d{4}-\d{2}-\d{2}$/.test(data.date) || !SHIFTS[data.shift]) return;
+      const { role, hours } = flag.draft;
       ui.pending.assignments = mergeAssignments([...ui.pending.assignments, {
-        date:data.date, shift:data.shift, person, sources:[{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
+        date:data.date, shift:data.shift, person, ...(role ? { role } : {}), ...(hours ? { hours } : {}),
+        sources:[{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
       }]);
       ui.pending.issues = verifyRoster(ui.pending.assignments);
       flag.status = 'corrected';

@@ -53,5 +53,52 @@ def main():
         files.append(file)
     (OUT / "manifest.json").write_text(json.dumps({"files": files, "truth": truth}, indent=2) + "\n")
 
+def calendar_pages():
+    """A printed month calendar like a paper schedule: weekday header, short dates, names in capitals,
+    highlighter for roles, one partial shift, and names struck out with a handwritten replacement."""
+    start = date(2026, 11, 29)
+    pink, green, blue = "#f6b6c9", "#bfe3b4", "#4f97c9"
+    truth, struck = [], []
+    for shift, people, per_cell, file in (("D", DAY, 4, "calendar-day.png"), ("N", NIGHT, 3, "calendar-night.png")):
+        image = Image.new("RGB", (1900, 1300), "#fbfaf7")
+        draw = ImageDraw.Draw(image)
+        left, top, width, height = 60, 110, 254, 285
+        if shift == "N":
+            draw.text((250, 40), "Night", fill="#333333", font=font(40))
+        for column, name in enumerate(["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]):
+            draw.rectangle((left + column * width, top - 50, left + (column + 1) * width, top), outline="#555555", width=2)
+            draw.text((left + column * width + 90, top - 42), name, fill="#333333", font=font(26))
+        for week in range(4):
+            for column in range(7):
+                offset = week * 7 + column
+                day = start + timedelta(days=offset)
+                x, y = left + column * width, top + week * height
+                draw.rectangle((x, y, x + width, y + height), outline="#555555", width=2)
+                draw.text((x + 12, y + 8), f"{day.month}/{day.day}", fill="#111111", font=font(27, True))
+                names = [people[(offset * per_cell + index) % len(people)] for index in range(per_cell)]
+                for index, name in enumerate(names):
+                    text, ty = name.upper(), y + 48 + index * 46
+                    hours = "7-3" if offset % 9 == 4 and index == per_cell - 1 else None
+                    label = text + (" " + hours if hours else "")
+                    span = draw.textlength(label, font=font(27))
+                    tint = blue if hours else pink if index == 0 else green if index == 1 else None
+                    if tint:
+                        draw.rectangle((x + 8, ty - 2, x + 20 + span, ty + 34), fill=tint)
+                    draw.text((x + 12, ty), label, fill="#141414", font=font(27))
+                    if offset % 11 == 6 and index == 2:
+                        draw.line((x + 8, ty + 19, x + 18 + span, ty + 15), fill="#141414", width=3)
+                        draw.text((x + 26 + span, ty + 2), "Lee Jn", fill="#30303a", font=font(24))
+                        struck.append(day.isoformat() + "|" + shift)
+                        continue
+                    entry = {"date": day.isoformat(), "shift": shift, "person": name}
+                    if index < 2 and not hours:
+                        entry["role"] = "charge" if index == 0 else "icu"
+                    if hours:
+                        entry["hours"] = hours
+                    truth.append(entry)
+        image.save(OUT / file, optimize=True)
+    (OUT / "calendar.json").write_text(json.dumps({"files": ["calendar-day.png", "calendar-night.png"], "truth": truth, "struck": struck}, indent=2) + "\n")
+
 if __name__ == "__main__":
     main()
+    calendar_pages()

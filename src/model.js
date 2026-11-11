@@ -44,9 +44,24 @@ function zonedInstant(date, time) {
   throw new Error('Ambiguous or invalid shift time');
 }
 
+// A partial shift is written on the schedule as "7-3" or "7-3:30". On a day page that is 07:00 to 15:00.
+// On a night page it is 19:00 to 03:00.
+export function shiftTimes(item) {
+  const base = SHIFTS[item.shift];
+  if (!base) throw new Error('Unsupported shift label');
+  const match = item.hours && /^(\d{1,2})(?::(\d{2}))?-(\d{1,2})(?::(\d{2}))?/.exec(item.hours);
+  if (!match) return base;
+  const night = item.shift === 'N';
+  const clock = (hour, minute) => String(hour % 24).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+  let start = Number(match[1]) % 12, end = Number(match[3]) % 12;
+  const startMinute = Number(match[2] || 0), endMinute = Number(match[4] || 0);
+  if (night || start < 5) start += 12;
+  if (night ? end + 12 > start : end * 60 + endMinute <= start * 60 + startMinute) end += 12;
+  return { label: base.label, start: clock(start, startMinute), end: clock(end, endMinute) };
+}
+
 export function shiftInterval(item) {
-  const shift = SHIFTS[item.shift];
-  if (!shift) throw new Error('Unsupported shift label');
+  const shift = shiftTimes(item);
   const endDate = shift.end > shift.start ? item.date : addDays(item.date, 1);
   return [zonedInstant(item.date, shift.start), zonedInstant(endDate, shift.end)];
 }
@@ -86,8 +101,10 @@ export function verifyRoster(rows, policy = POLICY) {
       }
     }
   }
+  // A batch can hold day pages only or night pages only. A shift the batch never mentions is not a gap.
+  const present = Object.keys(SHIFTS).filter(shift => rows.some(row => row.shift === shift));
   for (const [date, group] of Map.groupBy(rows, row => row.date)) {
-    for (const shift of Object.keys(SHIFTS)) {
+    for (const shift of present) {
       const count = group.filter(row => row.shift === shift).length;
       if (count !== policy.minimumByShift[shift]) {
         issues.push({ date, message: SHIFTS[shift].label + ' shift has ' + count + ' assignments. Sample target is ' + policy.minimumByShift[shift] + '.' });
