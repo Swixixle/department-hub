@@ -152,6 +152,28 @@ Checked in a browser with a simulated microphone and real files: a post with a p
 
 Until the shared version is on, a post, a voice message or an upload stays in the browser it was made in. The board says so.
 
+## Added on branch `claude/fairness-record`
+
+Two directions from the owner on 2026-11-11.
+
+**The look and feel matter a great deal.** He asked what research says about ease of use across ages and skill levels, and to place controls where people already expect them. The evidence gathered: most adults are at the lowest skill levels (OECD, 215,942 people, 33 countries); the touch-target minimum from research is about a centimetre, and larger for older adults; hidden navigation is used far less than visible navigation; about half of people hold a phone in one hand; a response under a tenth of a second feels instant; and a first impression forms in under a twentieth of a second, driven by simplicity and by looking familiar. Measured against that, the app had 35 of 41 Schedule controls under 48 px at phone size and more than half its text under 12 px.
+
+- **Sizes** (`src/sizes.css`): a main action is 60 CSS px tall, any other control 48, sentence text 16. Sizes are in rem. An **Aa** button gives three text sizes, and the browser's own text size is followed. CSS px match points and dp by design, but their physical size differs between devices, so real phones still need checking.
+- **Phone layout:** one day per row with names in full; one person per block in the name editor; dialogs as bottom sheets with the title and the main action pinned; labelled tabs at the bottom.
+- **Restore and erase** each get a sheet of their own.
+- **Press counts,** kept on the device: fixed button names and totals only. No names, shift keys, typed words or recordings. Left out of backups. Not counted in the public demo.
+- **`docs/USER-TEST.md`:** five tasks to watch five different coworkers do, recording completion, wrong presses and help needed.
+
+**Fairness is to be refined, and there has to be a custodian of the record.** It is for tracking when people are getting the worse of the schedule or taking more of the load, and for tracking holidays. It did not need to look the way it did.
+
+- **Everyone** sees their own sheet, with one plain sentence about where they stand, and the department picture without names.
+- **Whoever keeps the record** sees who is carrying more than their share and who less, a holiday tracker (who worked which holiday, day or night), the low-census ledger, and the full table folded away. They choose which holidays count and can add days. They can export the record as a spreadsheet file.
+- **The keeper** is set in Staff details. Until someone is set, anyone can take it on. On one device this is a courtesy, because "Viewing as" lets anyone look. Real access control comes with accounts.
+- **The record outlasts a schedule.** When a new schedule is published, shifts on dates it does not cover are carried forward, and the Fairness tab can show this schedule or everything on record. Importing a corrected page for the same dates replaces what it corrects.
+- A person listed only on weekends is pointed out to the keeper, in case theirs is a weekend-only position.
+
+Checked in a browser at phone size: after upgrading a Version 7 workspace in place, the schedule, a contact, posts and their files were all still there; five tasks were completed by tap (find a shift, correct a replacement, ask for coverage, post a recording, back up, erase and restore); the press counts held only button names; and the member view of Fairness showed no name but the viewer's own. Not checked: real phones, and real people.
+
 ## Still open from the review
 
 - Matches that are blocked are hidden with no reason given.

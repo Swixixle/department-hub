@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { census, holidays, isWeekendTurn, ledger, releaseOrder, staffing, statSheet } from '../src/fairness.js';
+import { carryForward, census, holidayTracker, holidays, isWeekendTurn, ledger, releaseOrder, staffing, standing, statSheet } from '../src/fairness.js';
 
 const row = (date, shift, person, role) => ({ date, shift, person, ...(role ? { role } : {}) });
 // Two weeks of nights starting Sunday 2026-11-29. Taylor works every weekend night and nothing else.
@@ -128,4 +128,41 @@ test('a stat sheet counts what a person carried and the times they helped', () =
   assert.deepEqual([sheet.shift, sheet.row.shifts, sheet.tradesAccepted, sheet.shiftsCovered, sheet.wentHomeForSomeone, sheet.releasedHours], ['N', 6, 1, 1, 1, 6]);
   // Nothing on the sheet counts a declined request.
   assert.equal(JSON.stringify(sheet).includes('eclin'), false);
+});
+
+test('the department decides which holidays count', () => {
+  const rules = { off: ['Christmas Eve', "New Year's Eve"], extra: [{ name: 'Easter', date: '2027-03-28' }, { name: 'Founders Day', date: '2026-12-20' }] };
+  assert.deepEqual(holidays(2026, rules).filter(item => item.date > '2026-12-01').map(item => item.name), ['Founders Day', 'Christmas Day']);
+  assert.deepEqual(holidays(2027, rules).map(item => item.name).slice(0, 3), ["New Year's Day", 'Easter', 'Memorial Day']);
+  const rows = [row('2026-12-24', 'N', 'Jordan'), row('2026-12-20', 'N', 'Jordan'), row('2026-12-25', 'N', 'Jordan')];
+  assert.deepEqual(ledger(rows, 'N', {}, rules).people[0].holidays, ['Founders Day', 'Christmas Day']);
+  assert.deepEqual(ledger(rows, 'N', {}).people[0].holidays, ['Christmas Eve', 'Christmas Day']);
+});
+
+test('the holiday tracker shows who worked which holiday on either shift', () => {
+  const rows = [row('2026-11-26', 'D', 'Avery'), row('2026-11-26', 'N', 'Jordan'), row('2026-11-26', 'N', 'Riley'), row('2026-12-25', 'D', 'Jordan'), row('2026-12-25', 'N', 'Jordan'),
+    row('2026-12-25', 'N', 'Jordan'), row('2026-12-26', 'D', 'Avery'), row('2026-11-20', 'D', 'Morgan')];
+  const tracker = holidayTracker(rows, { riley: { status: 'Student' } });
+  assert.deepEqual(tracker.days.map(day => day.name), ['Thanksgiving', 'Christmas Eve', 'Christmas Day']);
+  assert.deepEqual(tracker.people.map(entry => [entry.person, entry.count, entry.worked]), [['Jordan', 3, { '2026-11-26': 'N', '2026-12-25': 'DN' }], ['Avery', 1, { '2026-11-26': 'D' }]]);
+  assert.deepEqual(holidayTracker([]), { days: [], people: [] });
+});
+
+test('a new schedule keeps the old one on record, and a corrected page replaces what it corrects', () => {
+  const november = [row('2026-11-01', 'N', 'Jordan', 'charge'), row('2026-11-28', 'N', 'Morgan')];
+  const december = [row('2026-11-29', 'N', 'Jordan'), row('2026-12-26', 'N', 'Morgan')];
+  // December arrives: November is carried.
+  const record = carryForward([], november, december);
+  assert.deepEqual(record, [{ date: '2026-11-01', shift: 'N', person: 'Jordan', role: 'charge' }, { date: '2026-11-28', shift: 'N', person: 'Morgan' }]);
+  // December is imported again with a correction: nothing from the old December is carried, and November stays once.
+  assert.deepEqual(carryForward(record, december, [row('2026-11-29', 'N', 'Quinn'), row('2026-12-26', 'N', 'Morgan')]), record);
+  // January arrives: both earlier schedules are on record.
+  assert.equal(carryForward(record, december, [row('2027-01-03', 'N', 'Jordan')]).length, 4);
+  assert.deepEqual(carryForward([], november, []).length, 2);
+});
+
+test('standing names who carries more than a turn above their share and who less', () => {
+  const table = ledger(nights(), 'N', { taylor: { arrangement: 'weekend-only' } });
+  const result = standing(table);
+  assert.deepEqual([result.over.map(entry => entry.person), result.under.map(entry => entry.person), result.level], [['Jordan'], ['Parker'], 2]);
 });

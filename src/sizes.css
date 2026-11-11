@@ -102,3 +102,10 @@ button.count-note.over{border-radius:8px;margin:0 0 4px;justify-content:space-be
 @keyframes sheet{from{transform:translateY(100%)}to{transform:none}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after,dialog::backdrop{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* the record */
+.panel h3{margin:16px 0 6px;font-size:1rem}
+.panel h3:first-child{margin-top:0}
+.fair.holiday td,.fair.holiday thead th{text-align:center;white-space:normal}
+.fair.holiday th small{font-weight:400}
+details>summary{cursor:pointer;font-weight:650;color:#276143}

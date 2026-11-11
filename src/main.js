@@ -3,7 +3,7 @@ import './sizes.css';
 import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
-import { census, ledger, releaseOrder, staffing, statSheet } from './fairness.js';
+import { HOLIDAY_NAMES, carryForward, census, holidayTracker, ledger, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
 import { localBoard } from './backend.js';
 
@@ -36,6 +36,9 @@ const initial = {
   peopleSource: 'sample',
   manualLinks: {},
   releases: [],
+  custodians: ['jordan'],
+  holidayRules: { off: [], extra: [] },
+  history: [],
   assignments: staffSample,
   directory: sampleDirectory,
   hoursVerified: true,
@@ -52,7 +55,8 @@ const initial = {
 function prepare(loaded) {
   let next = loaded;
   if (!next.people) next = { ...next, people: next.mode === 'sample' ? samplePeople : [], peopleSource: next.mode === 'sample' ? 'sample' : 'import', manualLinks: {} };
-  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}]]) if (!next[field]) next = { ...next, [field]: empty };
+  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}], ['history', []],
+    ['custodians', next.mode === 'sample' ? ['jordan'] : []], ['holidayRules', { off: [], extra: [] }]]) if (!next[field]) next = { ...next, [field]: empty };
   next = withContacts(next);
   // The starter rules live in code. A saved workspace picks up a new rule version on load.
   if (next.policy?.version !== POLICY.version) next = { ...next, policy: POLICY };
@@ -289,41 +293,73 @@ function board() {
     '<div class="post-list">' + (shown.map(postMarkup).join('') || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>';
 }
 
+// Fairness is a kept record. Everyone sees their own sheet and the department picture, without names. Whoever keeps the
+// record sees who is carrying more, the holiday tracker and the low-census ledger, and can export it.
+const isKeeper = () => state.custodians.includes(normalizeName(state.actor));
+const keeperNames = () => state.custodians.map(id => state.directory[id]?.person || id);
+const recordRows = () => ui.fairScope === 'record' && state.history.length ? [...state.history, ...state.assignments] : state.assignments;
+const signed = value => (value >= 0 ? '+' : '−') + Math.abs(value).toFixed(1);
+const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
+
 function fairness() {
-  const mine = state.assignments.filter(row => isSame(row.person, state.actor));
+  const rows = recordRows(), rules = state.holidayRules;
+  const mine = rows.filter(row => isSame(row.person, state.actor));
   const pool = ui.pool || (mine.filter(row => row.shift === 'N').length > mine.length / 2 ? 'N' : 'D');
-  const table = ledger(state.assignments, pool, state.directory);
-  const signed = value => (value >= 0 ? '+' : '−') + Math.abs(value).toFixed(1);
-  const sheet = statSheet(state.actor, state);
+  const table = ledger(rows, pool, state.directory, rules), stand = standing(table), tracker = holidayTracker(rows, state.directory, rules);
+  const sheet = statSheet(state.actor, { ...state, assignments: rows, rules }), me = sheet.row;
   const line = (label, value) => '<div><b>' + h(value) + '</b><span>' + h(label) + '</span></div>';
-  const card = sheet.row ? '<div class="panel stat-sheet"><div class="eyebrow">YOUR SHEET · ' + h(state.actor.toUpperCase()) + '</div><div class="stat-grid">' +
-    line('shifts', sheet.row.shifts) +
-    line(sheet.row.weekendOnly ? 'weekend turns' : sheet.row.weekendVolunteer ? 'weekend turns, ' + sheet.weekendExtra.toFixed(1) + ' beyond a regular share by choice' :
-      'weekend turns, fair share ' + sheet.row.weekendFair.toFixed(1), sheet.row.weekend) +
-    line('holidays' + (sheet.row.holidays.length ? ': ' + sheet.row.holidays.join(', ') : ''), sheet.row.holidays.length) +
-    line('charge', sheet.row.charge) + line('ICU', sheet.row.icu) +
-    line('trades accepted', sheet.tradesAccepted) + line('shifts covered', sheet.shiftsCovered) +
-    line('went home for someone', sheet.wentHomeForSomeone) + line('low-census hours', sheet.releasedHours) + '</div></div>' : '';
-  const rows = table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + (entry.regular || entry.weekendVolunteer ? '' : ' light') + '"><th scope="row">' + h(entry.person) +
-    (entry.weekendOnly ? ' <small>weekend only</small>' : entry.weekendVolunteer ? ' <small>extra weekends by choice</small>' : entry.regular ? '' :
-      ' <small>' + h(entry.status === 'PRN' ? 'PRN' : 'few shifts') + '</small>') + '</th><td>' + entry.shifts + '</td><td>' + entry.weekend + '</td><td>' +
-    (entry.weekendOnly ? '–' : entry.weekendFair.toFixed(1)) + '</td><td class="gap ' +
+  const verdict = !me ? '' : me.weekendOnly ? 'Weekend-only position.' :
+    me.weekendVolunteer ? 'You have taken ' + sheet.weekendExtra.toFixed(1) + ' weekend turns beyond a regular share by choice.' :
+    me.weekendGap >= 1 ? 'You are carrying ' + me.weekendGap.toFixed(1) + ' weekend turns more than your share.' :
+    me.weekendGap <= -1 ? 'You are ' + Math.abs(me.weekendGap).toFixed(1) + ' weekend turns under your share.' : 'You are within one weekend turn of your share.';
+  const card = me ? '<div class="panel stat-sheet"><div class="eyebrow">YOUR SHEET · ' + h(state.actor.toUpperCase()) + '</div><p class="fair-line">' + h(verdict) + '</p><div class="stat-grid">' +
+    line('shifts', me.shifts) + line(me.weekendOnly || me.weekendVolunteer ? 'weekend turns' : 'weekend turns, share ' + me.weekendFair.toFixed(1), me.weekend) +
+    line('holidays' + (me.holidays.length ? ': ' + me.holidays.join(', ') : ''), me.holidays.length) + line('charge', me.charge) + line('ICU', me.icu) +
+    line('trades accepted', sheet.tradesAccepted) + line('shifts covered', sheet.shiftsCovered) + line('went home for someone', sheet.wentHomeForSomeone) + line('low-census hours', sheet.releasedHours) + '</div></div>' : '';
+  const holidayShifts = tracker.people.reduce((sum, entry) => sum + entry.count, 0);
+  const picture = !table.people.length ? '<div class="panel empty"><strong>No ' + (pool === 'N' ? 'night' : 'day') + ' shifts on record.</strong></div>' :
+    '<div class="panel"><p class="fair-line"><b>' + table.withinOne + ' of ' + table.regulars + '</b> regulars are within one weekend turn of their share. The spread is <b>' + table.spread.toFixed(1) + '</b> turns. The aim is under one.</p>' +
+    '<p><b>' + stand.over.length + '</b> carrying more than a turn extra. <b>' + stand.under.length + '</b> more than a turn under.' +
+    (holidayShifts ? ' ' + plural(holidayShifts, 'holiday shift') + ' worked by ' + plural(tracker.people.length, 'person').replace('persons', 'people') + '; the most by one person is ' + tracker.people[0].count + '.' : '') + '</p>' +
+    '<p class="subtle">A weekend turn is a Saturday or Sunday day shift, or a Friday, Saturday or Sunday night. A share follows how many shifts a person works. Students are left out. Calling in sick and declined requests are never counted.</p></div>';
+  const access = '<div class="panel"><p><b>' + (state.custodians.length ? 'The full record is kept by ' + h(keeperNames().join(' and ')) + '.' : 'Nobody keeps the record yet.') + '</b></p>' +
+    '<p class="subtle">You see your own sheet and the department picture. Whoever keeps the record sees who is carrying more, tracks the holidays and can export it.</p>' +
+    (state.custodians.length ? '' : '<p>' + button('I will keep the record', 'claim-record', 'class="secondary"') + '</p>') + '</div>';
+  return '<section class="intro"><div><div class="eyebrow">WHO CARRIED WHAT</div><h1>Fairness</h1><p>A kept record, so nobody quietly ends up with more than their share.</p></div></section>' + card +
+    '<div class="calendar-toolbar"><div><div class="eyebrow">' + (table.from ? h(dayLabel(table.from, { month:'short', day:'numeric' }) + ' – ' + dayLabel(table.to, { month:'short', day:'numeric', year:'numeric' })) : 'NOTHING ON RECORD') +
+    '</div><h2>' + (pool === 'N' ? 'Night shift' : 'Day shift') + '</h2></div><div class="controls">' +
+    (state.history.length ? '<div class="segments">' + button('This schedule', 'fair-scope', 'class="' + (ui.fairScope === 'record' ? '' : 'selected') + '" data-value="schedule"') +
+      button('Everything on record', 'fair-scope', 'class="' + (ui.fairScope === 'record' ? 'selected' : '') + '" data-value="record"') + '</div>' : '') +
+    '<div class="segments">' + button('Days', 'pool', 'class="' + (pool === 'D' ? 'selected' : '') + '" data-value="D"') + button('Nights', 'pool', 'class="' + (pool === 'N' ? 'selected' : '') + '" data-value="N"') + '</div></div></div>' +
+    picture + (isKeeper() ? recordMarkup(table, stand, tracker, pool) : access);
+}
+
+function recordMarkup(table, stand, tracker, pool) {
+  const person = entry => '<div><span><b>' + h(entry.person) + '</b> <small>' + plural(entry.weekend, 'weekend turn') + ', share ' + entry.weekendFair.toFixed(1) +
+    (entry.holidays.length ? ' · ' + plural(entry.holidays.length, 'holiday') : '') + '</small></span><b class="gap ' + (entry.weekendGap > 0 ? 'over' : 'under') + '">' + signed(entry.weekendGap) + '</b></div>';
+  const full = table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + (entry.regular || entry.weekendVolunteer ? '' : ' light') + '"><th scope="row">' + h(entry.person) +
+    (entry.weekendOnly ? ' <small>weekend only</small>' : entry.weekendVolunteer ? ' <small>extra weekends by choice</small>' : entry.regular ? '' : ' <small>' + h(entry.status === 'PRN' ? 'PRN' : 'few shifts') + '</small>') +
+    '</th><td>' + entry.shifts + '</td><td>' + entry.weekend + '</td><td>' + (entry.weekendOnly ? '–' : entry.weekendFair.toFixed(1)) + '</td><td class="gap ' +
     (entry.weekendVolunteer ? 'credit' : entry.weekendOnly || Math.abs(entry.weekendGap) < 1 ? 'even' : entry.weekendGap > 0 ? 'over' : 'under') + '">' +
-    (entry.weekendOnly ? '–' : entry.weekendVolunteer ? '+' + entry.weekendExtra.toFixed(1) + ' by choice' : signed(entry.weekendGap)) + '</td><td>' + (entry.holidays.length ? '<span title="' + h(entry.holidays.join(', ')) + '">' + entry.holidays.length + '</span>' : '0') +
-    '</td><td>' + entry.charge + '</td><td>' + entry.icu + '</td></tr>').join('');
-  return '<section class="intro"><div><div class="eyebrow">WHO CARRIED WHAT</div><h1>Fairness</h1><p>Counted from the schedule in this workspace. These are outcomes of how the schedule was built, not anyone’s doing.</p></div></section>' +
-    card + '<div class="calendar-toolbar"><div><div class="eyebrow">' + (table.from ? h(dayLabel(table.from, { month:'short', day:'numeric' }) + ' – ' + dayLabel(table.to, { month:'short', day:'numeric' })) : 'NO SHIFTS') +
-    '</div><h2>' + (pool === 'N' ? 'Night shift' : 'Day shift') + '</h2></div><div class="controls"><div class="segments">' +
-    button('Days', 'pool', 'class="' + (pool === 'D' ? 'selected' : '') + '" data-value="D"') + button('Nights', 'pool', 'class="' + (pool === 'N' ? 'selected' : '') + '" data-value="N"') + '</div></div></div>' +
-    (table.people.length ? '<div class="panel"><p class="fair-line"><b>' + table.withinOne + ' of ' + table.regulars + '</b> regulars are within one weekend turn of their fair share. The spread is <b>' +
-      table.spread.toFixed(1) + '</b> turns. The aim is under one.</p>' +
-      (table.next.length && table.spread >= 1 ? '<p class="subtle">Next weekend turns would go first to ' + h(table.next.join(', ')) + '.</p>' : '') +
-      table.volunteers.map(item => '<p class="subtle"><b>' + h(item.person) + '</b> has taken ' + item.extra.toFixed(1) +
-        ' weekend turns beyond a regular share by choice. Those turns are out of the rotation, so nobody else is measured against them.</p>').join('') +
-      '<div class="fair-scroll"><table class="fair"><thead><tr><th scope="col">Name</th><th scope="col">Shifts</th><th scope="col">Weekend</th><th scope="col">Fair share</th><th scope="col">Difference</th><th scope="col">Holidays</th><th scope="col">Charge</th><th scope="col">ICU</th></tr></thead><tbody>' +
-      rows + '</tbody></table></div><p class="subtle">A weekend turn is a Saturday or Sunday day shift, or a Friday, Saturday or Sunday night. Fair share follows how many shifts each person works. Students are left out. Calling in sick and declined requests are never counted.</p>' +
-      '<p class="subtle">On a weekend-only position, or taking extra weekends by choice? ' + button('Set it in Staff details', 'staff-setup', 'class="text-button"') + '</p></div>' + lowCensus(pool) :
-      '<div class="panel empty"><strong>No ' + (pool === 'N' ? 'night' : 'day') + ' shifts in this workspace.</strong></div>');
+    (entry.weekendOnly ? '–' : entry.weekendVolunteer ? '+' + entry.weekendExtra.toFixed(1) + ' by choice' : signed(entry.weekendGap)) + '</td><td>' + entry.holidays.length + '</td><td>' + entry.charge + '</td><td>' + entry.icu + '</td></tr>').join('');
+  return '<div class="calendar-toolbar"><div><div class="eyebrow">KEPT BY ' + h(keeperNames().join(' AND ').toUpperCase()) + '</div><h2>The record</h2></div></div>' +
+    '<div class="panel"><h3>Carrying more than their share</h3>' + (stand.over.length ? '<div class="line-list">' + stand.over.map(person).join('') + '</div>' : '<p class="subtle">Nobody is more than a weekend turn over.</p>') +
+    '<h3>Under their share</h3>' + (stand.under.length ? '<div class="line-list">' + stand.under.map(person).join('') + '</div>' : '<p class="subtle">Nobody is more than a weekend turn under.</p>') +
+    (table.next.length && table.spread >= 1 ? '<p class="subtle">The next weekend turns would go first to ' + h(table.next.join(', ')) + '.</p>' : '') +
+    table.volunteers.map(item => '<p class="subtle"><b>' + h(item.person) + '</b> has taken ' + item.extra.toFixed(1) + ' weekend turns beyond a regular share by choice. Those turns are out of the rotation, so nobody else is measured against them.</p>').join('') +
+    table.people.filter(entry => !entry.weekendOnly && !entry.weekendVolunteer && entry.shifts >= 4 && entry.weekend === entry.shifts).map(entry => '<p class="subtle"><b>' + h(entry.person) +
+      '</b> is listed only on weekends. If that is a weekend-only position, set it in Staff details, so nobody else is measured against it.</p>').join('') +
+    '<details><summary>Everyone, in one table</summary><div class="fair-scroll"><table class="fair"><thead><tr><th scope="col">Name</th><th scope="col">Shifts</th><th scope="col">Weekend</th><th scope="col">Share</th><th scope="col">Difference</th><th scope="col">Holidays</th><th scope="col">Charge</th><th scope="col">ICU</th></tr></thead><tbody>' +
+    full + '</tbody></table></div></details></div>' +
+    '<div class="panel"><h3>Holiday tracker</h3>' + (tracker.days.length ? '<div class="fair-scroll"><table class="fair holiday"><thead><tr><th scope="col">Name</th>' +
+      tracker.days.map(day => '<th scope="col">' + h(day.name) + '<br><small>' + h(dayLabel(day.date, { month:'short', day:'numeric', year:'2-digit' })) + '</small></th>').join('') + '<th scope="col">Total</th></tr></thead><tbody>' +
+      (tracker.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + '"><th scope="row">' + h(entry.person) + '</th>' +
+        tracker.days.map(day => '<td>' + (entry.worked[day.date] ? h(entry.worked[day.date].replace('D', 'Day ').replace('N', 'Night').trim()) : '·') + '</td>').join('') + '<td><b>' + entry.count + '</b></td></tr>').join('') ||
+        '<tr><td colspan="' + (tracker.days.length + 2) + '">Nobody is listed on these days.</td></tr>') + '</tbody></table></div>' : '<p class="subtle">No holiday falls inside these dates.</p>') +
+    '<p>' + button('Which holidays count', 'holiday-rules', 'class="secondary"') + '</p></div>' + lowCensus(pool) +
+    '<div class="panel"><h3>Keeping the record</h3><p class="subtle">Every schedule that is published, every shift edited by hand and every low-census entry leaves a dated receipt. When a new schedule replaces an old one, the old one stays on record.' +
+    (state.history.length ? ' ' + state.history.length + ' shifts are carried from earlier schedules.' : '') + '</p><div class="actions wrap">' + button('Export the record', 'export-record', 'class="primary"') +
+    button('Who keeps the record', 'staff-setup', 'class="secondary"') + button('Decision history', 'audit', 'class="secondary"') + '</div></div>';
 }
 
 function lowCensus(pool) {
@@ -591,6 +627,7 @@ function dialogMarkup() {
       '<label>Weekends<select name="arrangement"><option value="">Regular rotation</option><option value="weekend-only"' + (profile.arrangement === 'weekend-only' ? ' selected' : '') +
       '>Weekend-only position</option><option value="weekend-volunteer"' + (profile.arrangement === 'weekend-volunteer' ? ' selected' : '') + '>Regular position, taking extra weekends by choice</option></select></label>' +
       '<p class="subtle">Either choice takes this person’s weekend shifts out of the rotation, so nobody else is measured against them. Extra weekends taken by choice are shown as credit.</p>' +
+      '<label><span><input type="checkbox" name="keeper"' + (state.custodians.includes(normalizeName(name)) ? ' checked' : '') + '> Keeps the fairness record (sees everyone’s numbers)</span></label>' +
       '<button class="primary">Save staff details</button></form>');
   }
   if (type === 'voice') {
@@ -619,6 +656,14 @@ function dialogMarkup() {
   }
   if (type === 'remove-post') return shell('Remove this post?', '<p>It is taken off the board together with its files. This cannot be undone.</p><div class="actions">' +
     button('Keep it', 'close', 'class="secondary"') + button('Remove it', 'remove-post-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
+  if (type === 'holiday-rules') {
+    const rules = state.holidayRules;
+    return shell('Which holidays count', '<form data-form="holidays"><p class="subtle">Untick a day your department does not treat as a holiday. Add any day of your own.</p>' +
+      HOLIDAY_NAMES.map(name => '<label><span><input type="checkbox" name="on" value="' + h(name) + '"' + (rules.off.includes(name) ? '' : ' checked') + '> ' + h(name) + '</span></label>').join('') +
+      rules.extra.map((item, index) => '<label><span><input type="checkbox" name="keep" value="' + index + '" checked> ' + h(item.name + ' · ' + item.date) + '</span></label>').join('') +
+      '<h3>Add a day</h3><div class="cell-when"><label>Name<input name="name" maxlength="40" autocomplete="off" placeholder="Easter"></label><label>Date<input name="date" type="date"></label></div>' +
+      '<div class="actions"><button class="primary">Save</button></div></form>');
+  }
   if (type === 'edit-shift') {
     const { date, shift } = ui.dialog;
     const rows = state.assignments.filter(item => item.date === date && item.shift === shift);
@@ -902,6 +947,34 @@ async function act({action, value, kind}) {
     case 'view': ui.view = value; break;
     case 'navigate': ui.date = addDays(ui.date, Number(value)); break;
     case 'today': ui.date = localToday(); break;
+    case 'fair-scope': ui.fairScope = value; break;
+    case 'holiday-rules': if (isKeeper()) ui.dialog = { type:'holiday-rules' }; break;
+    case 'claim-record':
+      if (state.custodians.length) return;
+      await commit('Record keeper set', { keeper:state.actor }, previous => ({ ...previous, custodians:[normalizeName(previous.actor)] }));
+      break;
+    case 'export-record': {
+      if (!isKeeper()) return;
+      const rows = recordRows(), quote = value => '"' + String(value).replace(/"/g, '""') + '"';
+      const lines = [['Name', 'Shift', 'Shifts', 'Weekend turns', 'Share', 'Difference', 'Holidays worked', 'Which holidays', 'Charge', 'ICU', 'Low-census turns', 'Low-census hours', 'Offered to go'].map(quote).join(',')];
+      for (const pool of ['D', 'N']) {
+        const table = ledger(rows, pool, state.directory, state.holidayRules), low = census(rows, pool, state.directory, state.releases, localToday());
+        for (const entry of table.people) {
+          const cut = low.people.find(item => isSame(item.person, entry.person));
+          lines.push([entry.person, pool === 'N' ? 'Night' : 'Day', entry.shifts, entry.weekend, entry.weekendOnly ? '' : entry.weekendFair.toFixed(1),
+            entry.weekendOnly ? 'weekend only' : entry.weekendVolunteer ? '+' + entry.weekendExtra.toFixed(1) + ' by choice' : entry.weekendGap.toFixed(1),
+            entry.holidays.length, entry.holidays.join('; '), entry.charge, entry.icu, cut?.turns || 0, cut?.hours || 0, cut?.offered || 0].map(quote).join(','));
+        }
+      }
+      const url = URL.createObjectURL(new Blob([lines.join('\r\n') + '\r\n'], { type:'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'department-hub-record-' + localToday() + '.csv';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+      ui.notice = 'The record was saved to your downloads as ' + link.download + '. It lists people by name. Keep it private.';
+      break;
+    }
     case 'text-size':
       textSize = (textSize + 1) % TEXT_SIZES.length;
       try { localStorage.setItem(textKey, JSON.stringify(TEXT_SIZES[textSize])); } catch { /* still applies for this visit */ }
@@ -1034,7 +1107,9 @@ async function act({action, value, kind}) {
         people: draft.sample ? samplePeople : previous.peopleSource === 'import' ? previous.people : [],
         peopleSource: draft.sample ? 'sample' : 'import',
         manualLinks: (previous.mode === 'sample') === draft.sample ? previous.manualLinks : {},
-        releases: (previous.mode === 'sample') === draft.sample ? previous.releases || [] : []
+        releases: (previous.mode === 'sample') === draft.sample ? previous.releases || [] : [],
+        history: !draft.sample && previous.mode === 'local' ? carryForward(previous.history, previous.assignments, draft.assignments) : [],
+        custodians: (previous.mode === 'sample') === draft.sample ? previous.custodians : []
       }));
       state = withContacts(state);
       saveState(storageKey, state);
@@ -1148,8 +1223,10 @@ async function submit(form) {
     case 'profile': {
       const profile = { person:data.person, status:data.status || null, skills:[data.day && 'D', data.night && 'N'].filter(Boolean),
         ...(['weekend-only', 'weekend-volunteer'].includes(data.arrangement) ? { arrangement:data.arrangement } : {}) };
-      await commit('Staff details recorded', { ...profile }, previous => ({
-        ...previous, directory:{ ...previous.directory, [normalizeName(profile.person)]:profile }
+      const id = normalizeName(profile.person);
+      await commit('Staff details recorded', { ...profile, keeper:Boolean(data.keeper) }, previous => ({
+        ...previous, directory:{ ...previous.directory, [id]:profile },
+        custodians: data.keeper ? [...new Set([...previous.custodians, id])] : previous.custodians.filter(item => item !== id)
       }));
       break;
     }
@@ -1209,6 +1286,19 @@ async function submit(form) {
       await nextFlag(index);
       const notes = tidyNotes({ ...tidy, fresh: [] });
       if (notes.length) ui.flash = 'On ' + dayLabel(date, { month:'short', day:'numeric' }) + ': ' + notes.join(' ');
+      break;
+    }
+    case 'holidays': {
+      if (!isKeeper()) return;
+      const fields = new FormData(form), on = fields.getAll('on'), keep = fields.getAll('keep').map(Number);
+      const extra = state.holidayRules.extra.filter((item, index) => keep.includes(index));
+      const name = (data.name || '').trim().replace(/\s+/g, ' ');
+      if (name && /^\d{4}-\d{2}-\d{2}$/.test(data.date || '')) extra.push({ name, date:data.date });
+      else if (name || data.date) throw new Error('A day to add needs both a name and a date.');
+      const rules = { off:HOLIDAY_NAMES.filter(item => !on.includes(item)), extra };
+      await commit('Holiday list changed', rules, previous => ({ ...previous, holidayRules:rules }));
+      ui.dialog = null;
+      ui.notice = 'Holiday list saved.';
       break;
     }
     case 'edit-shift': {

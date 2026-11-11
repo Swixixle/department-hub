@@ -10,8 +10,15 @@ const nth = (year, month, day, count) => {            // count-th given weekday 
 };
 const fixed = (year, month, day) => year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
 
-// A starter list. The department decides which days count.
-export function holidays(year) {
+// A starter list. The department decides which days count: rules.off names the ones that do not, and rules.extra adds
+// days of its own as { name, date }.
+export const HOLIDAY_NAMES = ["New Year's Day", 'Memorial Day', 'Independence Day', 'Labor Day', 'Thanksgiving', 'Christmas Eve', 'Christmas Day', "New Year's Eve"];
+export function holidays(year, rules = {}) {
+  const off = new Set(rules.off || []);
+  const added = (rules.extra || []).filter(item => item?.name && String(item.date || '').startsWith(year + '-')).map(item => ({ name: item.name, date: item.date }));
+  return [...standardHolidays(year).filter(item => !off.has(item.name)), ...added].sort((a, b) => a.date.localeCompare(b.date));
+}
+function standardHolidays(year) {
   return [
     ["New Year's Day", fixed(year, 1, 1)], ['Memorial Day', nth(year, 4, 1, -1)], ['Independence Day', fixed(year, 7, 4)], ['Labor Day', nth(year, 8, 1, 1)],
     ['Thanksgiving', nth(year, 10, 4, 4)], ['Christmas Eve', fixed(year, 12, 24)], ['Christmas Day', fixed(year, 12, 25)], ["New Year's Eve", fixed(year, 12, 31)]
@@ -26,7 +33,7 @@ export const isWeekendTurn = row => row.shift === 'N' ? [5, 6, 0].includes(weekd
 // Two arrangements take a person, and the weekend shifts they work, out of the weekend rotation, so that nobody else
 // is measured against them: 'weekend-only' is a position, and 'weekend-volunteer' is someone on a regular position who
 // has offered to take extra weekends. The volunteer's turns beyond a regular share are shown as credit.
-export function ledger(assignments, shift, directory = {}) {
+export function ledger(assignments, shift, directory = {}, rules = {}) {
   const rows = assignments.filter(row => row.shift === shift && directory[key(row.person)]?.status !== 'Student');
   const named = new Map();
   for (const row of rows) {
@@ -39,7 +46,7 @@ export function ledger(assignments, shift, directory = {}) {
     if (row.role === 'charge') entry.charge++;
     if (row.role === 'icu') entry.icu++;
     if (row.role === 'extra') entry.extra++;
-    const holiday = holidays(Number(row.date.slice(0, 4))).find(item => item.date === row.date);
+    const holiday = holidays(Number(row.date.slice(0, 4)), rules).find(item => item.date === row.date);
     if (holiday) entry.holidays.push(holiday.name);
   }
   const people = [...named.values()];
@@ -138,10 +145,10 @@ export function census(assignments, shift, directory = {}, releases = [], today 
 }
 
 // One person's sheet: what they carried, and the times they helped someone else out.
-export function statSheet(name, { assignments, requests = [], releases = [], directory = {} }) {
+export function statSheet(name, { assignments, requests = [], releases = [], directory = {}, rules = {} }) {
   const mine = assignments.filter(row => key(row.person) === key(name));
   const shift = mine.filter(row => row.shift === 'N').length > mine.length / 2 ? 'N' : 'D';
-  const table = ledger(assignments, shift, directory);
+  const table = ledger(assignments, shift, directory, rules);
   const row = table.people.find(entry => key(entry.person) === key(name)) || null;
   const agreed = requests.filter(request => request.status?.startsWith('Both agreed'));
   const own = releases.filter(item => key(item.person) === key(name));
@@ -152,5 +159,47 @@ export function statSheet(name, { assignments, requests = [], releases = [], dir
     weekendExtra: row?.weekendExtra || 0,
     wentHomeForSomeone: own.filter(item => item.voluntary && item.inPlaceOf && key(item.inPlaceOf) !== key(name)).length,
     releasedHours: own.reduce((sum, item) => sum + Number(item.hours || 0), 0)
+  };
+}
+
+// The holiday tracker: who worked which holiday, on either shift. One row per person and one column per holiday that
+// falls inside the dates on record. A night shift belongs to the day it starts.
+export function holidayTracker(assignments, directory = {}, rules = {}) {
+  const dates = assignments.map(row => row.date).sort();
+  if (!dates.length) return { days: [], people: [] };
+  const years = [];
+  for (let year = Number(dates[0].slice(0, 4)); year <= Number(dates.at(-1).slice(0, 4)); year++) years.push(year);
+  const days = years.flatMap(year => holidays(year, rules)).filter(day => day.date >= dates[0] && day.date <= dates.at(-1));
+  const wanted = new Set(days.map(day => day.date)), named = new Map();
+  for (const row of assignments) {
+    if (!wanted.has(row.date) || directory[key(row.person)]?.status === 'Student') continue;
+    if (!named.has(key(row.person))) named.set(key(row.person), { person: row.person, worked: {}, count: 0 });
+    const entry = named.get(key(row.person));
+    if ((entry.worked[row.date] || '').includes(row.shift)) continue;
+    entry.worked[row.date] = [...(entry.worked[row.date] || ''), row.shift].sort().join('');
+    entry.count++;
+  }
+  return { days, people: [...named.values()].sort((a, b) => b.count - a.count || a.person.localeCompare(b.person)) };
+}
+
+// Keeps the record when a new schedule replaces the old one: shifts on dates the new schedule does not cover are carried
+// forward. Dates it does cover are taken from the new schedule, so a corrected page replaces what it corrects.
+export function carryForward(history = [], outgoing = [], incoming = []) {
+  const dates = incoming.map(row => row.date).sort(), from = dates[0], to = dates.at(-1);
+  const kept = new Map();
+  for (const row of [...history, ...outgoing]) {
+    if (from && row.date >= from && row.date <= to) continue;
+    kept.set([row.date, row.shift, key(row.person)].join('|'), { date: row.date, shift: row.shift, person: row.person, ...(row.role ? { role: row.role } : {}), ...(row.hours ? { hours: row.hours } : {}) });
+  }
+  return [...kept.values()].sort((a, b) => a.date.localeCompare(b.date) || a.shift.localeCompare(b.shift) || a.person.localeCompare(b.person));
+}
+
+// Who is carrying more than their share and who less, among the regulars, by at least `margin` weekend turns.
+export function standing(table, margin = 1) {
+  const regulars = table.people.filter(entry => entry.regular);
+  return {
+    over: regulars.filter(entry => entry.weekendGap >= margin).sort((a, b) => b.weekendGap - a.weekendGap),
+    under: regulars.filter(entry => entry.weekendGap <= -margin).sort((a, b) => a.weekendGap - b.weekendGap),
+    level: regulars.filter(entry => Math.abs(entry.weekendGap) < margin).length
   };
 }
