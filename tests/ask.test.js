@@ -487,3 +487,17 @@ test('who is off tonight filters the requested night shift and identifies missin
   const absent=ask('who is off tonight',{...w,assignments:w.assignments.filter(item=>item.date!==today||item.shift!=='N')});
   assert.match(absent.items[0].text,/no schedule entries/i);
 });
+
+// Found on the merged Version 13: moving the invalid-date check ahead of document questions made a policy question
+// with "24/7" in it answer "That is not a valid date". Any question with "24/7" already did.
+test('a fraction such as 24/7 is not a date, and a date that cannot exist is still reported', () => {
+  assert.equal(parseWhen('is the department staffed 24/7', today), null);
+  assert.equal(parseWhen('split the weekend 50/50', today)?.label, 'this weekend');
+  assert.equal(parseWhen('20/20 vision', today), null);
+  assert.deepEqual([parseWhen('do i work 12/25', today).from, parseWhen('do i work 2/30', today).invalid, parseWhen('13/01', today).invalid, parseWhen('24/7/2027', today).invalid], ['2026-12-25', true, true, true]);
+  const docs = [{ id: 'cover', title: 'Coverage', kind: 'Policy', effective: '2026-01-01', text: 'Staffing\n\nThe department is staffed 24/7 with four therapists on days and three on nights.' }];
+  assert.match(ask('is the department staffed 24/7', { ...world, documents: docs }).items[0].text, /staffed 24\/7/);
+  const policy = ask('what is the 24/7 coverage policy', { ...world, documents: docs });
+  assert.deepEqual([policy.kind, /valid date/.test(policy.title)], ['look', false]);                        // a document search again, whatever it finds
+  assert.match(reply('do i work 2/30').title, /not a valid date/);
+});

@@ -59,7 +59,9 @@ export function parseWhen(text, today, rules = {}) {
   const named = q.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? (\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/);
   if (named) return wide(one(named[3] ? dateIn(named[3], monthNumber(named[1]), Number(named[2])) : near(monthNumber(named[1]), Number(named[2]))));
   const slashed = q.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/);
-  if (slashed) return wide(one(slashed[3] ? dateIn(slashed[3], Number(slashed[1]), Number(slashed[2])) : near(Number(slashed[1]), Number(slashed[2]))));
+  // "24/7", "50/50" and "20/20" are not dates. A date that cannot exist, such as 2/30 or 13/01, is still reported as invalid.
+  const fraction = slashed && !slashed[3] && (slashed[0] === '24/7' || [slashed[1], slashed[2]].some(part => Number(part) < 1 || Number(part) > 31) || (Number(slashed[1]) > 12 && Number(slashed[2]) > 12));
+  if (slashed && !fraction) return wide(one(slashed[3] ? dateIn(slashed[3], Number(slashed[1]), Number(slashed[2])) : near(Number(slashed[1]), Number(slashed[2]))));
   const nextMonth = month === 12 ? [year + 1, 1] : [year, month + 1];
   const nth = q.match(new RegExp('\\b(first|1st|second|2nd|third|3rd|fourth|4th|last) week (?:of|in) (?:(next month|this month)|' + MONTH_WORD + ')\\b'));
   if (nth) {
