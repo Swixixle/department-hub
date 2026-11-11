@@ -1,12 +1,12 @@
 // Ask: answers from the app's own records. There is no language model here. A question is matched to a kind of lookup,
 // the lookup runs on the schedule, the board, the directory, the person's own fairness sheet or the added documents,
-// and the answer names where it came from. Nothing is guessed and nothing leaves the device. When nothing on record
-// answers a question, it says so.
+// and the answer names where it came from. It matches supported question patterns rather than generating advice, and
+// nothing leaves the device. When no matching record is found, it says so.
 //
 // A hosted model can be added later by handing it the records this module finds. It should never be handed more than
 // the person asking is allowed to see, which is why the filtering happens here, before anything else.
 import { holidays, staffing, statSheet } from './fairness.js';
-import { addDays, normalizeName, weekStart } from './model.js';
+import { addDays, normalizeName, shiftInterval, weekStart } from './model.js';
 
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -22,22 +22,32 @@ const tagged = row => row.person + (row.role ? ' (' + (ROLES[row.role] || row.ro
 export function parseWhen(text, today, rules = {}) {
   const q = ' ' + text.toLowerCase().replace(/[’]/g, "'") + ' ';
   const shift = /\b(tonight|nights?|overnight)\b/.test(q) ? 'N' : /\b(day shift|days|mornings?|daytime)\b/.test(q) ? 'D' : null;
-  const one = (date, label) => ({ from: date, to: date, shift, label: label || pretty(date) });
   const year = Number(today.slice(0, 4));
+  const one = (date, label) => {
+    const parsed = new Date(date + 'T12:00:00Z');
+    if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return { invalid:true };
+    return { from:date, to:date, shift, label:label || pretty(date) + (Number(date.slice(0, 4)) === year ? '' : ', ' + date.slice(0, 4)) };
+  };
   const near = (month, day) => {                      // a month and day with no year: the one coming, or just past
     const date = y => y + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
     return date(year) < addDays(today, -60) ? date(year + 1) : date(year);
   };
-  const named = q.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? (\d{1,2})(?:st|nd|rd|th)?\b/);
-  if (named) return one(near(MONTHS.indexOf(named[1]) + 1, Number(named[2])));
-  const slashed = q.match(/\b(\d{1,2})\/(\d{1,2})\b/);
-  if (slashed && Number(slashed[1]) <= 12 && Number(slashed[2]) <= 31) return one(near(Number(slashed[1]), Number(slashed[2])));
-  const calendar = [...holidays(year, rules), ...holidays(year + 1, rules)].filter(day => day.date >= addDays(today, -1));
+  const dateIn = (y, month, day) => y + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  const iso = q.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (iso) return one(iso[0]);
+  const named = q.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? (\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/);
+  if (named) return one(named[3] ? dateIn(named[3], MONTHS.indexOf(named[1]) + 1, Number(named[2])) : near(MONTHS.indexOf(named[1]) + 1, Number(named[2])));
+  const slashed = q.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/);
+  if (slashed) return one(slashed[3] ? dateIn(slashed[3], Number(slashed[1]), Number(slashed[2])) : near(Number(slashed[1]), Number(slashed[2])));
+  // Unticking a holiday changes fairness credit, not the calendar date named in a schedule question.
+  const calendarRules = { ...rules, off:[] };
+  const namedYear = q.match(/\b(\d{4})\b/), holidayYear = namedYear ? Number(namedYear[1]) : year;
+  const calendar = [...holidays(holidayYear, calendarRules), ...holidays(holidayYear + 1, calendarRules)].filter(day => namedYear ? day.date.startsWith(namedYear[1] + '-') : day.date >= addDays(today, -1));
   const wanted = [['christmas eve', 'Christmas Eve'], ['christmas', 'Christmas Day'], ['thanksgiving', 'Thanksgiving'], ["new year's eve", "New Year's Eve"], ['new years eve', "New Year's Eve"],
     ['new year', "New Year's Day"], ['memorial day', 'Memorial Day'], ['labor day', 'Labor Day'], ['fourth of july', 'Independence Day'], ['4th of july', 'Independence Day'], ['independence day', 'Independence Day'],
     ...calendar.map(day => [day.name.toLowerCase(), day.name])].find(([words]) => q.includes(words));
   const holiday = wanted && calendar.find(day => day.name === wanted[1]);
-  if (holiday) return one(holiday.date, holiday.name + ', ' + pretty(holiday.date));
+  if (holiday) return one(holiday.date, holiday.name + ', ' + pretty(holiday.date) + (Number(holiday.date.slice(0, 4)) === year ? '' : ', ' + holiday.date.slice(0, 4)));
   if (/\btonight\b/.test(q)) return { ...one(today, 'tonight'), shift: 'N' };
   if (/\btomorrow\b/.test(q)) return one(addDays(today, 1), 'tomorrow');
   if (/\byesterday\b/.test(q)) return one(addDays(today, -1), 'yesterday');
@@ -106,7 +116,7 @@ const snippet = (text, words, length = 260) => {
   return (from ? '…' : '') + flat.slice(from, from + length) + (flat.length > from + length ? '…' : '');
 };
 
-// world: { today, actor, assignments, directory, people, links, posts, documents, releases, rules, keeper, seen,
+// world: { today, now, actor, assignments, directory, people, links, posts, documents, releases, rules, keeper, seen,
 //          published, requests }. Returns { title, lines, items: [{ text, sub, go }], source, empty }.
 export function ask(question, world) {
   const q = ' ' + question.toLowerCase().replace(/[’]/g, "'").replace(/\s+/g, ' ').trim() + ' ';
@@ -118,9 +128,15 @@ export function ask(question, world) {
   const inRange = row => !when || (row.date >= when.from && row.date <= when.to && (!when.shift || row.shift === when.shift));
   const byTime = (a, b) => a.date.localeCompare(b.date) || a.shift.localeCompare(b.shift);
   const shiftsOf = name => assignments.filter(row => same(row.person, name)).sort(byTime);
-  const nextShift = name => shiftsOf(name).find(row => row.date >= today);
+  const now = Date.parse(world.now || '');
+  const upcoming = row => Number.isFinite(now) ? shiftInterval(row)[0] >= now : row.date >= today;
+  const nextShift = name => shiftsOf(name).find(upcoming);
   const on = (date, shift) => assignments.filter(row => row.date === date && row.shift === shift);
   const answer = (title, items, source, extra = {}) => ({ title, items, source, lines: [], empty: !items.length && !extra.lines?.length, ...extra });
+
+  // Explicit document questions take precedence over words such as "due", "call" or "short" inside a policy title.
+  if (/\b(polic(?:y|ies)|procedures?|protocols?|manuals?|guidelines?|handbook)\b/.test(q)) return documentAnswer();
+  if (when?.invalid) return answer('That is not a valid date.', [], 'No schedule lookup was made.', { lines:['Use a date such as Nov 26, 2027.'], empty:true });
 
   // 1. How to reach someone.
   if (/\b(number|phone|call|text|reach|contact|cell)\b/.test(q) && others.length) {
@@ -136,19 +152,23 @@ export function ask(question, world) {
     if (others.length && !world.keeper) return answer('That is kept by whoever keeps the record', [], 'Fairness', { lines: ['You can see your own sheet. Other people’s numbers are shown only to the person who keeps the record.'], empty: false });
     const subject = world.keeper && others[0] || actor, sheet = statSheet(subject, { assignments, requests: world.requests, releases: world.releases, directory: world.directory, rules: world.rules }), row = sheet.row;
     if (!row) return answer('Nothing on the schedule for ' + subject, [], scheduleSource);
-    const whose = same(subject, actor) ? 'You have' : subject + ' has', gap = row.weekendGap;
+    const whose = same(subject, actor) ? 'you have' : subject + ' has', gap = row.weekendGap;
     const standing = gap === null ? '' : Math.abs(gap) < 1 ? ' That is within one turn of the share.' : ' That is ' + Math.abs(gap).toFixed(1) + (gap > 0 ? ' more than' : ' under') + ' the share of ' + row.weekendFair.toFixed(1) + '.';
-    return answer(whose + ' worked ' + row.weekend + ' weekend turns in ' + row.shifts + ' shifts.' + standing,
+    return answer('On this schedule, ' + whose + ' ' + row.weekend + ' weekend turns in ' + row.shifts + ' shifts.' + standing,
       [{ text: row.holidays.length ? 'Holidays: ' + row.holidays.join(', ') : 'No holidays on this schedule', sub: 'Charge ' + row.charge + ' · ICU ' + row.icu + ' · low-census hours ' + sheet.releasedHours, go: 'fairness' }], 'The Fairness record. ' + scheduleSource);
   }
 
   // 3. Shifts with more or fewer people than usual.
   if (/\b(short|short-staffed|understaffed|overstaffed|over-staffed|four (people|on)|extra (person|people)|low census|called off)\b/.test(q)) {
     const span = when || { from: today, to: addDays(today, 28), label: 'the next four weeks' };
+    const listed = assignments.filter(row => row.date >= span.from && row.date <= span.to && (!span.shift || row.shift === span.shift));
+    if (!listed.length) return answer('No matching shifts are on record, ' + span.label + '.', [], scheduleSource,
+      { lines:['Missing schedule entries cannot establish whether staffing is normal.'], empty:true });
     const items = ['D', 'N'].filter(shift => !span.shift || span.shift === shift).flatMap(shift => { const usual = staffing(assignments, shift, world.directory); return [...usual.over, ...usual.short].map(item => ({ ...item, usual: usual.usual })); })
       .filter(item => item.date >= span.from && item.date <= span.to).sort(byTime)
       .map(item => ({ text: pretty(item.date) + ' ' + shiftWord(item.shift) + ': ' + item.people.length + ' listed, usual is ' + item.usual, sub: list(item.people), go: 'date|' + item.date }));
-    return answer(items.length ? items.length + ' shift' + (items.length === 1 ? '' : 's') + ' off the usual number, ' + span.label : 'Every shift has its usual number, ' + span.label, items, scheduleSource + '. Handwritten changes are not read.', { empty: false });
+    return answer(items.length ? items.length + ' shift' + (items.length === 1 ? '' : 's') + ' off the usual number, ' + span.label : 'No listed shifts differ from their usual headcount, ' + span.label,
+      items, scheduleSource + '. Usual means the most common headcount in this roster. Missing shifts cannot be checked; handwritten changes are not read.', { empty:false });
   }
 
   // 4. What is new on the board.
@@ -171,7 +191,7 @@ export function ask(question, world) {
   // 6. Who is on, or who the person is working with.
   if (/\b(who('s| is| are| all)? ?(is |are )?(on|working|scheduled|there)|work(ing)? with|who do i work)\b/.test(q)) {
     if (/\bwith\b/.test(q)) {
-      const mine = shiftsOf(actor).filter(row => when ? inRange(row) : row.date >= today).slice(0, when ? 4 : 1);
+      const mine = shiftsOf(actor).filter(row => when ? inRange(row) : upcoming(row)).slice(0, when ? 4 : 1);
       if (!mine.length) return answer('You are not on the schedule ' + (when ? when.label : 'from today on'), [], scheduleSource);
       return answer('', mine.map(row => { const mates = on(row.date, row.shift).filter(mate => !same(mate.person, actor)); return { text: pretty(row.date) + ' ' + shiftWord(row.shift) + ': ' + (mates.length ? 'with ' + list(mates.map(tagged)) : 'nobody else is listed'), sub: row.role ? 'You are ' + (ROLES[row.role] || row.role) : '', go: 'date|' + row.date }; }), scheduleSource);
     }
@@ -192,27 +212,31 @@ export function ask(question, world) {
       const rows = shiftsOf(subject).filter(inRange);
       return answer(rows.length ? whose + ' ' + be + ' on ' + when.label + ':' : whose + ' ' + be + ' not on the schedule ' + when.label + '.', rows.map(shiftItem), scheduleSource, { empty: false });
     }
-    const coming = shiftsOf(subject).filter(row => row.date >= today).slice(0, 4);
+    const coming = shiftsOf(subject).filter(upcoming).slice(0, 4);
     return answer(coming.length ? (same(subject, actor) ? 'Your' : subject + '’s') + ' next shift is ' + pretty(coming[0].date) + ', ' + shiftWord(coming[0].shift) + (coming[0].role ? ' (' + (ROLES[coming[0].role] || coming[0].role) + ')' : '') + '.' : whose + ' ' + be + ' not on the schedule from today on.',
-      coming.slice(1).map(shiftItem), scheduleSource, { empty: false, lines: coming.length > 1 ? ['After that:'] : [] });
+      coming.map(shiftItem), scheduleSource, { empty: false });
   }
 
   // 8. Everything else: look in the added documents, then on the board.
-  const found = searchDocuments(q, documents), wanted = terms(q);
-  const mentions = wanted.length ? posts.filter(post => post.body && wanted.filter(word => post.body.toLowerCase().includes(word)).length >= Math.min(2, wanted.length)).slice(-3).reverse() : [];
-  if (found.length || mentions.length) {
-    return answer(found.length ? 'From the documents the department has added' : 'Nothing in the documents. On the board:', [
-      ...found.map(passage => ({ text: snippet(passage.text, passage.hits), sub: [passage.doc.title, passage.heading, passage.doc.kind, passage.doc.effective ? 'effective ' + passage.doc.effective : 'no effective date given'].filter(Boolean).join(' · '), go: 'doc|' + passage.doc.id + '|' + passage.offset })),
-      ...mentions.map(post => ({ ...postItem(post), sub: 'A post on the board by ' + post.author + ', not policy' }))
-    ], found.length ? 'Quoted from the document as added. Check its date, and ask the person responsible if it does not settle the question.' : 'The board. Posts are from coworkers and are not policy.');
+  return documentAnswer();
+
+  function documentAnswer() {
+    const found = searchDocuments(q, documents), wanted = terms(q);
+    const mentions = wanted.length ? posts.filter(post => post.body && wanted.filter(word => post.body.toLowerCase().includes(word)).length >= Math.min(2, wanted.length)).slice(-3).reverse() : [];
+    if (found.length || mentions.length) {
+      return answer(found.length ? 'From the documents the department has added' : 'Nothing in the documents. On the board:', [
+        ...found.map(passage => ({ text: snippet(passage.text, passage.hits), sub: [passage.doc.title, passage.heading, passage.doc.kind, passage.doc.effective ? 'effective ' + passage.doc.effective : 'no effective date given'].filter(Boolean).join(' · '), go: 'doc|' + passage.doc.id + '|' + passage.offset })),
+        ...mentions.map(post => ({ ...postItem(post), sub: 'A post on the board by ' + post.author + ', not policy' }))
+      ], found.length ? 'Quoted from the document as added. Check its date, and ask the person responsible if it does not settle the question.' : 'The board. Posts are from coworkers and are not policy.');
+    }
+    return answer('Nothing on record answers that.', [], documents.length ? 'Searched the board and ' + documents.length + ' added document' + (documents.length === 1 ? '' : 's') : 'Searched the board. No documents have been added yet.',
+      { empty: true, lines: ['Ask the person responsible, or put the question on the board so the answer is on record for everyone.'] });
   }
-  return answer('Nothing on record answers that.', [], documents.length ? 'Looked in the schedule, the board and ' + documents.length + ' added document' + (documents.length === 1 ? '' : 's') : 'Looked in the schedule and the board. No documents have been added yet.',
-    { empty: true, lines: ['Ask the person responsible, or put the question on the board so the answer is on record for everyone.'] });
 
   function shiftItem(row) { return { text: pretty(row.date) + ', ' + shiftWord(row.shift) + (row.role ? ' (' + (ROLES[row.role] || row.role) + ')' : '') + (row.hours ? ' ' + row.hours : ''), sub: 'With ' + (list(on(row.date, row.shift).filter(mate => !same(mate.person, row.person)).map(mate => mate.person)) || 'nobody else listed'), go: 'date|' + row.date }; }
   function postItem(post) {
     const label = post.when ? ({ due: 'Due ', meeting: 'Meeting ', event: 'Event ' }[post.when.kind] || '') + pretty(post.when.date) + ': ' : '';
-    return { text: label + (post.body ? post.body.slice(0, 140) + (post.body.length > 140 ? '…' : '') : post.voice ? 'Voice message' : 'A post with files'), sub: post.author + ' · ' + pretty(post.created.slice(0, 10)), go: 'post|' + post.id };
+    return { text: label + (post.body ? post.body.slice(0, 140) + (post.body.length > 140 ? '…' : '') : post.voice ? 'Voice message' : 'A post with files'), sub: post.author + ' · ' + (post.created ? pretty(post.created.slice(0, 10)) : 'Sample announcement'), go: 'post|' + post.id };
   }
 }
 

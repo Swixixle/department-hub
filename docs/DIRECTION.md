@@ -194,11 +194,21 @@ What is in is the part that needs no language model.
 - **Access is applied before the lookup.** Another person's fairness numbers are given only to whoever keeps the record.
 - **Dated posts.** A post can be marked due, a meeting or an event, with a date. The board has a Dates filter.
 - **Documents.** A small library Ask can search, added as a text file or pasted text, with what it is and its effective date. Text is kept in the workspace and goes into backups. The receipt for adding one records the title, not the words. PDFs are not read yet.
-- Nothing typed into Ask is stored or counted. The press counter records only that a question was asked.
+- Question text is not saved or counted. The press counter records only that a question was asked.
 
-What it is not: it does not learn, summarise or understand phrasing outside the shapes it knows. That needs a language model, which needs the hosted service, costs money for each question, and sends the department's text to an outside company. That is a separate decision. If it is made, the model should be handed only the records this module finds for the person asking.
+It does not learn, summarise or understand phrasing outside the shapes it knows. Broader language support is a separate future stage. The hosted API option in `docs/SERVER.md` would incur provider charges and send selected records to that provider; a local model is not implemented either. A future model should receive only records the person asking is allowed to see.
 
 Limits to respect: only documents the department is allowed to share should be added. For a clinical protocol, Ask quotes the passage and its date. It gives no advice about a patient.
+
+### Ask integration review
+
+The phone and fairness commits in the Version 9 patch were already on PR #2. Only the new Ask commit was applied, retaining all Version 8 record fixes. The documentation merge kept both sets of notes.
+
+Review corrections: the next shift itself now has an Open link; explicit years and impossible dates are handled; disabling holiday credit does not erase its calendar date; explicit policy/protocol questions search documents before board or staffing keywords; missing staffing data no longer produces a normal-staffing claim; and fairness describes scheduled turns rather than asserting they were worked. When a current time is supplied, next-shift queries skip shifts that have already started. Sample posts without a timestamp can be opened safely.
+
+Ask is in the header so it cannot float over another control. Answers are recomputed from the current viewer and records whenever the sheet is shown, and switching viewers clears the previous question. Document source passages scroll after the sheet opens. Board read markers update immediately in memory and storage, and opening a post from Ask also marks the board viewed. Restore and erase clear question state and the read marker.
+
+Independent checks: 59 Node tests, two launcher checks and both production builds pass. An additional simulated-DOM run of the production bundle checked viewer changes, document removal and reopening, passage scrolling, board read markers, question text remaining absent from storage, roster preservation and no external requests in those Ask flows. This was not a real browser or physical-phone check. The keeper restriction remains a single-device courtesy; document matching does not establish that an uploaded policy is approved, current or controlling.
 
 ## Still open from the review
 

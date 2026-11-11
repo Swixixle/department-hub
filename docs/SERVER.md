@@ -28,7 +28,7 @@ There is no machine to run or look after.
 
 ## A language model for Ask
 
-Ask works today by looking things up, with no model. A model would let it take questions in any wording and summarise. It would run on the hosted service, because the key for it cannot sit in the app. Each question would cost a little and would send the text of the records it uses to the company that runs the model. Hand the model only what `src/ask.js` finds for the person asking, keep the source and date on every answer, and decide first whether the department's documents may be sent to an outside service at all.
+Ask works today by looking things up, with no model. A model could broaden supported wording and provide summaries. For a hosted API, keep the provider key on the server rather than in the app. That route would incur the provider's usage charges and send selected records to that provider. A local model is also possible but is not implemented. Hand a model only records the person asking is allowed to see, keep the source and date on every answer, and establish an approved processing route before sending department documents to an outside service.
 
 ## Hosting
 

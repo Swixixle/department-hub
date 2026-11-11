@@ -40,7 +40,7 @@ test('a question names its day: today, tonight, weekdays, weekends, dates and ho
 
 test('schedule questions are answered from the roster and say so', () => {
   assert.match(reply('When do I work next?').title, /^Your next shift is Fri, Nov 13, night \(charge\)\.$/);
-  assert.deepEqual(reply('When do I work next?').items.map(item => item.text.slice(0, 11)), ['Sat, Nov 14,', 'Sun, Nov 15,', 'Thu, Nov 26,'].map(text => text.slice(0, 11)));
+  assert.deepEqual(reply('When do I work next?').items.map(item => item.text.slice(0, 11)), ['Fri, Nov 13,', 'Sat, Nov 14,', 'Sun, Nov 15,', 'Thu, Nov 26,'].map(text => text.slice(0, 11)));
   assert.equal(reply('Who am I working with on my next shift?').items[0].text, 'Fri, Nov 13 night: with Morgan (ICU), Parker and Quinn');
   assert.deepEqual(reply('Who is on tonight?').items.map(item => item.text), ['Wed, Nov 11 night: Morgan (charge), Parker and Quinn (ICU)']);
   assert.deepEqual(reply('who is on today').items.length, 2);
@@ -62,10 +62,10 @@ test('the board, dated posts, contacts and the person’s own sheet', () => {
   assert.match(reply('What is due before my next shift?').title, /^Due before your next shift on Fri, Nov 13$/);
   assert.deepEqual(reply('What is due before my next shift?').items.length, 1);
   assert.equal(reply("What is Avery's number?").items[0].text, 'Avery: 317.555.0100');
-  assert.match(reply('How many weekends have I worked?').title, /^You have worked 4 weekend turns in 5 shifts\./);
+  assert.match(reply('How many weekends have I worked?').title, /^On this schedule, you have 4 weekend turns in 5 shifts\./);
   // Someone else's numbers are not given out, unless the person asking keeps the record.
   assert.match(reply('how many weekends has Morgan worked? is it fair').title, /whoever keeps the record/);
-  assert.match(ask('is it fair how many weekends Morgan has', { ...world, keeper: true }).title, /^Morgan has worked/);
+  assert.match(ask('is it fair how many weekends Morgan has', { ...world, keeper: true }).title, /^On this schedule, Morgan has/);
 });
 
 test('staffing off the usual number is listed with its dates', () => {
@@ -73,7 +73,7 @@ test('staffing off the usual number is listed with its dates', () => {
   const roster = [...nights, ...['Jordan', 'Morgan', 'Parker', 'Quinn'].map(person => row('2026-11-13', 'N', person)), row('2026-11-14', 'N', 'Jordan'), row('2026-11-14', 'N', 'Riley')];
   const found = ask('any short nights this week or four people?', { ...world, assignments: roster });
   assert.deepEqual(found.items.map(item => item.text), ['Fri, Nov 13 night: 4 listed, usual is 3', 'Sat, Nov 14 night: 2 listed, usual is 3']);
-  assert.match(ask('any short shifts tomorrow', { ...world, assignments: roster }).title, /^Every shift has its usual number, tomorrow$/);
+  assert.match(ask('any short shifts tomorrow', { ...world, assignments: roster }).title, /^No listed shifts differ from their usual headcount, tomorrow$/);
 });
 
 test('documents are quoted with their title, section and date, and an unanswered question says so', () => {
@@ -90,4 +90,59 @@ test('documents are quoted with their title, section and date, and an unanswered
   assert.match(none.title, /Nothing on record answers that/);
   assert.match(ask('anything on weaning', { ...world, documents: [] }).source, /No documents have been added yet/);
   assert.deepEqual(searchDocuments('the and for', documents), []);
+});
+
+test('the next shift itself can be opened, even when it is the only future shift', () => {
+  const answer = ask('When do I work next?', { ...world, assignments:[row('2026-11-13', 'N', 'Jordan')] });
+  assert.equal(answer.items[0]?.go, 'date|2026-11-13');
+});
+
+test('date lookups respect explicit years, reject impossible dates and retain unchecked holidays', () => {
+  assert.equal(parseWhen('Nov 26, 2027', today).from, '2027-11-26');
+  assert.equal(parseWhen('11/26/2027', today).from, '2027-11-26');
+  assert.equal(parseWhen('2027-11-26', today).from, '2027-11-26');
+  assert.equal(parseWhen('Feb 30', today).invalid, true);
+  assert.equal(parseWhen('13/01', today).invalid, true);
+  assert.equal(parseWhen('Christmas', today, { off:['Christmas Day'] }).from, '2026-12-25');
+  assert.equal(parseWhen('Christmas 2027', today, { off:['Christmas Day'] }).from, '2027-12-25');
+  const future = ask('Am I working Nov 26, 2027?', { ...world, assignments:[...assignments, row('2027-11-26', 'N', 'Jordan')] });
+  assert.deepEqual(future.items.map(item => item.go), ['date|2027-11-26']);
+  assert.equal(reply('Am I working Feb 30?').empty, true);
+  assert.match(reply('Am I working Feb 30?').title, /valid date/);
+});
+
+test('policy and protocol questions search documents before schedule or board keywords', () => {
+  const docs = [{ id:'leave-rule', title:'Leave policy', kind:'Policy', effective:'2026-01-01',
+    text:'Leave requests are due four weeks before publication. The lead records each request and reviews staffing before approving leave.' }];
+  const answer = ask('What is the leave policy deadline?', { ...world, documents:docs });
+  assert.equal(answer.items[0]?.go.split('|').slice(0, 2).join('|'), 'doc|leave-rule');
+  assert.match(answer.items[0].sub, /Policy/);
+});
+
+test('missing dates or shifts cannot establish that staffing is normal', () => {
+  for (const rows of [[], assignments.filter(item => item.shift === 'D'), assignments.filter(item => item.date !== today)]) {
+    const answer = ask('Any short nights tonight?', { ...world, assignments:rows });
+    assert.equal(answer.empty, true);
+    assert.doesNotMatch(answer.title, /Every shift has its usual number/);
+  }
+});
+
+test('fairness describes scheduled turns without claiming that future shifts were worked', () => {
+  const answer = reply('How many weekends have I worked?');
+  assert.doesNotMatch(answer.title, /have worked/);
+  assert.match(answer.title, /schedule/);
+});
+
+test('next-shift lookups skip shifts that already started when the current time is available', () => {
+  const rows = [row(today, 'D', 'Jordan'), row(today, 'N', 'Jordan'), row('2026-11-12', 'N', 'Jordan'), row('2026-11-12', 'N', 'Morgan')];
+  const current = { ...world, assignments:rows, now:'2026-11-11T21:00:00-05:00' };
+  assert.equal(ask('When do I work next?', current).items[0].go, 'date|2026-11-12');
+  assert.match(ask('Who am I working with on my next shift?', current).items[0].text, /^Thu, Nov 12 night: with Morgan$/);
+  assert.equal(ask('When do I work next?', { ...current, now:'2026-11-11T17:00:00-05:00' }).items[0].go, 'date|2026-11-11');
+});
+
+test('matching a sample announcement without a timestamp still opens its source', () => {
+  const answer = ask('How can I start a trade?', { ...world, posts:[{ id:'sample', author:'Avery', created:null, body:'Start a trade from the schedule.' }], documents:[] });
+  assert.equal(answer.items[0].go, 'post|sample');
+  assert.match(answer.source, /not policy/);
 });

@@ -112,8 +112,12 @@ const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Boar
   over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog' };
 // When the board was last opened on this device, so Ask can say what is new since then.
 const seenKey = storageKey + '-seen';
-const boardSeen = loadState(seenKey, null);
-const askWorld = () => ({ today: localToday(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
+let boardSeen = loadState(seenKey, null);
+function markBoardSeen(value = new Date().toISOString()) {
+  boardSeen = value;
+  try { value ? localStorage.setItem(seenKey, JSON.stringify(value)) : localStorage.removeItem(seenKey); } catch { /* only affects what is new */ }
+}
+const askWorld = () => ({ today: localToday(), now:new Date().toISOString(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
   documents: state.documents, releases: state.releases, requests: state.requests, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt });
 const DOC_LIMIT = 300000, DOC_TOTAL = 1500000;
 // Attachments on board posts: the files themselves, and addresses the page can show them from.
@@ -440,6 +444,7 @@ function render() {
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
   app.innerHTML = top() + '<main><header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
     '<div class="top-tools">' + button('Aa', 'text-size', 'class="text-size" title="Text size" aria-label="Text size: ' + TEXT_NAMES[textSize] + '. Press to change."') +
+    button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board or the documents"') +
     '<label class="actor">Viewing as <select id="actor" aria-label="Viewing as">' +
     (actorNames().length ? actorNames() : [state.actor]).map(name => '<option ' + (isSame(name, state.actor) ? 'selected' : '') + '>' + h(name) + '</option>').join('') +
     '</select></label></div></header><div class="content">' +
@@ -447,9 +452,7 @@ function render() {
     (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : schedule()) +
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
     ' · No payroll or official schedule changes · Version ' + BUILD + '</span><span>' + (publicDemo ? '' : button('Backup and restore', 'data', 'class="text-button"') + ' ') +
-    button('Decision history', 'audit', 'class="text-button"') + '</span></footer></div>' +
-    button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-fab" aria-label="Ask a question about the schedule, the board or the documents"') + '</main>' + dialogMarkup();
-  if (ui.scrollTo) { app.querySelector(ui.scrollTo)?.scrollIntoView({ block:'start' }); ui.scrollTo = null; }
+    button('Decision history', 'audit', 'class="text-button"') + '</span></footer></div></main>' + dialogMarkup();
   for (const item of playing) {
     const player = app.querySelector('[data-media="' + CSS.escape(item.id) + '"]');
     if (player) { player.currentTime = item.time; if (item.on) player.play().catch(() => {}); }
@@ -459,6 +462,7 @@ function render() {
     dialog.showModal();
     if (sameDialog && focus?.id) document.getElementById(focus.id)?.focus();
   }
+  if (ui.scrollTo) { app.querySelector(ui.scrollTo)?.scrollIntoView({ block:'start' }); ui.scrollTo = null; }
 }
 
 function shell(title, body) {
@@ -674,14 +678,16 @@ function dialogMarkup() {
   if (type === 'remove-post') return shell('Remove this post?', '<p>It is taken off the board together with its files. This cannot be undone.</p><div class="actions">' +
     button('Keep it', 'close', 'class="secondary"') + button('Remove it', 'remove-post-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
   if (type === 'ask') {
-    const { q = '', result } = ui.dialog;
+    const { q = '' } = ui.dialog;
+    // Recheck the current records and viewer every time; never reopen a cached keeper-only answer.
+    const result = q ? ask(q, askWorld()) : null;
     const item = entry => '<div class="ask-item"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h(entry.sub) + '</small>' : '') + '</div>' +
       (entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
     return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
       '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
       (result ? '<div class="ask-answer" role="status">' + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') + result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.map(item).join('') +
         '<p class="subtle">From: ' + h(result.source) + '</p>' + (result.empty ? '<p>' + button('Put this question on the board', 'ask-post', 'class="secondary"') + '</p>' : '') + '</div>' :
-        '<p class="subtle">It looks things up in this workspace and shows where each answer came from. It does not guess, and nothing you type leaves this device.</p>') +
+        '<p class="subtle">It looks up supported questions in this workspace and opens the records it finds. Nothing you type leaves this device.</p>') +
       '<div class="chip-list"><span class="subtle">Try</span><div>' + SUGGESTIONS.map((text, index) => button(h(text), 'ask-try', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' +
       '<p>' + button('Documents it can search (' + state.documents.length + ')', 'docs', 'class="text-button"') + '</p>');
   }
@@ -734,7 +740,7 @@ function dialogMarkup() {
       button('Cancel', 'data', 'class="secondary"') + button('Erase everything in this browser', 'erase', 'class="danger"') + '</div>');
     return shell('Workspace data', '<p>This workspace is kept in this browser only, at <b>' + h(location.host) + '</b>. A different browser, or a different address, starts with sample names.</p>' +
       '<p><b>' + state.assignments.length + '</b> shifts · <b>' + state.people.length + '</b> contacts · ' + h(state.mode === 'sample' ? 'sample workspace' : 'published ' + timeLabel(state.importedAt)) + ' · version ' + BUILD + '</p>' +
-      '<h3>Backup</h3><p class="subtle">A backup file holds the schedule, the contacts with their phone numbers, requests and history. Photos, videos and recordings are not included. Keep the file somewhere private.</p>' +
+      '<h3>Backup</h3><p class="subtle">A backup file holds the schedule, the contacts with their phone numbers, requests, history and added documents. Photos, videos and recordings are not included. Keep the file somewhere private.</p>' +
       '<p>' + button('Save a backup file', 'backup', 'class="primary"') + '</p>' +
       '<label class="drop"><b>Restore from a backup file</b><span>Choose a file saved with the button above</span><input id="backup-file" type="file" accept="application/json,.json"></label>' +
       (() => {
@@ -890,6 +896,8 @@ app.addEventListener('click', event => {
 app.addEventListener('change', event => {
   if (event.target.id === 'actor') {
     state = { ...state, actor: event.target.value };
+    ui.lastAsk = null;
+    ui.dialog = null;
     saveState(storageKey, state);
     render();
   }
@@ -997,18 +1005,18 @@ async function act({action, value, kind}) {
     case 'tab':
       ui.tab = value;
       ui.dialog = null;
-      if (value === 'board') { try { localStorage.setItem(seenKey, JSON.stringify(new Date().toISOString())); } catch { /* only affects "what is new" */ } }
+      if (value === 'board') markBoardSeen();
       break;
     case 'ask-open': ui.dialog = ui.lastAsk || { type:'ask' }; break;
     case 'ask-back': ui.dialog = ui.lastAsk || { type:'ask' }; break;
-    case 'ask-try': ui.lastAsk = ui.dialog = { type:'ask', q:SUGGESTIONS[Number(value)], result:ask(SUGGESTIONS[Number(value)], askWorld()) }; break;
-    case 'ask-post': ui.draftPost = ui.dialog.q || ''; ui.tab = 'board'; ui.boardFilter = 'all'; ui.dialog = null; ui.scrollTo = '.composer'; break;
+    case 'ask-try': ui.lastAsk = ui.dialog = { type:'ask', q:SUGGESTIONS[Number(value)] }; break;
+    case 'ask-post': ui.draftPost = ui.dialog.q || ''; ui.tab = 'board'; ui.boardFilter = 'all'; ui.dialog = null; ui.scrollTo = '.composer'; markBoardSeen(); break;
     case 'ask-go': {
       const [kind, first, second] = String(value).split('|');
       if (kind === 'doc') { ui.dialog = { type:'doc', id:first, at:Number(second) }; ui.scrollTo = '#doc-mark'; break; }
       ui.dialog = null;
       if (kind === 'date') { ui.tab = 'schedule'; ui.view = 'week'; ui.date = first; ui.scrollTo = '.day-card[data-date="' + first + '"]'; }
-      else if (kind === 'post') { ui.tab = 'board'; ui.boardFilter = 'all'; ui.scrollTo = '[data-post="' + CSS.escape(first) + '"]'; }
+      else if (kind === 'post') { ui.tab = 'board'; ui.boardFilter = 'all'; ui.scrollTo = '[data-post="' + CSS.escape(first) + '"]'; markBoardSeen(); }
       else if (kind === 'people' || kind === 'fairness') ui.tab = kind;
       break;
     }
@@ -1085,6 +1093,9 @@ async function act({action, value, kind}) {
       const { restore } = ui.dialog;
       if (!restore) return;
       state = prepare(restore.state);
+      ui.lastAsk = null;
+      ui.draftPost = '';
+      markBoardSeen(null);
       saveState(storageKey, state);
       await commit('Workspace restored from a backup', { savedAt:restore.savedAt || null, assignmentCount:state.assignments.length }, previous => previous);
       void hydrateMedia();
@@ -1231,6 +1242,9 @@ async function act({action, value, kind}) {
       forgetMedia([...mediaBlobs.keys()]);
       localStorage.removeItem(storageKey);
       state = withContacts(structuredClone(initial));
+      ui.lastAsk = null;
+      ui.draftPost = '';
+      markBoardSeen(null);
       ui.pending = null;
       ui.dialog = null;
       ui.date = startDate();
@@ -1285,7 +1299,7 @@ async function submit(form) {
     case 'ask': {
       const q = (data.q || '').trim();
       if (!q) return;
-      ui.lastAsk = ui.dialog = { type:'ask', q, result:ask(q, askWorld()) };
+      ui.lastAsk = ui.dialog = { type:'ask', q };
       break;
     }
     case 'doc': {
