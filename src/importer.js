@@ -1,5 +1,7 @@
 import { createWorker } from 'tesseract.js';
 import { mergeAssignments, verifyRoster } from './model.js';
+import { inkMask, maskToRgba, backgroundColor, tintName, longStrokes, tightBox } from './pixels.js';
+import { parseCalendar, reconcileNames } from './calendar.js';
 
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 
@@ -57,7 +59,7 @@ function splitNames(words) {
   return groups;
 }
 
-export function parsePage(words, source) {
+export function parsePage(words, source, context = {}) {
   const rows = groupRows(words.filter(word => word.text.trim()));
   const assignments = [];
   const flags = [];
@@ -118,6 +120,8 @@ export function parsePage(words, source) {
     if (!assignments.length && !flags.length) addFlag('No supported shift codes were found in the grid.', []);
     return { layout: 'employee grid', assignments, flags, dates: [...dates] };
   }
+  const calendar = parseCalendar(words.filter(word => word.text.trim()), source, context);
+  if (calendar) return calendar;
   addFlag('Unknown page layout. Use a clearer crop or a supported roster layout.', []);
   return { layout: 'unrecognized', assignments, flags, dates: [] };
 }
@@ -162,11 +166,30 @@ export async function readBatch(files, onProgress, onSource) {
         context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         bitmap.close();
         await onSource(page, file, { width: canvas.width, height: canvas.height });
+        // Read a black-and-white copy with the highlighter removed. Colour and pen strokes are checked on the original.
+        const image = context.getImageData(0, 0, canvas.width, canvas.height);
+        const mask = inkMask(image);
+        context.putImageData(new ImageData(maskToRgba(mask), canvas.width, canvas.height), 0, 0);
         const { data } = await worker.recognize(canvas, {}, { blocks: true, text: false });
-        const parsed = parsePage(ocrWords(data), source);
+        const words = ocrWords(data);
+        let paper = null;
+        const colorOf = box => backgroundColor(image, tightBox(mask, image.width, box));
+        const parsed = parsePage(words, source, {
+          tintOf: box => {
+            if (paper === null) {
+              const saturations = words.map(word => colorOf([word.x0, word.y0, word.x1, word.y1]).saturation).sort((a, b) => a - b);
+              paper = saturations[Math.floor(saturations.length * 0.2)] ?? 0.05;
+            }
+            return tintName(colorOf(box), paper);
+          },
+          strokesIn: (region, minLength) => longStrokes(mask, image.width, region, minLength)
+        });
         flags.push(...parsed.flags);
         rows.push(...parsed.assignments);
-        pages.push({ name: file.name, page, status: parsed.layout, dates: parsed.dates, count: parsed.assignments.length });
+        pages.push({
+          name: file.name, page, status: parsed.layout, dates: parsed.dates, count: parsed.assignments.length,
+          ...(parsed.shift ? { shift: parsed.shift, shiftGuessed: parsed.shiftGuessed } : {})
+        });
       } catch (error) {
         flags.push({ message: 'Page could not be decoded or read: ' + error.message, source, draft: {}, status: 'open' });
         pages.push({ name: file.name, page, status: 'unreadable', dates: [] });
@@ -175,6 +198,20 @@ export async function readBatch(files, onProgress, onSource) {
   } finally {
     await worker.terminate();
   }
-  const assignments = mergeAssignments(rows);
+  // A lost space is repaired quietly and listed. A near-miss spelling is put to the reviewer, never merged silently.
+  const cleaned = reconcileNames(rows);
+  const asked = new Set();
+  for (const { from, to, row, kind, index } of cleaned.changes) {
+    const { sources, ...draft } = row;
+    if (kind === 'similar') asked.add(index);
+    flags.push({
+      message: kind === 'similar' ? 'Read "' + from + '". Did it mean ' + to + '?' : 'Read "' + from + '" as ' + to + '.',
+      source: sources[0], draft: { ...draft, person: to }, status: kind === 'similar' ? 'open' : 'corrected'
+    });
+  }
+  const renamed = new Map(cleaned.changes.map(change => [change.from, change.to]));
+  for (const flag of flags) if (renamed.has(flag.draft.person)) flag.draft.person = renamed.get(flag.draft.person);
+  const kept = cleaned.rows.filter((row, index) => !asked.has(index));
+  const assignments = mergeAssignments(kept);
   return { pages, assignments, flags, issues: verifyRoster(assignments) };
 }

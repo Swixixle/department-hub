@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assignmentKey, evaluateChange, mergeAssignments, minutesByWeek } from '../src/model.js';
+import { AGREED_STATUS, assignmentKey, committedKeys, evaluateChange, mergeAssignments, minutesByWeek, projectRoster } from '../src/model.js';
 import { parseDate, parsePage } from '../src/importer.js';
 
 function shift(date, code, person, sources = []) {
@@ -60,4 +60,64 @@ test('date-row parsing attaches a source and flags doubtful cells', () => {
   assert.deepEqual(result.assignments.map(row => row.person), ['Avery','Jordan']);
   assert.equal(result.flags.length,1);
   assert.equal(result.assignments[0].sources[0].page,'source');
+});
+
+const staff = skills => ({ status:'Staff', skills });
+const nights = (person, ...days) => days.map(day => shift('2026-11-' + day,'N',person));
+
+test('unknown staff details never hide an overlap or projected overtime', () => {
+  const jordan = nights('Jordan','15','17','19');
+  const morgan = nights('Morgan','15','17','20');
+  const quinn = nights('Quinn','13','16','18');
+  const roster = [...nights('Jordan','09','10','12'), ...jordan, ...morgan, ...quinn];
+  const directory = { jordan:{ person:'Jordan', status:null, skills:[] }, morgan:{ person:'Morgan', status:null, skills:[] } };
+  const overlap = evaluateChange({ roster, from:jordan[0], to:morgan[1], kind:'trade', directory });
+  assert.equal(overlap.status, 'blocked');
+  assert.match(overlap.reason, /overlaps/);
+  const overtime = evaluateChange({ roster, from:jordan[0], to:quinn[0], kind:'trade', directory:{} });
+  assert.equal(overtime.status, 'blocked');
+  assert.match(overtime.reason, /overtime/);
+  const sameWeek = evaluateChange({ roster, from:jordan[0], to:quinn[1], kind:'trade', directory:{} });
+  assert.equal(sameWeek.status, 'review');
+  assert.match(sameWeek.reason, /verification/);
+});
+
+test('a change that puts a night and a day back to back is blocked', () => {
+  const jordan = nights('Jordan','15','17','19');
+  const avery = ['15','18','20'].map(day => shift('2026-11-' + day,'D','Avery'));
+  const directory = { jordan:staff(['D','N']), avery:staff(['D','N']) };
+  const result = evaluateChange({ roster:[...jordan, ...avery], from:jordan[0], to:avery[1], kind:'trade', directory, hoursVerified:true });
+  assert.equal(result.status, 'blocked');
+  assert.match(result.reason, /back to back/);
+  const noRule = evaluateChange({ roster:[...jordan, ...avery], from:jordan[0], to:avery[1], kind:'trade', directory, hoursVerified:true,
+    policy:{ overtimeLimitMinutes:2400, minimumRestMinutes:0 } });
+  assert.equal(noRule.status, 'eligible');
+});
+
+test('a shift in an agreed request cannot be agreed again and its hours count', () => {
+  const jordan = nights('Jordan','15','17','19');
+  const quinn = nights('Quinn','16','18','20');
+  const sam = [shift('2026-11-16','N','Sam'), shift('2026-11-19','N','Sam')];
+  const roster = [...jordan, ...quinn, ...sam];
+  const directory = { jordan:staff(['N']), quinn:staff(['N']), sam:staff(['N']) };
+  const first = { id:'one', status:AGREED_STATUS, kind:'trade', from:jordan[0], to:quinn[0], recipient:'Quinn' };
+  const waiting = { id:'two', status:'Awaiting reply', kind:'trade', from:jordan[0], to:sam[0], recipient:'Sam' };
+  assert.deepEqual(committedKeys([first, waiting]), [jordan[0].key, quinn[0].key]);
+  assert.deepEqual(committedKeys([first, waiting], 'one'), []);
+  const again = evaluateChange({ roster:projectRoster(roster, [first, waiting]), from:jordan[0], to:sam[0], kind:'trade', directory,
+    hoursVerified:true, committed:committedKeys([first, waiting]) });
+  assert.equal(again.status, 'blocked');
+  assert.match(again.reason, /already part of an agreed request/);
+
+  // Sam agreed to cover a Jordan shift. That pickup is not in the imported roster yet, but it still counts.
+  const pickup = { id:'three', status:AGREED_STATUS, kind:'coverage', from:jordan[1], recipient:'Sam' };
+  const projected = projectRoster(roster, [pickup]);
+  assert.equal(projected.find(item => item.key === jordan[1].key).person, 'Sam');
+  assert.equal(roster.find(item => item.key === jordan[1].key).person, 'Jordan');
+  const second = evaluateChange({ roster:projected, from:quinn[2], recipient:'Sam', kind:'coverage', directory, hoursVerified:true,
+    committed:committedKeys([pickup]), policy:{ overtimeLimitMinutes:2400, minimumRestMinutes:480, allowPrnCoverage:true } });
+  assert.equal(second.status, 'blocked');
+  assert.match(second.reason, /overtime/);
+  const withoutProjection = evaluateChange({ roster, from:quinn[2], recipient:'Sam', kind:'coverage', directory, hoursVerified:true });
+  assert.equal(withoutProjection.status, 'eligible');
 });

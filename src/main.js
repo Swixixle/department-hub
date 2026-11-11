@@ -1,5 +1,5 @@
 import './style.css';
-import { SHIFTS, POLICY, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange } from './model.js';
+import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 
 const publicDemo = __PUBLIC_DEMO__;
@@ -30,7 +30,15 @@ const initial = {
   events: []
 };
 let state = loadState(storageKey, initial);
-let ui = { tab: 'schedule', date: '2026-11-13', view: 'weekend', dialog: null, pending: null, busy: null, notice: '' };
+// The starter rules live in code. A saved workspace picks up a new rule version on load.
+if (state.policy?.version !== POLICY.version) state = { ...state, policy: POLICY };
+const agreedRequestFor = row => state.requests.find(request => request.status === AGREED_STATUS &&
+  [request.from?.key, request.to?.key].includes(row.key));
+const checkChange = (details, exceptId = null) => evaluateChange({
+  roster: projectRoster(state.assignments, state.requests), directory: state.directory,
+  hoursVerified: state.hoursVerified, policy: state.policy, committed: committedKeys(state.requests, exceptId), ...details
+});
+let ui ={ tab: 'schedule', date: '2026-11-13', view: 'weekend', dialog: null, pending: null, busy: null, notice: '' };
 let sourceUrl = null;
 let writing = false;
 const h = value => String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -45,6 +53,7 @@ const valueAttr = value => 'data-value="' + h(value) + '"';
 const actorNames = () => [...new Set([...state.assignments.map(row => row.person), ...Object.values(state.directory).map(profile => profile.person)])].sort((a,b) => a.localeCompare(b));
 const isSame = (a,b) => normalizeName(a) === normalizeName(b);
 const isMine = row => isSame(row.person, state.actor);
+const ROLE_LABELS = { charge: 'Charge', icu: 'ICU', extra: 'Extra' };
 
 async function receipt(type, details) {
   const payload = {
@@ -90,8 +99,10 @@ function schedule() {
       const rows = state.assignments.filter(row => row.date === date && row.shift === shift);
       return '<section class="shift"><div class="shift-label ' + (shift === 'N' ? 'night' : 'day') + '"><b>' + def.label + '</b><span>' +
         (shift === 'N' ? '7 PM – 7 AM' : '7 AM – 7 PM') + '</span></div>' +
-        (rows.length ? rows.map(row => button(avatar(row.person) + '<span>' + h(row.person) + '</span>' +
-          (isMine(row) ? '<em>You</em>' : ''), 'shift', 'class="staff ' + (isMine(row) ? 'mine' : '') + '" ' + valueAttr(row.key))).join('') :
+        (rows.length ? rows.map(row => button(avatar(row.person) + '<span class="name">' + h(row.person) + '</span>' +
+          (row.hours ? '<i class="tag">' + h(row.hours) + '</i>' : '') +
+          (isMine(row) ? '<em>You</em>' : ''), 'shift', 'class="staff ' + (isMine(row) ? 'mine ' : '') + h(row.role || '') + '" ' +
+          (row.role ? 'title="' + h(ROLE_LABELS[row.role] || row.role) + '" ' : '') + valueAttr(row.key))).join('') :
           '<p class="empty-shift">No assignments in this roster.</p>') + '</section>';
     }).join('') + '</article>').join('');
   return '<section class="intro"><div><div class="eyebrow">TEAM ROSTER</div><h1>Schedule</h1><p>See who’s working. Start a trade or find coverage from your shift.</p></div>' +
@@ -105,6 +116,8 @@ function schedule() {
     '<div class="segments">' + button('‹', 'navigate', 'aria-label="Previous week" data-value="-7"') +
     button('›', 'navigate', 'aria-label="Next week" data-value="7"') + '</div></div></div>' +
     '<div class="calendar ' + ui.view + '">' + cells + '</div>' +
+    (state.assignments.some(row => row.role) ? '<p class="calendar-foot legend"><span class="name charge">Pink</span> charge <span class="name icu">Green</span> ICU' +
+      (state.assignments.some(row => row.role === 'extra') ? ' <span class="name extra">Yellow</span> extra' : '') + '</p>' : '') +
     '<p class="calendar-foot">Night shifts appear on their start date. Payroll checks split hours at the workweek boundary.</p>';
 }
 
@@ -169,10 +182,14 @@ function dialogMarkup() {
     return shell('Review import', '<div class="import-stats"><b>' + pending.pages.length + ' pages</b><b>' + pending.assignments.length +
       ' assignments</b><b>' + (unresolved + pending.issues.length) + ' to review</b></div>' +
       '<p>Review the flagged cells and check the date span. Duplicate assignments are combined with their source references.</p>' +
-      '<details><summary>Pages and extracted dates</summary><ul class="compact">' + pending.pages.map(page => '<li>' +
-        h(page.name + ' · ' + page.status + (page.dates.length ? ' · ' + page.dates.at(0) + ' to ' + page.dates.at(-1) : '')) + '</li>').join('') + '</ul></details>' +
+      '<details' + (pending.pages.some(page => page.shift) ? ' open' : '') + '><summary>Pages and extracted dates</summary><ul class="compact">' + pending.pages.map(page => '<li>' +
+        h(page.name + ' · ' + page.status + (page.dates.length ? ' · ' + page.dates.at(0) + ' to ' + page.dates.at(-1) : '')) +
+        (page.shift ? ' · <b>' + (page.shift === 'N' ? 'Night' : 'Day') + ' schedule</b>' + (page.shiftGuessed ? ' (guessed) ' : ' ') +
+          button('Switch to ' + (page.shift === 'N' ? 'Day' : 'Night'), 'flip-page', 'class="text-button" ' + valueAttr(page.page)) : '') +
+        '</li>').join('') + '</ul></details>' +
+      (unresolved ? '<p>' + button('Review ' + unresolved + ' flagged ' + (unresolved === 1 ? 'shift' : 'shifts'), 'review-flags', 'class="primary"') + '</p>' : '') +
       (pending.flags.length ? '<div class="flags">' + pending.flags.map((flag, index) => '<div class="flag"><p>' + h(flag.message) + '</p><small>' +
-        h(flag.source.file + ' · ' + flag.status) + '</small> ' +
+        h((flag.draft.date ? flag.draft.date.slice(5).replace('-', '/') + ' · ' : '') + flag.source.file + ' · ' + flag.status) + '</small> ' +
         button('Review', 'flag', 'class="text-button" ' + valueAttr(index)) + '</div>').join('') + '</div>' : '') +
       (pending.issues.length ? '<ul class="compact">' + pending.issues.slice(0,20).map(issue => '<li>' +
         h(issue.date + ' · ' + issue.message) + '</li>').join('') + '</ul>' : '<p class="good">No structural issues were flagged.</p>') +
@@ -181,18 +198,41 @@ function dialogMarkup() {
   }
   if (type === 'flag') {
     const flag = ui.pending.flags[id];
-    return shell('Check a flagged cell', '<p>' + h(flag.message) + '</p>' + (chosen ? imageMarkup(chosen, flag.source) : '') +
-      '<form data-form="correct" data-index="' + id + '"><label>Date<input name="date" type="date" value="' + h(flag.draft.date) +
+    const left = ui.pending.flags.filter(item => item.status === 'open').length;
+    const existing = flagCellRows(flag);
+    const suggested = flagCellFlags(flag).map(item => item.draft)
+      .filter((draft, index, all) => draft.person && !existing.some(row => isSame(row.person, draft.person)) &&
+        all.findIndex(other => other.person && isSame(other.person, draft.person)) === index);
+    // Listed top to bottom, the way they sit on the page.
+    const height = item => (item.sources || [item.source]).find(source => source?.page === flag.source.page)?.box?.[1] ?? Infinity;
+    const rows = [...existing.map(row => ({ ...row, check: false, y: height(row) })),
+      ...flagCellFlags(flag).filter(item => suggested.includes(item.draft)).map(item => ({ ...item.draft, check: true, y: height(item) }))]
+      .sort((a, b) => a.y - b.y);
+    const known = [...new Set([...ui.pending.assignments.map(item => item.person), ...actorNames()])].sort((a, b) => a.localeCompare(b));
+    const blank = rows.findIndex(row => row.check);
+    const focus = blank >= 0 ? blank : rows.length;
+    const line = (row, index) => '<div class="name-row' + (row?.check ? ' check' : '') + '"><input name="person" list="known-names" maxlength="80" autocomplete="off" placeholder="Name" aria-label="Name ' +
+      (index + 1) + '" value="' + h(row?.person || '') + '"' + (index === focus ? ' autofocus' : '') + '><select name="role" aria-label="Role for name ' + (index + 1) + '">' +
+      [['', 'No role'], ...Object.entries(ROLE_LABELS)].map(([value, label]) => '<option value="' + value + '"' + ((row?.role || '') === value ? ' selected' : '') + '>' + label + '</option>').join('') +
+      '</select><input name="hours" maxlength="9" autocomplete="off" placeholder="7-3" pattern="\\d{1,2}(:\\d{2})?-\\d{1,2}(:\\d{2})?" title="Partial hours like 7-3 or 7-3:30" aria-label="Partial hours for name ' + (index + 1) + '" value="' + h(row?.hours || '') + '"></div>';
+    return shell('Check this shift · ' + left + ' left', '<p>' + h(flag.message) + '</p>' + (chosen ? cropMarkup(chosen, flag.source) : '') +
+      '<form data-form="correct" data-index="' + id + '"><div class="cell-when"><label>Date<input name="date" type="date" value="' + h(flag.draft.date) +
       '" required></label><label>Shift<select name="shift"><option value="D"' + (flag.draft.shift === 'D' ? ' selected' : '') +
-      '>Day</option><option value="N"' + (flag.draft.shift === 'N' ? ' selected' : '') + '>Night</option></select></label>' +
-      '<label>Staff name<input name="person" maxlength="80" value="' + h(flag.draft.person) + '" required></label><div class="actions">' +
-      button('Mark as non-assignment', 'dismiss-flag', 'class="secondary" ' + valueAttr(id)) +
-      '<button class="primary">Save correction</button></div></form>');
+      '>Day</option><option value="N"' + (flag.draft.shift === 'N' ? ' selected' : '') + '>Night</option></select></label></div>' +
+      '<p class="subtle">One box per person. Fix a name, add anyone missing, or clear a box to remove someone.' +
+      (suggested.length ? ' Shaded names are unsure readings.' : '') + '</p>' +
+      '<div class="name-rows">' + Array.from({ length: Math.max(rows.length + 2, 5) }, (_, index) => line(rows[index], index)).join('') + '</div>' +
+      '<datalist id="known-names">' + known.map(name => '<option value="' + h(name) + '">').join('') + '</datalist><div class="actions">' +
+      button('Leave as read', 'dismiss-flag', 'class="secondary" ' + valueAttr(id)) +
+      '<button class="primary">Save and next</button></div></form>');
   }
-  if (type === 'shift') return shell(shiftCaption(row), '<p><b>' + h(row.person) + '</b> · ' + h(row.date) + '</p>' +
+  if (type === 'shift') return shell(shiftCaption(row), '<p><b>' + h(row.person) + '</b> · ' + h(row.date) +
+    (row.role ? ' · ' + h(ROLE_LABELS[row.role] || row.role) : '') + (row.hours ? ' · ' + h(row.hours) : '') + '</p>' +
     (row.sources.length ? '<p>' + button('See photo source', 'source', 'class="text-button" ' + valueAttr(row.key)) +
       ' <small>' + h(row.sources.length + ' source page(s)') + '</small></p>' : '<p class="subtle">Fictional starting roster. Import sample photos to see image evidence.</p>') +
-    (isMine(row) ? '<div class="actions">' + button('Trade this shift', 'matches', 'class="primary" data-kind="trade" ' + valueAttr(row.key)) +
+    (agreedRequestFor(row) ? '<p class="subtle">This shift is part of an agreed request that is queued for review. It cannot be offered again until that is settled.</p>' +
+      '<div class="actions">' + button('Open the request', 'thread', 'class="secondary" ' + valueAttr(agreedRequestFor(row).id)) + '</div>' :
+    isMine(row) ? '<div class="actions">' + button('Trade this shift', 'matches', 'class="primary" data-kind="trade" ' + valueAttr(row.key)) +
       button('Find coverage', 'matches', 'class="secondary" data-kind="coverage" ' + valueAttr(row.key)) + '</div>' : ''));
   if (type === 'source') return shell('Original photo', chosen ? imageMarkup(chosen, row.sources[0]) : '<p>The photo is unavailable in this browser.</p>');
   if (type === 'matches') {
@@ -244,6 +284,40 @@ function dialogMarkup() {
   return '';
 }
 
+// Rows and open flags that belong to the same date and shift on the same photo as a flag.
+function flagCellRows(flag) {
+  return flag.draft.date ? ui.pending.assignments.filter(item => item.date === flag.draft.date && item.shift === flag.draft.shift &&
+    item.sources.some(source => source.page === flag.source.page)) : [];
+}
+function flagCellFlags(flag) {
+  return flag.draft.date ? ui.pending.flags.filter(item => item.status === 'open' && item.source.page === flag.source.page &&
+    item.draft.date === flag.draft.date && item.draft.shift === flag.draft.shift) : [flag];
+}
+async function nextFlag(after = -1) {
+  clearPreview();
+  const open = ui.pending.flags.map((flag, index) => ({ flag, index })).filter(entry => entry.flag.status === 'open');
+  const next = open.find(entry => entry.index > after) || open[0];
+  ui.dialog = next ? { type:'flag', id:next.index, chosen:await showSource(next.flag.source) } : { type:'import' };
+}
+
+// The part of the photo a flag points at, enlarged. A small box is a single name, so its surroundings are included.
+function cropMarkup(image, source) {
+  const box = source.box;
+  if (!box || box[2] <= box[0] || box[3] <= box[1]) return imageMarkup(image, source);
+  const [x0, y0, x1, y1] = box;
+  const cell = x1 - x0 > image.width * 0.06 && y1 - y0 > image.height * 0.08;
+  const padX = cell ? (x1 - x0) * 0.1 : Math.max((x1 - x0) * 0.6, image.width * 0.05);
+  const padY = cell ? (y1 - y0) * 0.1 : (y1 - y0) * 3.5;
+  const left = Math.max(0, x0 - padX), top = Math.max(0, y0 - padY);
+  const width = Math.min(image.width, x1 + padX) - left, height = Math.min(image.height, y1 + padY) - top;
+  const percent = value => (value * 100).toFixed(3) + '%';
+  return '<figure class="source-image"><div class="source-crop" style="aspect-ratio:' + width + '/' + height + ';max-width:calc(44vh*' + (width / height).toFixed(3) + ')">' +
+    '<img src="' + h(image.url) + '" alt="' + h(source.file) + '" style="width:' + percent(image.width / width) + ';left:' + percent(-left / width) + ';top:' + percent(-top / height) + '">' +
+    (cell ? '' : '<span class="source-box" style="left:' + percent((x0 - left) / width) + ';top:' + percent((y0 - top) / height) +
+      ';width:' + percent((x1 - x0) / width) + ';height:' + percent((y1 - y0) / height) + '"></span>') +
+    '</div><figcaption>' + h(source.file) + '</figcaption></figure>';
+}
+
 function imageMarkup(image, source) {
   const box = source.box;
   return '<figure class="source-image"><div><img src="' + h(image.url) + '" alt="' + h(source.file) + '">' +
@@ -257,9 +331,8 @@ function matches(row, kind) {
   const pool = kind === 'trade' ? state.assignments.filter(to => to.date !== row.date && !isSame(to.person,row.person)).map(to => ({
     to, recipient: to.person
   })) : Object.values(directory).filter(profile => !isSame(profile.person,row.person)).map(profile => ({ recipient: profile.person }));
-  return pool.map(match => ({ ...match, check: evaluateChange({
-    roster: state.assignments, from: row, kind, directory, hoursVerified: state.hoursVerified, policy: state.policy, ...match
-  }) })).filter(match => match.check.status !== 'blocked')
+  return pool.map(match => ({ ...match, check: checkChange({ from: row, kind, ...match }) }))
+    .filter(match => match.check.status !== 'blocked')
     .sort((a,b) => (a.check.status === b.check.status ? 0 : a.check.status === 'eligible' ? -1 : 1) ||
       (a.to && b.to ? Math.abs(toDate(a.to.date) - toDate(row.date)) - Math.abs(toDate(b.to.date) - toDate(row.date)) : 0) ||
       a.recipient.localeCompare(b.recipient)).slice(0,40);
@@ -354,8 +427,23 @@ async function act({action, value, kind}) {
       return;
     }
     case 'clear-draft': ui.pending = null; break;
+    case 'flip-page': {
+      // A calendar page is all days or all nights. Switching moves every row and flag that came only from that page.
+      const draft = ui.pending;
+      const page = draft.pages.find(entry => entry.page === value);
+      if (!page?.shift) return;
+      const from = page.shift, to = from === 'N' ? 'D' : 'N';
+      page.shift = to;
+      page.shiftGuessed = false;
+      draft.assignments = mergeAssignments(draft.assignments.map(item =>
+        item.shift === from && item.sources.every(source => source.page === value) ? { ...item, shift: to } : item));
+      for (const flag of draft.flags) if (flag.source.page === value && flag.draft.shift === from) flag.draft.shift = to;
+      draft.issues = verifyRoster(draft.assignments);
+      break;
+    }
     case 'flag': ui.dialog = { type:'flag', id:Number(value), chosen:await showSource(ui.pending.flags[value].source) }; break;
-    case 'dismiss-flag': ui.pending.flags[value].status = 'dismissed'; ui.dialog = { type:'import' }; clearPreview(); break;
+    case 'review-flags': await nextFlag(); break;
+    case 'dismiss-flag': ui.pending.flags[value].status = 'dismissed'; await nextFlag(Number(value)); break;
     case 'publish': {
       const draft = ui.pending;
       if (!draft?.assignments.length || draft.flags.some(flag => flag.status === 'open')) return;
@@ -399,11 +487,10 @@ async function act({action, value, kind}) {
       if (!request || !isSame(state.actor, request.recipient) || request.status !== 'Awaiting reply') return;
       const activeFrom = state.assignments.find(item => item.key === request.from.key);
       const activeTo = request.to ? state.assignments.find(item => item.key === request.to.key) : undefined;
-      const check = activeFrom && (!request.to || activeTo) ? evaluateChange({
-        roster:state.assignments, from:activeFrom, to:activeTo, recipient:request.recipient, kind:request.kind,
-        directory:state.directory, hoursVerified:state.hoursVerified, policy:state.policy
-      }) : { status:'blocked', reason:'An assignment changed after the request was opened.' };
-      const status = value === 'decline' ? 'Declined' : check.status === 'blocked' ? 'Blocked after recheck' : 'Both agreed · queued for review';
+      const check = activeFrom && (!request.to || activeTo) ? checkChange({
+        from:activeFrom, to:activeTo, recipient:request.recipient, kind:request.kind
+      }, request.id) : { status:'blocked', reason:'An assignment changed after the request was opened.' };
+      const status = value === 'decline' ? 'Declined' : check.status === 'blocked' ? 'Blocked after recheck' : AGREED_STATUS;
       await commit('Request response', { id:request.id, status, check }, previous => ({
         ...previous, requests:previous.requests.map(item => item.id === request.id ? { ...item, status, check } : item)
       }));
@@ -458,24 +545,46 @@ async function submit(form) {
       break;
     }
     case 'correct': {
-      const flag = ui.pending.flags[Number(form.dataset.index)];
-      const person = data.person.trim();
-      if (!person || !/^\d{4}-\d{2}-\d{2}$/.test(data.date) || !SHIFTS[data.shift]) return;
-      ui.pending.assignments = mergeAssignments([...ui.pending.assignments, {
-        date:data.date, shift:data.shift, person, sources:[{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
-      }]);
+      const index = Number(form.dataset.index);
+      const flag = ui.pending.flags[index];
+      const fields = new FormData(form);
+      const date = fields.get('date'), shift = fields.get('shift');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SHIFTS[shift]) return;
+      const roles = fields.getAll('role'), times = fields.getAll('hours');
+      // The boxes replace what was read for this date and shift on this photo.
+      const sameCell = date === flag.draft.date && shift === flag.draft.shift;
+      const existing = sameCell ? flagCellRows(flag) : [];
+      const listed = [];
+      fields.getAll('person').forEach((value, position) => {
+        const person = value.trim().replace(/\s+/g, ' ');
+        if (!person || listed.some(row => isSame(row.person, person))) return;
+        const hours = times[position].trim();
+        if (hours && !/^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/.test(hours)) throw new Error('Write partial hours like 7-3 or 7-3:30.');
+        const before = existing.find(row => isSame(row.person, person));
+        listed.push({
+          date, shift, person, ...(roles[position] ? { role:roles[position] } : {}), ...(hours ? { hours } : {}),
+          sources: before?.sources || [{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
+        });
+      });
+      const settled = sameCell ? flagCellFlags(flag) : [flag];
+      ui.pending.assignments = mergeAssignments([...ui.pending.assignments.filter(item => !existing.includes(item)), ...listed]);
       ui.pending.issues = verifyRoster(ui.pending.assignments);
-      flag.status = 'corrected';
-      ui.dialog = { type:'import' };
-      clearPreview();
+      for (const item of [...settled, flag]) item.status = 'corrected';
+      await nextFlag(index);
       break;
     }
     case 'request': {
       const { row, kind, chosen } = ui.dialog;
       if (!isMine(row)) return;
+      const check = checkChange({ from:row, to:chosen.to, recipient:chosen.recipient, kind });
+      if (check.status === 'blocked') throw new Error(check.reason);
+      if (state.requests.some(entry => entry.status === 'Awaiting reply' && entry.from.key === row.key &&
+          entry.to?.key === chosen.to?.key && isSame(entry.recipient, chosen.recipient))) {
+        throw new Error('You already sent this request to ' + chosen.recipient + '. Open it from Requests.');
+      }
       const id = crypto.randomUUID();
       const request = {
-        id, from:row, to:chosen.to, recipient:chosen.recipient, kind, check:chosen.check,
+        id, from:row, to:chosen.to, recipient:chosen.recipient, kind, check,
         status:'Awaiting reply', messages:body ? [message] : []
       };
       await commit('Request opened', { id, kind, from:assignmentKey(row), to:chosen.to?.key, recipient:chosen.recipient, check:chosen.check },

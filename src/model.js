@@ -4,10 +4,11 @@ export const SHIFTS = {
 };
 
 export const POLICY = {
-  version: 'pilot-1',
+  version: 'pilot-2',
   source: 'Illustrative department rules',
   zone: 'America/Indiana/Indianapolis',
   overtimeLimitMinutes: 40 * 60,
+  minimumRestMinutes: 8 * 60,
   minimumByShift: { D: 4, N: 3 },
   allowPrnTrade: false,
   allowPrnCoverage: true,
@@ -43,9 +44,24 @@ function zonedInstant(date, time) {
   throw new Error('Ambiguous or invalid shift time');
 }
 
+// A partial shift is written on the schedule as "7-3" or "7-3:30". On a day page that is 07:00 to 15:00.
+// On a night page it is 19:00 to 03:00.
+export function shiftTimes(item) {
+  const base = SHIFTS[item.shift];
+  if (!base) throw new Error('Unsupported shift label');
+  const match = item.hours && /^(\d{1,2})(?::(\d{2}))?-(\d{1,2})(?::(\d{2}))?/.exec(item.hours);
+  if (!match) return base;
+  const night = item.shift === 'N';
+  const clock = (hour, minute) => String(hour % 24).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+  let start = Number(match[1]) % 12, end = Number(match[3]) % 12;
+  const startMinute = Number(match[2] || 0), endMinute = Number(match[4] || 0);
+  if (night || start < 5) start += 12;
+  if (night ? end + 12 > start : end * 60 + endMinute <= start * 60 + startMinute) end += 12;
+  return { label: base.label, start: clock(start, startMinute), end: clock(end, endMinute) };
+}
+
 export function shiftInterval(item) {
-  const shift = SHIFTS[item.shift];
-  if (!shift) throw new Error('Unsupported shift label');
+  const shift = shiftTimes(item);
   const endDate = shift.end > shift.start ? item.date : addDays(item.date, 1);
   return [zonedInstant(item.date, shift.start), zonedInstant(endDate, shift.end)];
 }
@@ -85,8 +101,10 @@ export function verifyRoster(rows, policy = POLICY) {
       }
     }
   }
+  // A batch can hold day pages only or night pages only. A shift the batch never mentions is not a gap.
+  const present = Object.keys(SHIFTS).filter(shift => rows.some(row => row.shift === shift));
   for (const [date, group] of Map.groupBy(rows, row => row.date)) {
-    for (const shift of Object.keys(SHIFTS)) {
+    for (const shift of present) {
       const count = group.filter(row => row.shift === shift).length;
       if (count !== policy.minimumByShift[shift]) {
         issues.push({ date, message: SHIFTS[shift].label + ' shift has ' + count + ' assignments. Sample target is ' + policy.minimumByShift[shift] + '.' });
@@ -98,31 +116,58 @@ export function verifyRoster(rows, policy = POLICY) {
 
 const same = (left, right) => normalizeName(left) === normalizeName(right);
 
-export function evaluateChange({ roster, from, to, recipient, kind, directory, hoursVerified = false, policy = POLICY }) {
+export const AGREED_STATUS = 'Both agreed · queued for review';
+
+// Assignment keys that already belong to an agreed request. A shift can be agreed once.
+export function committedKeys(requests = [], exceptId = null) {
+  return requests.filter(request => request.status === AGREED_STATUS && request.id !== exceptId)
+    .flatMap(request => [request.from?.key, request.to?.key]).filter(Boolean);
+}
+
+// The imported roster with every agreed request applied. Each row keeps its original key,
+// so hours, overlap and rest checks count changes that are agreed but not yet in the official system.
+export function projectRoster(roster, requests = []) {
+  const holder = new Map();
+  for (const request of requests) {
+    if (request.status !== AGREED_STATUS || !request.from?.key) continue;
+    holder.set(request.from.key, request.recipient);
+    if (request.to?.key) holder.set(request.to.key, request.from.person);
+  }
+  return holder.size ? roster.map(item => holder.has(item.key) ? { ...item, person: holder.get(item.key) } : item) : roster;
+}
+
+export function evaluateChange({ roster, from, to, recipient, kind, directory, hoursVerified = false, policy = POLICY, committed = [] }) {
   const second = kind === 'trade' ? to?.person : recipient;
   if (!second || same(from.person, second)) return { status: 'blocked', reason: 'Choose a different coworker.' };
+  const taken = new Set(committed);
+  if ([from, to].some(item => item && taken.has(item.key))) {
+    return { status: 'blocked', reason: 'One of these shifts is already part of an agreed request.' };
+  }
   const owner = directory[normalizeName(from.person)];
   const candidate = directory[normalizeName(second)];
-  if (!owner || !candidate || !owner.status || !candidate.status) {
-    return { status: 'review', reason: 'Employment status or qualifications need verification.' };
-  }
+  // Unknown staff details lower the result to review. They never skip the roster checks below.
+  const unknown = [owner, candidate].some(profile => !profile?.status);
   const allowPrn = kind === 'trade' ? policy.allowPrnTrade : policy.allowPrnCoverage;
-  if (!allowPrn && [owner.status, candidate.status].includes('PRN')) {
+  if (!allowPrn && [owner?.status, candidate?.status].includes('PRN')) {
     return { status: 'blocked', reason: 'The current trade rules exclude PRN staff.' };
   }
   const candidates = [{ person: second, outgoing: to, incoming: from, profile: candidate }];
   if (kind === 'trade') candidates.push({ person: from.person, outgoing: from, incoming: to, profile: owner });
+  const rest = (policy.minimumRestMinutes || 0) * 60000;
   const projections = [];
   for (const { person, outgoing, incoming, profile } of candidates) {
-    if (!incoming || !profile.skills?.includes(incoming.shift)) {
+    if (!incoming || (profile?.status && !profile.skills?.includes(incoming.shift))) {
       return { status: 'blocked', reason: 'The required shift qualification is missing.' };
     }
     const source = roster.filter(item => same(item.person, person) && item.key !== outgoing?.key);
     const [start, end] = shiftInterval(incoming);
-    if (source.some(item => {
-      const [otherStart, otherEnd] = shiftInterval(item);
-      return start < otherEnd && otherStart < end;
-    })) return { status: 'blocked', reason: 'The proposed shift overlaps an existing assignment.' };
+    const others = source.map(shiftInterval);
+    if (others.some(([otherStart, otherEnd]) => start < otherEnd && otherStart < end)) {
+      return { status: 'blocked', reason: 'The proposed shift overlaps an existing assignment.' };
+    }
+    if (rest && others.some(([otherStart, otherEnd]) => Math.max(start - otherEnd, otherStart - end) < rest)) {
+      return { status: 'blocked', reason: 'The change would leave ' + person + ' back to back with another shift.' };
+    }
     const totals = new Map();
     for (const item of [...source, incoming]) {
       for (const [week, minutes] of minutesByWeek(item)) totals.set(week, (totals.get(week) || 0) + minutes);
@@ -135,6 +180,7 @@ export function evaluateChange({ roster, from, to, recipient, kind, directory, h
     }
     projections.push({ person, weeks: relevant });
   }
+  if (unknown) return { status: 'review', reason: 'Employment status or qualifications need verification.', projections };
   if (!hoursVerified) return { status: 'review', reason: 'Hours and pickups outside this roster need verification.', projections };
   return { status: 'eligible', reason: 'Roster-based checks passed.', projections };
 }
