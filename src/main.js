@@ -1,4 +1,5 @@
 import './style.css';
+import './sizes.css';
 import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
@@ -9,7 +10,7 @@ import { localBoard } from './backend.js';
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
 const draftKey = storageKey + '-draft';
-const BUILD = 7;
+const BUILD = 8;
 const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
@@ -80,6 +81,29 @@ const checkChange = (details, exceptId = null) => evaluateChange({
   hoursVerified: state.hoursVerified, policy: state.policy, committed: committedKeys(state.requests, exceptId), ...details
 });
 let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: null, pending: loadDraft(), busy: null, notice: '', flash: '' };
+// Text size is a setting of this device, not of the workspace. It scales every rem in sizes.css.
+const TEXT_SIZES = [1, 1.15, 1.3], TEXT_NAMES = ['normal', 'large', 'larger'], textKey = 'department-hub-text-size';
+let textSize = Math.max(0, TEXT_SIZES.indexOf(Number(loadState(textKey, 1))));
+const applyTextSize = () => document.documentElement.style.setProperty('--scale', TEXT_SIZES[textSize]);
+applyTextSize();
+// Which buttons get pressed, as fixed button names and totals only. Never a person's name, a shift, a typed word or a
+// recording: a value is kept only for the few controls whose values are fixed words, such as the tab that was opened.
+// Kept apart from the workspace, so it is not in backups or receipts, and not counted at all in the public demo.
+const usageKey = 'department-hub-usage-v1', FIXED_VALUES = new Set(['tab', 'view', 'board-filter', 'pool', 'fair-scope']);
+function countPress(action, value) {
+  if (publicDemo || !/^[a-z][a-z-]*(:[a-z-]+)?$/.test(action || '')) return;
+  const name = FIXED_VALUES.has(action) && /^[A-Za-z-]{1,12}$/.test(value || '') ? action + ':' + value.toLowerCase() : action;
+  try {
+    const usage = loadState(usageKey, null) || { since: localToday(), counts: {} };
+    usage.counts[name] = (usage.counts[name] || 0) + 1;
+    localStorage.setItem(usageKey, JSON.stringify(usage));
+  } catch { /* counting must never get in the way */ }
+}
+const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory',
+  shift:'Opened a shift', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
+  voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
+  import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
+  over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog' };
 // Attachments on board posts: the files themselves, and addresses the page can show them from.
 const mediaBlobs = new Map(), mediaUrls = new Map();
 // The one place the board keeps posts and files. A hosted service replaces this line (see src/backend.js).
@@ -194,9 +218,9 @@ function schedule() {
       const rows = state.assignments.filter(row => row.date === date && row.shift === shift);
       return '<section class="shift"><div class="shift-label ' + (shift === 'N' ? 'night' : 'day') + '"><b>' + def.label + '</b><span>' +
         (shift === 'N' ? '7 PM – 7 AM' : '7 AM – 7 PM') + '</span>' +
-        (!offUsual(date, shift) ? '' : offUsual(date, shift).extra > 0 ?
-          button(h(countNote(offUsual(date, shift))), 'over', 'class="count-note over" title="More people than usual. See who is next for low census." ' + valueAttr(date + '|' + shift)) :
-          '<i class="count-note">' + h(countNote(offUsual(date, shift))) + '</i>') + '</div>' +
+        (offUsual(date, shift)?.extra < 0 ? '<i class="count-note">' + h(countNote(offUsual(date, shift))) + '</i>' : '') + '</div>' +
+        (offUsual(date, shift)?.extra > 0 ? button('<span>' + h(countNote(offUsual(date, shift))) + '</span><span>Who is next ›</span>', 'over',
+          'class="count-note over" title="More people than usual. See who is next for low census." ' + valueAttr(date + '|' + shift)) : '') +
         (rows.length ? rows.map(row => button(avatar(row.person) + '<span class="name">' + h(row.person) + '</span>' +
           (row.hours ? '<i class="tag">' + h(row.hours) + '</i>' : '') +
           (isMine(row) ? '<em>You</em>' : ''), 'shift', 'class="staff ' + (isMine(row) ? 'mine ' : '') + h(row.role || '') + '" ' +
@@ -205,7 +229,7 @@ function schedule() {
         button(rows.length ? 'Edit names' : 'Add names', 'edit-shift', 'class="edit-shift" ' + valueAttr(date + '|' + shift)) + '</section>';
     }).join('') + '</article>').join('');
   return '<section class="intro"><div><div class="eyebrow">TEAM ROSTER</div><h1>Schedule</h1><p>See who’s working. Start a trade or find coverage from your shift.</p></div>' +
-    button('＋ Import schedule', 'import', 'class="primary"') + '</section>' +
+    button('＋ Import schedule', 'import', 'class="secondary"') + '</section>' +
     '<div class="roster-status"><span class="status-dot"></span><b>' + (state.mode === 'sample' ? 'Fictional practice roster' : 'Imported roster') +
     '</b><span>' + h(state.mode !== 'sample' ? 'Published ' + timeLabel(state.importedAt) : publicDemo ? 'Try the full flow with sample staff' :
       'No schedule is saved in this browser at ' + location.host + '. These are sample names.') +
@@ -245,8 +269,8 @@ function postMarkup(post) {
     (post.learning ? '<span class="badge learning">Learning</span>' : '') + '</div>' + words +
     (post.media?.length ? '<div class="post-media">' + post.media.map(piece).join('') + '</div>' : '') +
     (link ? '<div class="link-player" data-embed="' + h(link.embed) + '">' + button('▶ Play here · ' + h(link.site), 'play-link', 'class="play-link"') + '</div>' : '') +
-    '<div class="post-actions">' + (post.inside ? '<span class="subtle">Department only</span>' : button('Share', 'share', 'class="text-button" ' + valueAttr(post.id))) +
-    (post.created && isSame(post.author, state.actor) ? button('Remove', 'remove-post', 'class="text-button" ' + valueAttr(post.id)) : '') + '</div></article>';
+    '<div class="post-actions">' + (post.inside ? '<span class="subtle">Department only</span>' : button('↗ Share', 'share', 'class="post-action" ' + valueAttr(post.id))) +
+    (post.created && isSame(post.author, state.actor) ? button('Remove', 'remove-post', 'class="post-action quiet" ' + valueAttr(post.id)) : '') + '</div></article>';
 }
 
 function board() {
@@ -364,9 +388,10 @@ function render() {
     .map(player => ({ id: player.dataset.media, time: player.currentTime, on: !player.paused }));
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
   app.innerHTML = top() + '<main><header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
+    '<div class="top-tools">' + button('Aa', 'text-size', 'class="text-size" title="Text size" aria-label="Text size: ' + TEXT_NAMES[textSize] + '. Press to change."') +
     '<label class="actor">Viewing as <select id="actor" aria-label="Viewing as">' +
     (actorNames().length ? actorNames() : [state.actor]).map(name => '<option ' + (isSame(name, state.actor) ? 'selected' : '') + '>' + h(name) + '</option>').join('') +
-    '</select></label></header><div class="content">' +
+    '</select></label></div></header><div class="content">' +
     (ui.notice ? '<div role="status" class="notice">' + h(ui.notice) + '</div>' : '') +
     (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : schedule()) +
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
@@ -603,17 +628,28 @@ function dialogMarkup() {
   }
   if (type === 'data') {
     const { restore, confirmErase } = ui.dialog;
+    // A step that replaces or removes everything gets the sheet to itself: one question, two answers.
+    if (restore) return shell('Restore this backup?', '<p><b>' + h(restore.name) + '</b> holds ' + restore.state.assignments.length + ' shifts and ' + (restore.state.people || []).length + ' contacts' +
+      (restore.savedAt ? ', saved ' + h(timeLabel(restore.savedAt)) : '') + '.</p><p>Restoring replaces what is in this browser now' +
+      (state.mode === 'sample' ? ' (sample names).' : ' (' + state.assignments.length + ' shifts).') + '</p><div class="actions">' +
+      button('Cancel', 'data', 'class="secondary"') + button('Replace this workspace with the backup', 'restore', 'class="danger"') + '</div>');
+    if (confirmErase) return shell('Erase everything in this browser?', '<p><b>This cannot be undone.</b> ' + (state.mode === 'sample' ? 'The sample workspace will be reset.' :
+      state.assignments.length + ' shifts and ' + state.people.length + ' contacts will be removed. Save a backup file first if you might want them back.') + '</p><div class="actions">' +
+      button('Cancel', 'data', 'class="secondary"') + button('Erase everything in this browser', 'erase', 'class="danger"') + '</div>');
     return shell('Workspace data', '<p>This workspace is kept in this browser only, at <b>' + h(location.host) + '</b>. A different browser, or a different address, starts with sample names.</p>' +
       '<p><b>' + state.assignments.length + '</b> shifts · <b>' + state.people.length + '</b> contacts · ' + h(state.mode === 'sample' ? 'sample workspace' : 'published ' + timeLabel(state.importedAt)) + ' · version ' + BUILD + '</p>' +
       '<h3>Backup</h3><p class="subtle">A backup file holds the schedule, the contacts with their phone numbers, requests and history. Photos, videos and recordings are not included. Keep the file somewhere private.</p>' +
       '<p>' + button('Save a backup file', 'backup', 'class="primary"') + '</p>' +
       '<label class="drop"><b>Restore from a backup file</b><span>Choose a file saved with the button above</span><input id="backup-file" type="file" accept="application/json,.json"></label>' +
-      (restore ? '<div class="flag"><p><b>' + h(restore.name) + '</b> holds ' + restore.state.assignments.length + ' shifts and ' + (restore.state.people || []).length + ' contacts' +
-        (restore.savedAt ? ', saved ' + h(timeLabel(restore.savedAt)) : '') + '. Restoring replaces what is in this browser now' +
-        (state.mode === 'sample' ? ' (sample names).' : ' (' + state.assignments.length + ' shifts).') + '</p>' + button('Replace this workspace with the backup', 'restore', 'class="danger"') + '</div>' : '') +
+      (() => {
+        const usage = loadState(usageKey, null), rows = Object.entries(usage?.counts || {}).sort((a, b) => b[1] - a[1]);
+        return '<h3>How this copy gets used</h3><p class="subtle">Which buttons get pressed, by button name and total only. No names, no shifts, no typed words, no recordings. Kept in this browser and left out of backups.</p>' +
+          (rows.length ? '<div class="usage">' + rows.slice(0, 15).map(([name, total]) => '<div><span>' + h(USAGE_NAMES[name] || name) + '</span><b>' + total + '</b></div>').join('') + '</div>' +
+            '<p class="subtle">' + rows.reduce((sum, row) => sum + row[1], 0) + ' presses since ' + h(usage.since) + '.</p><p>' + button('Copy the counts', 'usage-copy', 'class="secondary"') + ' ' +
+            button('Reset the counts', 'usage-reset', 'class="secondary"') + '</p>' : '<p class="subtle">Nothing counted yet.</p>');
+      })() +
       '<h3>Start over</h3><p class="subtle">Clears the roster, contacts, source photos, messages and receipts from this browser and brings back the sample names.</p>' +
-      (confirmErase ? '<div class="flag"><p><b>This cannot be undone.</b> ' + (state.mode === 'sample' ? '' : state.assignments.length + ' shifts and ' + state.people.length + ' contacts will be removed. Save a backup file first if you might want them back.') +
-        '</p>' + button('Erase everything in this browser', 'erase', 'class="danger"') + '</div>' : button('Erase local workspace', 'erase-ask', 'class="secondary"')));
+      button('Erase local workspace', 'erase-ask', 'class="secondary"'));
   }
   return '';
 }
@@ -738,6 +774,7 @@ async function importFiles(files, sampleImport = false) {
 app.addEventListener('click', event => {
   const control = event.target.closest('[data-action]');
   if (!control || control.disabled) return;
+  countPress(control.dataset.action, control.dataset.value);
   if (control.dataset.action === 'play-link') {
     const box = control.closest('.link-player'), frame = document.createElement('iframe');
     frame.src = box.dataset.embed;
@@ -865,6 +902,20 @@ async function act({action, value, kind}) {
     case 'view': ui.view = value; break;
     case 'navigate': ui.date = addDays(ui.date, Number(value)); break;
     case 'today': ui.date = localToday(); break;
+    case 'text-size':
+      textSize = (textSize + 1) % TEXT_SIZES.length;
+      try { localStorage.setItem(textKey, JSON.stringify(TEXT_SIZES[textSize])); } catch { /* still applies for this visit */ }
+      applyTextSize();
+      ui.notice = 'Text size: ' + TEXT_NAMES[textSize] + '.';
+      break;
+    case 'usage-reset': localStorage.removeItem(usageKey); ui.flash = 'Counts reset.'; break;
+    case 'usage-copy': {
+      const usage = loadState(usageKey, null);
+      const text = Object.entries(usage?.counts || {}).sort((a, b) => b[1] - a[1]).map(([name, total]) => total + '\t' + (USAGE_NAMES[name] || name)).join('\n');
+      try { await navigator.clipboard.writeText('Department Hub button counts since ' + (usage?.since || '') + '\n' + text); ui.flash = 'Counts copied.'; }
+      catch { ui.flash = 'Copying was not allowed here.'; }
+      break;
+    }
     case 'edit-shift': { const [date, shift] = value.split('|'); ui.dialog = { type:'edit-shift', date, shift }; break; }
     case 'erase-ask': ui.dialog = { type:'data', confirmErase:true }; break;
     case 'backup': {
@@ -1053,6 +1104,7 @@ app.addEventListener('submit', event => {
   const form = event.target.closest('[data-form]');
   if (!form) return;
   event.preventDefault();
+  countPress('form:' + form.dataset.form);
   void submit(form).catch(fail).finally(saveDraft);
 });
 async function submit(form) {
