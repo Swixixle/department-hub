@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { carryForward, census, holidayTracker, holidays, isWeekendTurn, ledger, releaseOrder, staffing, standing, statSheet } from '../src/fairness.js';
+import { carryForward, census, holidayTracker, holidays, isWeekendTurn, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from '../src/fairness.js';
 
 const row = (date, shift, person, role) => ({ date, shift, person, ...(role ? { role } : {}) });
 // Two weeks of nights starting Sunday 2026-11-29. Taylor works every weekend night and nothing else.
@@ -118,10 +118,10 @@ test('extra weekends taken by choice are credit, and nobody else is measured aga
 
 test('a stat sheet counts what a person carried and the times they helped', () => {
   const requests = [
-    { status: 'Both agreed · queued for review', kind: 'trade', recipient: 'Jordan', from: { person: 'Morgan' } },
-    { status: 'Both agreed · queued for review', kind: 'coverage', recipient: 'Jordan', from: { person: 'Quinn' } },
-    { status: 'Declined', kind: 'trade', recipient: 'Jordan', from: { person: 'Parker' } },
-    { status: 'Awaiting reply', kind: 'trade', recipient: 'Jordan', from: { person: 'Parker' } }
+    { status: 'Both agreed · queued for review', kind: 'trade', recipient: 'Jordan', from: row(date(0), 'N', 'Morgan') },
+    { status: 'Both agreed · queued for review', kind: 'coverage', recipient: 'Jordan', from: row(date(1), 'N', 'Quinn') },
+    { status: 'Declined', kind: 'trade', recipient: 'Jordan', from: row(date(2), 'N', 'Parker') },
+    { status: 'Awaiting reply', kind: 'trade', recipient: 'Jordan', from: row(date(3), 'N', 'Parker') }
   ];
   const releases = [{ person: 'Jordan', hours: 4, voluntary: true, inPlaceOf: 'Morgan', date: '2026-11-29' }, { person: 'Jordan', hours: 2, voluntary: false, date: '2026-12-01' }];
   const sheet = statSheet('Jordan', { assignments: nights(), requests, releases, directory: {} });
@@ -165,4 +165,49 @@ test('standing names who carries more than a turn above their share and who less
   const table = ledger(nights(), 'N', { taylor: { arrangement: 'weekend-only' } });
   const result = standing(table);
   assert.deepEqual([result.over.map(entry => entry.person), result.under.map(entry => entry.person), result.level], [['Jordan'], ['Parker'], 2]);
+});
+
+test('a partial correction preserves the other shift and dates not supplied', () => {
+  const outgoing = [row('2026-11-26', 'D', 'Avery'), row('2026-11-26', 'N', 'Jordan', 'charge'),
+    { ...row('2026-11-27', 'D', 'Blair'), hours:'7-3' }, row('2026-11-28', 'D', 'Casey')];
+  const incoming = [row('2026-11-26', 'D', 'Drew'), row('2026-11-28', 'D', 'Emery')];
+  const expected = [outgoing[1], outgoing[2]];
+  const history = carryForward([], outgoing, incoming);
+  assert.deepEqual(history, expected);
+  assert.deepEqual(carryForward(history, incoming, incoming), expected);
+  assert.equal(holidayTracker([...history, ...incoming]).people.find(entry => entry.person === 'Jordan').count, 1);
+});
+
+test('period totals exclude earlier activity while earlier releases still protect the next turn', () => {
+  const rows = [row('2026-12-01', 'N', 'Jordan'), row('2026-12-01', 'N', 'Morgan'), row('2026-12-01', 'N', 'Quinn'),
+    row('2026-12-02', 'N', 'Jordan'), row('2026-12-02', 'N', 'Morgan'), row('2026-12-03', 'N', 'Jordan'), row('2026-12-03', 'N', 'Morgan')];
+  const releases = [
+    { person:'Jordan', date:'2026-11-26', shift:'N', hours:8, voluntary:true, inPlaceOf:'Morgan' },
+    { person:'Jordan', date:'2026-12-02', shift:'N', hours:2, voluntary:false }
+  ];
+  const requests = [
+    { kind:'trade', recipient:'Jordan', from:row('2026-11-26', 'N', 'Morgan'), status:'Both agreed · queued for review' },
+    { kind:'coverage', recipient:'Jordan', from:row('2026-12-01', 'N', 'Quinn'), status:'Both agreed · queued for review' }
+  ];
+  const sheet = statSheet('Jordan', { assignments:rows, requests, releases });
+  assert.deepEqual([sheet.tradesAccepted, sheet.shiftsCovered, sheet.releasedHours, sheet.wentHomeForSomeone], [0, 1, 2, 0]);
+  const table = census(rows, 'N', {}, releases);
+  assert.equal(table.people.find(entry => entry.person === 'Jordan').hours, 2);
+  assert.equal(table.over[0].order.find(entry => entry.person === 'Jordan').hours, 10);
+  assert.equal(statSheet('Jordan', { assignments:[row('2026-11-26', 'N', 'Jordan'), ...rows], requests, releases }).releasedHours, 10);
+});
+
+test('publishing retains absent staff settings so archived students and weekend-only positions stay excluded', () => {
+  const previous = { assignments:[...nights(), row('2026-12-01', 'N', 'Riley')], history:[],
+    directory:{ taylor:{ person:'Taylor', status:'Staff', arrangement:'weekend-only', skills:['N'] }, riley:{ person:'Riley', status:'Student', skills:['N'] } } };
+  const snapshot = structuredClone(previous);
+  const incoming = [row('2027-01-01', 'N', 'Avery')];
+  const result = publicationRecord(previous, incoming);
+  const table = ledger([...result.history, ...incoming], 'N', result.directory);
+  assert.equal(table.people.some(entry => entry.person === 'Riley'), false);
+  assert.equal(table.people.find(entry => entry.person === 'Taylor').weekendGap, null);
+  assert.deepEqual(result.directory.avery, { person:'Avery', status:null, skills:[] });
+  assert.deepEqual(previous, snapshot);
+  assert.deepEqual(publicationRecord({}, incoming).history, []);
+  assert.deepEqual(Object.keys(publicationRecord({}, incoming).directory), ['avery']);
 });

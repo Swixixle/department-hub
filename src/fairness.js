@@ -9,6 +9,10 @@ const nth = (year, month, day, count) => {            // count-th given weekday 
   return count < 0 ? dates.at(-1) : dates[count - 1];
 };
 const fixed = (year, month, day) => year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+const period = assignments => {
+  const dates = assignments.map(row => row.date).sort();
+  return date => Boolean(dates.length && date >= dates[0] && date <= dates.at(-1));
+};
 
 // A starter list. The department decides which days count: rules.off names the ones that do not, and rules.extra adds
 // days of its own as { name, date }.
@@ -121,6 +125,7 @@ export function releaseOrder(working, releases = []) {
 // that cut as their share (the carpool rule), so being scheduled on more of these shifts shows up as a larger share.
 export function census(assignments, shift, directory = {}, releases = [], today = '') {
   const { usual, over, short } = staffing(assignments, shift, directory);
+  const inPeriod = period(assignments);
   const named = new Map();
   const entry = person => {
     if (!named.has(key(person))) named.set(key(person), { person, onOver: 0, share: 0, turns: 0, hours: 0, offered: 0 });
@@ -129,7 +134,7 @@ export function census(assignments, shift, directory = {}, releases = [], today 
   for (const item of over) for (const person of item.people) { entry(person).onOver++; entry(person).share += item.extra / item.people.length; }
   const pool = new Set(assignments.filter(row => row.shift === shift && directory[key(row.person)]?.status !== 'Student').map(row => key(row.person)));
   for (const item of releases) {
-    if (item.shift !== shift || !pool.has(key(item.person))) continue;
+    if (item.shift !== shift || !pool.has(key(item.person)) || !inPeriod(item.date)) continue;
     const row = entry(item.person);
     row.turns++; row.hours += Number(item.hours || 0);
     if (item.voluntary) row.offered++;
@@ -150,8 +155,9 @@ export function statSheet(name, { assignments, requests = [], releases = [], dir
   const shift = mine.filter(row => row.shift === 'N').length > mine.length / 2 ? 'N' : 'D';
   const table = ledger(assignments, shift, directory, rules);
   const row = table.people.find(entry => key(entry.person) === key(name)) || null;
-  const agreed = requests.filter(request => request.status?.startsWith('Both agreed'));
-  const own = releases.filter(item => key(item.person) === key(name));
+  const inPeriod = period(assignments);
+  const agreed = requests.filter(request => request.status?.startsWith('Both agreed') && inPeriod(request.from?.date));
+  const own = releases.filter(item => key(item.person) === key(name) && inPeriod(item.date));
   return {
     person: name, shift, row,
     tradesAccepted: agreed.filter(request => request.kind === 'trade' && key(request.recipient) === key(name)).length,
@@ -182,16 +188,24 @@ export function holidayTracker(assignments, directory = {}, rules = {}) {
   return { days, people: [...named.values()].sort((a, b) => b.count - a.count || a.person.localeCompare(b.person)) };
 }
 
-// Keeps the record when a new schedule replaces the old one: shifts on dates the new schedule does not cover are carried
-// forward. Dates it does cover are taken from the new schedule, so a corrected page replaces what it corrects.
+// Only a supplied date AND shift replaces an earlier cell. A date range cannot establish that a missing date or the
+// other shift was supplied; preserve those rows, including when the import is just one corrected day or night page.
 export function carryForward(history = [], outgoing = [], incoming = []) {
-  const dates = incoming.map(row => row.date).sort(), from = dates[0], to = dates.at(-1);
+  const covered = new Set(incoming.map(row => row.date + '|' + row.shift));
   const kept = new Map();
   for (const row of [...history, ...outgoing]) {
-    if (from && row.date >= from && row.date <= to) continue;
+    if (covered.has(row.date + '|' + row.shift)) continue;
     kept.set([row.date, row.shift, key(row.person)].join('|'), { date: row.date, shift: row.shift, person: row.person, ...(row.role ? { role: row.role } : {}), ...(row.hours ? { hours: row.hours } : {}) });
   }
   return [...kept.values()].sort((a, b) => a.date.localeCompare(b.date) || a.shift.localeCompare(b.shift) || a.person.localeCompare(b.person));
+}
+
+// Historical shifts still need their staff settings (especially Student and weekend-only). Keep those profiles even
+// when a person is absent from the new roster. Callers supply an empty previous state when switching out of the demo.
+export function publicationRecord({ history = [], assignments = [], directory = {} } = {}, incoming = []) {
+  const profiles = { ...directory };
+  for (const row of incoming) if (!profiles[key(row.person)]) profiles[key(row.person)] = { person: row.person, status: null, skills: [] };
+  return { history: carryForward(history, assignments, incoming), directory: profiles };
 }
 
 // Who is carrying more than their share and who less, among the regulars, by at least `margin` weekend turns.

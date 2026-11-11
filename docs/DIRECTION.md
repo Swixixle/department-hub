@@ -169,10 +169,18 @@ Two directions from the owner on 2026-11-11.
 - **Everyone** sees their own sheet, with one plain sentence about where they stand, and the department picture without names.
 - **Whoever keeps the record** sees who is carrying more than their share and who less, a holiday tracker (who worked which holiday, day or night), the low-census ledger, and the full table folded away. They choose which holidays count and can add days. They can export the record as a spreadsheet file.
 - **The keeper** is set in Staff details. Until someone is set, anyone can take it on. On one device this is a courtesy, because "Viewing as" lets anyone look. Real access control comes with accounts.
-- **The record outlasts a schedule.** When a new schedule is published, shifts on dates it does not cover are carried forward, and the Fairness tab can show this schedule or everything on record. Importing a corrected page for the same dates replaces what it corrects.
+- **The record outlasts a schedule.** When a new schedule is published, shifts in date-and-shift cells it does not supply are carried forward, and the Fairness tab can show this schedule or everything on record. Importing a corrected day page replaces those day cells and preserves the nights and missing dates. An import cannot establish that an absent cell is empty; those earlier entries remain on record.
 - A person listed only on weekends is pointed out to the keeper, in case theirs is a weekend-only position.
 
 Checked in a browser at phone size: after upgrading a Version 7 workspace in place, the schedule, a contact, posts and their files were all still there; five tasks were completed by tap (find a shift, correct a replacement, ask for coverage, post a recording, back up, erase and restore); the press counts held only button names; and the member view of Fairness showed no name but the viewer's own. Not checked: real phones, and real people.
+
+### Integration review
+
+The two supplied Version 8 commits applied on top of PR #2. Review reproduced two defects with failing regression tests: a partial day-page correction discarded archived nights and missing dates, and the selected schedule's personal totals included earlier releases and trades. Both are fixed. Publication also retains staff profiles for people absent from the next roster, so historical students and weekend-only positions remain excluded. Switching between fictional and local schedules starts a separate record and holiday configuration.
+
+Personal and low-census totals, including the CSV export, now follow the selected record's date span. The low-census section uses the selected roster/history, with archived dates shown as read-only. Release order still uses all recorded hours, so earlier voluntary releases continue to protect a person. Earlier activity is visible by selecting Everything on record. Historical fairness uses the staff settings currently kept in Staff details; historical employment/arrangement changes are not versioned.
+
+Independent checks: 47 Node tests pass, including three new record regressions, and both production builds pass. The two launcher checks passed on the original patch; launcher code is unchanged by these fixes. Browser task replay, physical-phone sizing and real-person usability were not independently rerun during this integration.
 
 ## Still open from the review
 

@@ -3,7 +3,7 @@ import './sizes.css';
 import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
-import { HOLIDAY_NAMES, carryForward, census, holidayTracker, ledger, releaseOrder, staffing, standing, statSheet } from './fairness.js';
+import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
 import { localBoard } from './backend.js';
 
@@ -331,10 +331,10 @@ function fairness() {
     (state.history.length ? '<div class="segments">' + button('This schedule', 'fair-scope', 'class="' + (ui.fairScope === 'record' ? '' : 'selected') + '" data-value="schedule"') +
       button('Everything on record', 'fair-scope', 'class="' + (ui.fairScope === 'record' ? 'selected' : '') + '" data-value="record"') + '</div>' : '') +
     '<div class="segments">' + button('Days', 'pool', 'class="' + (pool === 'D' ? 'selected' : '') + '" data-value="D"') + button('Nights', 'pool', 'class="' + (pool === 'N' ? 'selected' : '') + '" data-value="N"') + '</div></div></div>' +
-    picture + (isKeeper() ? recordMarkup(table, stand, tracker, pool) : access);
+    picture + (isKeeper() ? recordMarkup(table, stand, tracker, pool, rows) : access);
 }
 
-function recordMarkup(table, stand, tracker, pool) {
+function recordMarkup(table, stand, tracker, pool, rows) {
   const person = entry => '<div><span><b>' + h(entry.person) + '</b> <small>' + plural(entry.weekend, 'weekend turn') + ', share ' + entry.weekendFair.toFixed(1) +
     (entry.holidays.length ? ' · ' + plural(entry.holidays.length, 'holiday') : '') + '</small></span><b class="gap ' + (entry.weekendGap > 0 ? 'over' : 'under') + '">' + signed(entry.weekendGap) + '</b></div>';
   const full = table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + (entry.regular || entry.weekendVolunteer ? '' : ' light') + '"><th scope="row">' + h(entry.person) +
@@ -356,16 +356,20 @@ function recordMarkup(table, stand, tracker, pool) {
       (tracker.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + '"><th scope="row">' + h(entry.person) + '</th>' +
         tracker.days.map(day => '<td>' + (entry.worked[day.date] ? h(entry.worked[day.date].replace('D', 'Day ').replace('N', 'Night').trim()) : '·') + '</td>').join('') + '<td><b>' + entry.count + '</b></td></tr>').join('') ||
         '<tr><td colspan="' + (tracker.days.length + 2) + '">Nobody is listed on these days.</td></tr>') + '</tbody></table></div>' : '<p class="subtle">No holiday falls inside these dates.</p>') +
-    '<p>' + button('Which holidays count', 'holiday-rules', 'class="secondary"') + '</p></div>' + lowCensus(pool) +
+    '<p>' + button('Which holidays count', 'holiday-rules', 'class="secondary"') + '</p></div>' + lowCensus(pool, rows) +
     '<div class="panel"><h3>Keeping the record</h3><p class="subtle">Every schedule that is published, every shift edited by hand and every low-census entry leaves a dated receipt. When a new schedule replaces an old one, the old one stays on record.' +
     (state.history.length ? ' ' + state.history.length + ' shifts are carried from earlier schedules.' : '') + '</p><div class="actions wrap">' + button('Export the record', 'export-record', 'class="primary"') +
     button('Who keeps the record', 'staff-setup', 'class="secondary"') + button('Decision history', 'audit', 'class="secondary"') + '</div></div>';
 }
 
-function lowCensus(pool) {
-  const table = census(state.assignments, pool, state.directory, state.releases, localToday());
+function lowCensus(pool, rows) {
+  const table = census(rows, pool, state.directory, state.releases, localToday());
   const word = pool === 'N' ? 'night' : 'day';
-  const chip = item => button(h(dayLabel(item.date, { weekday:'short', month:'short', day:'numeric' })), 'over', 'class="chip" ' + valueAttr(item.date + '|' + pool));
+  const chip = item => {
+    const label = h(dayLabel(item.date, { weekday:'short', month:'short', day:'numeric' }));
+    return state.assignments.some(row => row.date === item.date && row.shift === pool)
+      ? button(label, 'over', 'class="chip" ' + valueAttr(item.date + '|' + pool)) : '<span class="chip">' + label + ' · archived</span>';
+  };
   const next = item => firstInLine(item.order).length === 1 ? 'next in line is ' + firstInLine(item.order)[0] : 'tied for next: ' + firstInLine(item.order).join(', ');
   const shortDates = table.short.map(item => dayLabel(item.date, { month:'short', day:'numeric' }));
   return '<div class="calendar-toolbar"><div><div class="eyebrow">MORE PEOPLE THAN USUAL</div><h2>Low census</h2></div></div><div class="panel">' +
@@ -376,7 +380,7 @@ function lowCensus(pool) {
     (table.people.length ? '<div class="fair-scroll"><table class="fair"><thead><tr><th scope="col">Name</th><th scope="col">On those shifts</th><th scope="col">Share of the cuts</th><th scope="col">Released</th><th scope="col">Hours</th><th scope="col">Offered</th></tr></thead><tbody>' +
       table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + '"><th scope="row">' + h(entry.person) + '</th><td>' + entry.onOver + '</td><td>' + entry.share.toFixed(2) +
         '</td><td>' + entry.turns + '</td><td>' + entry.hours + '</td><td>' + entry.offered + '</td></tr>').join('') + '</tbody></table></div>' +
-      '<p class="subtle">Whoever has lost the fewest hours is next. Hours count the same whether a person offered or was sent, so offering never moves anyone to the front. Share of the cuts splits each extra person evenly between everyone listed on that shift.</p>' : '') +
+      '<p class="subtle">Totals follow the dates shown. Who is next uses all recorded hours: whoever has lost the fewest is next. Hours count the same whether a person offered or was sent, so offering never moves anyone to the front. Share of the cuts splits each extra person evenly between everyone listed on that shift.</p>' : '') +
     (shortDates.length ? '<p class="subtle">' + shortDates.length + ' ' + word + ' shift' + (shortDates.length === 1 ? ' lists' : 's list') + ' fewer than usual: ' + h(shortDates.slice(0, 8).join(', ')) +
       (shortDates.length > 8 ? ' and ' + (shortDates.length - 8) + ' more' : '') + '. Handwritten additions are not read, so check the page.</p>' : '') + '</div>';
 }
@@ -1098,17 +1102,13 @@ async function act({action, value, kind}) {
         posts: (previous.mode === 'sample') === draft.sample ? previous.posts : [],
         requests: (previous.mode === 'sample') === draft.sample ? previous.requests : [],
         hoursVerified: draft.sample,
-        directory: draft.sample ? sampleDirectory : Object.fromEntries(
-          [...new Set(draft.assignments.map(item => item.person))].map(person => [
-            normalizeName(person), previous.mode === 'local' && previous.directory[normalizeName(person)] || { person, status: null, skills: [] }
-          ])
-        ),
+        ...(draft.sample ? { directory:sampleDirectory, history:[] } : publicationRecord(previous.mode === 'local' ? previous : {}, draft.assignments)),
         actor: draft.assignments.some(item => isSame(item.person, previous.actor)) ? previous.actor : draft.assignments[0].person,
         people: draft.sample ? samplePeople : previous.peopleSource === 'import' ? previous.people : [],
         peopleSource: draft.sample ? 'sample' : 'import',
         manualLinks: (previous.mode === 'sample') === draft.sample ? previous.manualLinks : {},
         releases: (previous.mode === 'sample') === draft.sample ? previous.releases || [] : [],
-        history: !draft.sample && previous.mode === 'local' ? carryForward(previous.history, previous.assignments, draft.assignments) : [],
+        holidayRules: (previous.mode === 'sample') === draft.sample ? previous.holidayRules : { off:[], extra:[] },
         custodians: (previous.mode === 'sample') === draft.sample ? previous.custodians : []
       }));
       state = withContacts(state);
