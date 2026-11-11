@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AGREED_STATUS, EXCHANGE_AGREED, POLICY, assignmentKey, committedKeys, minutesByWeek, projectRoster } from '../src/model.js';
-import { applyMoves, checkExchange, describe, exchangeCredits, findOptions } from '../src/trades.js';
+import { applyMoves, checkExchange, describe, exchangeBasis, exchangeCredits, findOptions } from '../src/trades.js';
 
 // Two weeks of nights in November 2026. Nov 8 is a Sunday. Everyone is at 36 hours in the first week except Casey at 24.
 const row = (date, shift, person, role = '') => { const item = { date, shift, person, ...(role ? { role } : {}) }; return { ...item, key: assignmentKey(item) }; };
@@ -116,4 +116,26 @@ test('an agreed exchange holds its shifts, shows in the projected roster and is 
   assert.deepEqual(committedKeys([{ ...exchange, status: 'Waiting for Blair' }]), []);
   assert.equal(projectRoster(roster, [exchange]).find(item => item.key === friday.key).person, 'Blair');
   assert.deepEqual(exchangeCredits([exchange]), [{ kind: 'trade', recipient: 'Blair', status: AGREED_STATUS, from: { date: '2026-11-13' } }, { kind: 'coverage', recipient: 'Casey', status: AGREED_STATUS, from: { date: '2026-11-08' } }]);
+});
+
+test('acceptance is bound to the assignment details, participant rosters and rules originally proposed', () => {
+  const moves = [{ key: friday.key, to:'Blair' }, { key:at('2026-11-11','N','Blair').key, to:'Avery' }];
+  const basis = exchangeBasis(world, moves);
+  assert.notEqual(check(moves, {basis}).status, 'blocked');
+  for (const change of [
+    {roster:roster.map(item => item.key === friday.key ? {...item,hours:'7-3'} : item)},
+    {roster:[...roster,row('2026-11-24','N','Avery')]},
+    {policy:{...POLICY,minimumRestMinutes:600}},
+    {directory:{blair:{status:'Staff',skills:['D','N']}}},
+    {basis:''}
+  ]) assert.equal(check(moves, {basis,...change}).status, 'blocked');
+  assert.equal(exchangeBasis({...world,roster:[...roster].reverse()}, [...moves].reverse()), basis);
+});
+
+test('a shift that has started today cannot be offered, taken, or used in a loop', () => {
+  const now = '2026-11-13T20:00:00-05:00';
+  const expired = {...world,today:'2026-11-13',now};
+  assert.match(checkExchange({...expired,moves:[{key:friday.key,to:'Casey'}]}).problems.join(' '), /already started/);
+  const found = findOptions({...expired,target:friday,loops:true});
+  assert.ok(Object.values(found.counts).every(count => count === 0));
 });

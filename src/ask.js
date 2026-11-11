@@ -62,7 +62,8 @@ export function parseWhen(text, today, rules = {}) {
   const nextMonth = month === 12 ? [year + 1, 1] : [year, month + 1];
   const nth = q.match(new RegExp('\\b(first|1st|second|2nd|third|3rd|fourth|4th|last) week (?:of|in) (?:(next month|this month)|' + MONTH_WORD + ')\\b'));
   if (nth) {
-    const [y, m] = nth[2] === 'next month' ? nextMonth : nth[2] ? [year, month] : [yearOf(monthNumber(nth[3])), monthNumber(nth[3])];
+    const explicitYear = q.match(/\b(\d{4})\b/);
+    const [y, m] = nth[2] === 'next month' ? nextMonth : nth[2] ? [year, month] : [explicitYear ? Number(explicitYear[1]) : yearOf(monthNumber(nth[3])), monthNumber(nth[3])];
     const from = nth[1] === 'last' ? lastOf(y, m) - 6 : (NTH[nth[1]] - 1) * 7 + 1, to = Math.min(from + 6, lastOf(y, m));
     return span(dateIn(y, m, from), dateIn(y, m, to), 'from ' + short(dateIn(y, m, from)) + ' to ' + short(dateIn(y, m, to)));
   }
@@ -230,6 +231,12 @@ export function ask(question, world) {
     weekends || (others.length && (when || has('work', 'shift', 'schedule', 'on', 'off', 'next'))) || (has('shift', 'schedule') && (self || others.length > 0 || Boolean(when))) || (has('work') && (self || when)) || (has('on', 'off') && self && when) || (has('next') && self) || (when && self && tokens.size <= 5) ? 'when' : 'look';
   // A follow-up such as "and Saturday?" or "what about Avery?" keeps the last kind of question and changes one part.
   const last = world.last;
+  // Scheduling uses calendar weeks; an hours question uses the configured pay week instead.
+  if (kind === 'hours' && /\b(this|next|last) week\b/.test(q) && !/\b(rest of|week of)\b/.test(q)) {
+    const offset = /\bnext week\b/.test(q) ? 7 : /\blast week\b/.test(q) ? -7 : 0;
+    const from = addDays(payWeekStart(today, world.trade?.policy?.weekStartsOn || 0), offset);
+    when = {...when,from,to:addDays(from,6)};
+  }
   let followed = false;
   if (kind === 'look' && last?.kind && last.kind !== 'look' && (when || others.length) && tokens.size <= 6) {
     followed = true;
@@ -328,6 +335,7 @@ export function ask(question, world) {
     const target = ahead.find(row => when && !when.bare ? inRange(row) : upcoming(row) && (!when?.shift || row.shift === when.shift)) ||
       (when?.weekday ? ahead.find(row => new Date(row.date + 'T12:00:00Z').getUTCDay() === new Date(when.from + 'T12:00:00Z').getUTCDay() && (!when.shift || row.shift === when.shift)) : null);
     if (!target) return answer('You are not on the schedule ' + (when && !when.bare ? when.label : 'from today on') + '.', [], scheduleSource, { empty: false });
+    when = {from:target.date,to:target.date,shift:target.shift,label:pretty(target.date)};
     const found = findOptions({ ...world.trade, target }), some = (n, one, many) => n ? n + ' ' + (n === 1 ? one : many) : '';
     if (found.blockedForMe.length) return answer(shiftName(target) + ' cannot be offered.', [{ text: found.blockedForMe.join(' '), sub: '', go: 'date|' + target.date }], tradeSource, { empty: false });
     // Unless cover is asked for, a trade means keeping your hours: swaps inside the pay week come first.
@@ -363,7 +371,8 @@ export function ask(question, world) {
     const subject = others[0] || actor, mine = same(subject, actor), policy = world.trade?.policy || {}, startDay = policy.weekStartsOn || 0, limit = policy.overtimeLimitMinutes || 0;
     const base = last?.kind === 'trade' && last.when && !when ? last.when : when;                       // "that week" after a trade question
     const range = base && !base.bare ? base : { from: today, to: today }, totals = new Map(), listed = new Map(), tell = minutes => String(Math.round(minutes / 6) / 10);
-    for (const row of shiftsOf(subject)) for (const [week, minutes] of minutesByWeek(row, startDay)) { totals.set(week, (totals.get(week) || 0) + minutes); listed.set(week, [...(listed.get(week) || []), row]); }
+    const hoursRoster = world.trade?.roster || assignments;
+    for (const row of hoursRoster.filter(row => same(row.person,subject))) for (const [week, minutes] of minutesByWeek(row, startDay)) { totals.set(week, (totals.get(week) || 0) + minutes); listed.set(week, [...(listed.get(week) || []), row]); }
     const items = [];
     for (let week = payWeekStart(range.from, startDay); week <= payWeekStart(range.to, startDay) && items.length < 8; week = addDays(week, 7)) {
       const minutes = totals.get(week) || 0;
@@ -371,27 +380,34 @@ export function ask(question, world) {
         sub: (listed.get(week) || []).map(row => pretty(row.date).split(', ')[1] + (row.shift === 'N' ? ' night' : ' day')).join(', ') || 'No shifts', go: 'date|' + week });
     }
     return answer(items.length === 1 ? (mine ? 'You are' : subject + ' is') + ' scheduled for ' + tell(totals.get(payWeekStart(range.from, startDay)) || 0) + ' hours in the week of ' + pretty(payWeekStart(range.from, startDay)) + '.' : (mine ? 'Your' : subject + '’s') + ' scheduled hours, week by week:',
-      items, scheduleSource + '. Hours are from this schedule only. The pay week starts on ' + DAYS[startDay][0].toUpperCase() + DAYS[startDay].slice(1) + (limit ? ' and the limit entered is ' + tell(limit) + ' hours.' : '.'),
+      items, scheduleSource + '. Hours are from this schedule' + (world.trade?.roster ? ' with agreed changes applied' : '') + ' only; missing entries and unrecorded pickups are not counted. The pay week starts on ' + DAYS[startDay][0].toUpperCase() + DAYS[startDay].slice(1) + (limit ? ' and the limit entered is ' + tell(limit) + ' hours.' : '.'),
       { empty: false, next: mine && world.trade ? ['Who can I trade my next shift with?'] : [] });
   }
   // Days off.
   if (kind === 'off') {
-    const subject = others[0] || actor, mine = same(subject, actor), worked = new Set(shiftsOf(subject).map(row => row.date));
+    const subject = others[0] || actor, mine = same(subject, actor), worked = new Set(shiftsOf(subject).filter(row => !when?.shift || row.shift === when.shift).map(row => row.date));
     const range = when && !when.bare ? when : { from: today, to: addDays(today, 13), label: 'in the next 14 days' };
-    const note = scheduleSource + '. A night shift is counted on the day it starts.';
+    const known = new Set(assignments.filter(row => !when?.shift || row.shift === when.shift).map(row => row.date));
+    const note = scheduleSource + '. A night shift is counted on the day it starts. Off means no shift is listed for this person on a recorded date; missing pages and handwritten changes cannot be checked.';
     if (range.from === range.to) {
-      const rows = shiftsOf(subject).filter(row => row.date === range.from);
+      if (!known.has(range.from)) return answer('No schedule entries are on record for ' + range.label + '.', [], note,
+        {lines:['A missing date cannot establish that someone is off.'],empty:true});
+      const rows = shiftsOf(subject).filter(row => row.date === range.from && (!range.shift || row.shift === range.shift));
       return answer(rows.length ? 'No. ' + (mine ? 'You work ' : subject + ' works ') + range.label + ':' : 'Yes. ' + (mine ? 'You are' : subject + ' is') + ' off ' + range.label + '.', rows.map(shiftItem), note, { empty: false });
     }
-    const runs = [];
-    for (let date = range.from > today ? range.from : today; date <= range.to && runs.length < 40; date = addDays(date, 1)) {
+    const runs = []; let missing = 0;
+    for (let date = range.from; date <= range.to && runs.length < 40; date = addDays(date, 1)) {
+      if (!known.has(date)) { missing++; continue; }
       if (worked.has(date)) continue;
       const open = runs.at(-1);
       if (open && addDays(open.to, 1) === date) open.to = date; else runs.push({ from: date, to: date });
     }
     const days = runs.reduce((sum, run) => sum + Math.round((Date.parse(run.to) - Date.parse(run.from)) / 864e5) + 1, 0);
-    return answer((mine ? 'You are' : subject + ' is') + ' off ' + days + ' day' + (days === 1 ? '' : 's') + ' ' + range.label + (runs.length ? ':' : '.'),
-      runs.map(run => ({ text: run.from === run.to ? pretty(run.from) : pretty(run.from) + ' to ' + pretty(run.to), sub: run.from === run.to ? '' : Math.round((Date.parse(run.to) - Date.parse(run.from)) / 864e5) + 1 + ' days', go: 'date|' + run.from })), note, { empty: false });
+    if (!days && missing) return answer('No recorded days off can be established ' + range.label + '.', [], note,
+      {lines:[missing + ' dates are missing from this roster.'],empty:true});
+    return answer((mine ? 'You are' : subject + ' is') + ' off ' + days + ' recorded day' + (days === 1 ? '' : 's') + ' ' + range.label + (runs.length ? ':' : '.'),
+      runs.map(run => ({ text: run.from === run.to ? pretty(run.from) : pretty(run.from) + ' to ' + pretty(run.to), sub: run.from === run.to ? '' : Math.round((Date.parse(run.to) - Date.parse(run.from)) / 864e5) + 1 + ' days', go: 'date|' + run.from })), note,
+      {empty:false,lines:missing ? [missing + ' dates are missing and were not counted as days off.'] : []});
   }
 
   // 6. Who is on, or who the person is working with.

@@ -32,6 +32,8 @@ A notice on each screen and sheet says this is an independent staff project, not
 
 **Find ways off this shift**, on any of your own shifts, works out who could pick it up, which swaps pass, and which three-person exchanges pass, under rules the record keeper can set (pay-week start, weekly hours, rest between shifts). Each option states what it does to everyone's weekly hours. An exchange needs every person in it to agree and is rechecked each time. Ask answers "who can take my Friday night" and "can I pick up Saturday" with the same arithmetic. None of it knows who is willing or on leave.
 
+Version 12 prefers swaps and three-person loops that preserve everyone's weekly hours, before changes between weeks and cover that loses hours. Pending exchange agreements are bound to the proposed assignments, participating rosters, recorded qualifications and rules. If these change, make a new proposal; earlier pending proposals without that binding also need to be proposed again. Started shifts are excluded. Ask reads month/week ranges and explicit years; hours include agreed changes and the configured pay-week boundary. Days off mean no listed shift on a recorded date, with missing dates reported separately. None of these checks establishes that the printed roster is complete or that a person is available or currently credentialed.
+
 Controls are sized for phones: 60 px for a main action, 48 px for any other control and 16 px text, with an **Aa** button for larger text. `docs/USER-TEST.md` is a one-page sheet for watching coworkers try five tasks.
 
 ## Work on the source

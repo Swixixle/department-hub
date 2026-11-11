@@ -256,6 +256,16 @@ The owner's correction on 2026-11-11, after using Version 11: a trade does not u
 - **New answers.** Days off ("am I off Friday", "what days am I off next week"), scheduled hours by pay week against the limit entered ("how many hours do I have this week"), weekend shifts only ("which weekends am I on"), and the count of shifts in any range.
 - The lesson for testing: the questions that passed before were ones written by the person who wrote the code. The battery now used is closer to how people type, and it is still not a substitute for other people's questions.
 
+## Version 12 integration review
+
+The three new commits applied cleanly on main at `256e914`. The first removes employer initials from the current banner, sheet notice and documentation and replaces two test names with fictional ones. This does not rewrite Git history. No real schedules, contact numbers or employer documents were added.
+
+Review bound pending exchange agreements to a fingerprint of the exact moves, participating rosters, recorded qualifications and rule settings. A correction or changed rule requires a fresh proposal and agreement; old unbound pending proposals are rejected. The check runs again during the serialized save. Shifts that already started today are excluded, and legacy two-person request screens now use the same whole-exchange checker as the finder. Consecutive-day settings are labelled as warnings, matching their behavior.
+
+Ask now also retains explicit years for a named month's week, uses the configured pay-week boundary for hours questions, includes agreed assignments in hours totals and carries the target shift's week into a trade follow-up. Missing roster dates are unknown, not days off; day/night-specific questions keep their requested shift. Available dates alone do not establish a complete roster or verified absence.
+
+Validation: 95 Node tests, two launcher integration checks and both production builds pass. The extended production-bundle simulated-DOM script checks the December wording, configured pay week, proposal fingerprint, stale agreement rejection, fresh multi-party agreement and projected reservations, alongside the earlier Ask/audit checks. Fixture roster preserved and no external requests in those flows. The public bundle is checked for the removed identifiers. These checks do not replay the author's real photos or establish the reported 29/29 or later 26-question results, and they are not real-phone checks. Footer remains Version 12.
+
 ## Still open from the review
 
 - Matches that are blocked are hidden with no reason given.

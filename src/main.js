@@ -1,13 +1,13 @@
 import './style.css';
 import './sizes.css';
-import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
+import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
 import { localBoard } from './backend.js';
 import { SUGGESTIONS, ask, pretty as prettyDate } from './ask.js';
-import { checkExchange, describe, exchangeCredits, findOptions, parties, shiftName } from './trades.js';
+import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, parties, shiftName } from './trades.js';
 import { keywords, qualifiers } from './words.js';
 import { patientSigns } from './guard.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
@@ -96,18 +96,25 @@ const tradeRules = () => ({ ...state.policy, ...(state.tradeRules || {}) });
 const allRequests = () => [...state.requests, ...state.exchanges];
 const creditRequests = () => [...state.requests, ...exchangeCredits(state.exchanges)];
 const tradeWorld = (exceptId = null) => ({ roster: projectRoster(state.assignments, allRequests().filter(item => item.id !== exceptId)), directory: state.directory, policy: tradeRules(),
-  committed: committedKeys(allRequests(), exceptId), today: localToday() });
+  committed: committedKeys(allRequests(), exceptId), today: localToday(), now:new Date().toISOString() });
 const exchangeFor = row => state.exchanges.find(item => item.status === EXCHANGE_AGREED && item.moves.some(move => move.key === row.key));
 const pendingOf = exchange => exchange.parties.filter(name => !exchange.accepted[normalizeName(name)]);
 const namesList = names => names.length < 2 ? names.join('') : names.slice(0, -1).join(', ') + ' and ' + names.at(-1);
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const rulesLine = () => { const rules = tradeRules(); return 'the week starts on ' + WEEKDAYS[rules.weekStartsOn || 0] + ', ' + rules.overtimeLimitMinutes / 60 + ' hours a week (going over is ' + (rules.overLimit === 'warn' ? 'flagged' : 'refused') + '), ' +
-  rules.minimumRestMinutes / 60 + ' hours between shifts' + (rules.maxInARow ? ', at most ' + rules.maxInARow + ' days in a row' : ''); };
+  rules.minimumRestMinutes / 60 + ' hours between shifts' + (rules.maxInARow ? ', a warning above ' + rules.maxInARow + ' days in a row' : ''); };
 const optionsFor = (target, loops = false) => findOptions({ ...tradeWorld(), target, offers: state.offers, loops });
-const checkChange = (details, exceptId = null) => evaluateChange({
-  roster: projectRoster(state.assignments, allRequests()), directory: state.directory,
-  hoursVerified: state.hoursVerified, policy: tradeRules(), committed: committedKeys(allRequests(), exceptId), ...details
-});
+const checkChange = (details, exceptId = null) => {
+  const {from,to,recipient,kind} = details, second = kind === 'trade' ? to?.person : recipient;
+  const moves = [{key:from.key,to:second}, ...(kind === 'trade' && to ? [{key:to.key,to:from.person}] : [])];
+  const result = checkExchange({...tradeWorld(exceptId),moves});
+  if (result.status === 'blocked') return {status:'blocked',reason:result.problems.join(' ')};
+  const unknown = result.people.some(part => !state.directory[normalizeName(part.person)]?.status);
+  const cautions = [...result.cautions, ...(unknown ? ['Employment status and qualifications need verification.'] : []),
+    ...(!state.hoursVerified ? ['Hours and pickups outside this roster need verification.'] : [])];
+  return {status:cautions.length ? 'review' : 'eligible',reason:cautions.join(' ') || 'Roster-based checks passed.',
+    projections:result.people.map(part=>({person:part.person,weeks:part.weeks}))};
+};
 // The notice is shown once on each device and answered with a press, before anything else.
 const noticeKey = 'department-hub-notice-v2';
 let noticeSeen = loadState(noticeKey, null);
@@ -161,7 +168,7 @@ async function askAndLog(q) {
   ui.lastAsk = ui.dialog = dialog;
   await commit(result.kind === 'blocked' ? 'Question blocked by text screen' : 'Question asked', {
     ...(result.kind === 'blocked' ? {} : { fingerprint:await sha256(q.trim().toLowerCase()) }),
-    engine:'ask-10-review-1', build:BUILD, kind:result.kind, answered:!result.empty,
+    engine:'ask-12-review-1', build:BUILD, kind:result.kind, answered:!result.empty,
     resolved:result.context?.when || null,
     sources:result.items.map(item => ({ reference:item.go || 'note',
       ...(item.go?.startsWith('doc|') ? { version:sourceVersions[item.go.split('|')[1]] } : {}) })),
@@ -706,7 +713,7 @@ function dialogMarkup() {
     const exchange = state.exchanges.find(item => item.id === id);
     if (!exchange) return shell('Exchange', '<p>This exchange is no longer here.</p>');
     const open = exchange.status.startsWith('Waiting'), waiting = pendingOf(exchange), agreed = exchange.parties.filter(name => exchange.accepted[normalizeName(name)]);
-    const result = open ? checkExchange({ ...tradeWorld(exchange.id), moves: exchange.moves }) : null;
+    const result = open ? checkExchange({ ...tradeWorld(exchange.id), moves: exchange.moves, basis:exchange.basis || '' }) : null;
     const text = (result ? describe(result, state.actor) : exchange.summary).map(line => '<p class="' + (/^(Hours|Nobody|Rest)/.test(line) ? 'subtle' : result?.cautions.includes(line) || result?.problems.includes(line) ? 'caution' : 'move') + '">' + h(line) + '</p>').join('');
     const reach = waiting.filter(name => contactFor(name)?.cell).map(name => '<p class="person-lines"><span>' + h(name) + '</span>' + contactButtons(contactFor(name), state.actor + ' is asking about an exchange in Department Hub: ' + exchange.summary.slice(0, 3).join(' ')) + '</p>').join('');
     return shell(exchange.parties.length > 2 ? 'Exchange between ' + exchange.parties.length + ' people' : exchange.moves.length > 1 ? 'Swap' : 'Pick-up', '<p><span class="badge">' + h(exchange.status) + '</span></p><div class="option">' + text + '</div>' +
@@ -724,7 +731,7 @@ function dialogMarkup() {
       '<label>Hours in a week before overtime<input name="limit" type="number" inputmode="decimal" min="1" max="168" step="0.5" required value="' + rules.overtimeLimitMinutes / 60 + '"></label>' +
       '<label>A change that would go over that<select name="overLimit">' + pick('block', rules.overLimit || 'block', 'Is refused') + pick('warn', rules.overLimit || 'block', 'Is allowed, with a warning') + '</select></label>' +
       '<label>Fewest hours between two shifts<input name="rest" type="number" inputmode="decimal" min="0" max="48" step="0.5" required value="' + rules.minimumRestMinutes / 60 + '"></label>' +
-      '<label>Most days in a row (0 for no limit)<input name="row" type="number" inputmode="numeric" min="0" max="14" step="1" required value="' + (rules.maxInARow || 0) + '"></label>' +
+      '<label>Warn above this many days in a row (0 for no warning)<input name="row" type="number" inputmode="numeric" min="0" max="14" step="1" required value="' + (rules.maxInARow || 0) + '"></label>' +
       '<div class="actions">' + button('Cancel', 'close', 'class="secondary"') + '<button class="primary">Save the rules</button></div></form>');
   }
   if (type === 'source') return shell('Original photo', chosen ? imageMarkup(chosen, row.sources[0]) : '<p>The photo is unavailable in this browser.</p>');
@@ -1463,12 +1470,14 @@ async function act({action, value, kind}) {
       const [group, index] = String(value).split('|'), option = ui.dialog?.found?.[group]?.[Number(index)], target = ui.dialog?.row;
       if (!option || !target || !isMine(target)) return;
       const world = tradeWorld(), rows = new Map(world.roster.map(item => [item.key, item]));
-      const moves = option.moves.map(move => { const item = rows.get(move.key); return { key:move.key, to:move.to, from:item.person, date:item.date, shift:item.shift, ...(item.role ? { role:item.role } : {}) }; });
+      if (option.moves.some(move => !rows.has(move.key))) { ui.flash = 'The schedule changed. Find the options again.'; break; }
+      const moves = option.moves.map(move => { const item = rows.get(move.key); return { key:move.key, to:move.to, from:item.person, date:item.date, shift:item.shift, ...(item.role ? { role:item.role } : {}), ...(item.hours ? {hours:item.hours} : {}) }; });
       const result = checkExchange({ ...world, moves });
       if (result.status === 'blocked') { ui.flash = 'That no longer passes. ' + result.problems.join(' '); break; }
       const people = parties(moves, rows), now = new Date().toISOString();
-      const exchange = { id:crypto.randomUUID(), by:state.actor, created:now, moves, parties:people, accepted:{ [normalizeName(state.actor)]:now }, summary:describe(result),
-        status:'Waiting for ' + namesList(people.filter(name => !isSame(name, state.actor))), version:await sha256(JSON.stringify(moves.map(move => [move.key, move.to]))) };
+      const basis = exchangeBasis(world,moves);
+      const exchange = { id:crypto.randomUUID(), by:state.actor, created:now, moves, parties:people, accepted:{ [normalizeName(state.actor)]:now }, summary:describe(result), basis,
+        status:'Waiting for ' + namesList(people.filter(name => !isSame(name, state.actor))), version:await sha256(basis) };
       await commit('Exchange proposed', { id:exchange.id, version:exchange.version, people:people.length, moves:moves.map(move => [move.key, move.to]), check:result.status, rules:tradeRules() }, previous => ({ ...previous, exchanges:[...previous.exchanges, exchange] }));
       ui.dialog = { type:'exchange', id:exchange.id };
       break;
@@ -1482,11 +1491,14 @@ async function act({action, value, kind}) {
       if (!pendingOf(exchange).some(name => isSame(name, state.actor))) return;
       if (action === 'exchange-decline') { await commit('Exchange declined', { id:exchange.id }, update({ status:'Declined' })); break; }
       // Checked again on the schedule as it stands now, with everything agreed since counted in.
-      const result = checkExchange({ ...tradeWorld(exchange.id), moves:exchange.moves });
+      const result = checkExchange({ ...tradeWorld(exchange.id), moves:exchange.moves, basis:exchange.basis || '' });
       if (result.status === 'blocked') { await commit('Exchange blocked after recheck', { id:exchange.id, version:exchange.version }, update({ status:'No longer possible', summary:describe(result) })); break; }
       const accepted = { ...exchange.accepted, [normalizeName(state.actor)]:new Date().toISOString() }, left = exchange.parties.filter(name => !accepted[normalizeName(name)]);
-      await commit(left.length ? 'Exchange accepted' : 'Exchange agreed by everyone', { id:exchange.id, version:exchange.version, check:result.status },
-        update({ accepted, summary:describe(result), status:left.length ? 'Waiting for ' + namesList(left) : EXCHANGE_AGREED }));
+      await commit(left.length ? 'Exchange accepted' : 'Exchange agreed by everyone', { id:exchange.id, version:exchange.version, check:result.status }, previous => {
+        const latest = checkExchange({...tradeWorld(exchange.id),moves:exchange.moves,basis:exchange.basis || ''});
+        if (latest.status === 'blocked') throw new Error('The exchange changed while saving. Reopen it and review the current result.');
+        return update({ accepted, summary:describe(latest), status:left.length ? 'Waiting for ' + namesList(left) : EXCHANGE_AGREED })(previous);
+      });
       break;
     }
     case 'trade-rules': if (isKeeper()) ui.dialog = { type:'trade-rules' }; break;

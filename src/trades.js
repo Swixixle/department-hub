@@ -22,6 +22,20 @@ export const applyMoves = (roster, moves) => {
   return roster.map(row => to.has(row.key) ? { ...row, person: to.get(row.key) } : row);
 };
 
+// The proposal binds the plan, the participating people's recorded shifts/qualifications and the rules checked.
+// Clock time is deliberately excluded: it is checked again separately on acceptance.
+export function exchangeBasis({ roster, directory = {}, policy = POLICY }, moves) {
+  const rows = new Map(roster.map(row => [row.key, row]));
+  const names = new Set(moves.flatMap(move => [rows.get(move.key)?.person, move.to]).filter(Boolean).map(key));
+  const schedule = roster.filter(row => names.has(key(row.person))).map(row =>
+    [row.key, key(row.person), row.date, row.shift, row.hours || '', row.role || '']).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  const profiles = [...names].sort().map(name => [name, directory[name]?.status || '', [...(directory[name]?.skills || [])].sort()]);
+  const rules = ['version','zone','weekStartsOn','overtimeLimitMinutes','minimumRestMinutes','maxInARow','overLimit',
+    'allowPrnTrade','allowPrnCoverage','allowStudents','allowOvertimeTrade','allowOvertimeCoverage'].map(field => [field, policy[field] ?? null]);
+  const plan = moves.map(move => [move.key,key(move.to)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  return JSON.stringify(['exchange-basis-v1',plan,schedule,profiles,rules]);
+}
+
 // What a person can be given. Recorded qualifications win. With none recorded, a person can be given the kinds of shift
 // this schedule already lists them on, and nothing else.
 function abilities(roster, directory = {}) {
@@ -39,9 +53,10 @@ function abilities(roster, directory = {}) {
 }
 
 // The checker for one roster. judge() looks at one person after they give some shifts and take others.
-function checker({ roster, directory = {}, policy = POLICY, committed = [], today = '' }) {
+function checker({ roster, directory = {}, policy = POLICY, committed = [], today = '', now = '' }) {
   const able = abilities(roster, directory), taken = new Set(committed), startDay = policy.weekStartsOn || 0;
   const rest = (policy.minimumRestMinutes || 0) * 60000, limit = policy.overtimeLimitMinutes || Infinity;
+  const instant = Date.parse(now);
   const mine = new Map(), spans = new Map(), weeks = new Map(), memo = new Map();
   for (const row of roster) { const id = key(row.person); if (!mine.has(id)) mine.set(id, []); mine.get(id).push(row); }
   const span = row => { if (!spans.has(row.key)) spans.set(row.key, shiftInterval(row)); return spans.get(row.key); };
@@ -58,6 +73,7 @@ function checker({ roster, directory = {}, policy = POLICY, committed = [], toda
     for (const row of [...gives, ...takes]) {
       if (taken.has(row.key)) problems.push(shiftName(row) + ' is already part of an agreed request.');
       if (today && row.date < today) problems.push(shiftName(row) + ' has already passed.');
+      else if (Number.isFinite(instant) && span(row)[0] <= instant) problems.push(shiftName(row) + ' has already started.');
     }
     for (const take of takes) {
       if (gives.some(given => given.date === take.date && given.shift === take.shift)) { problems.push(person + ' would give up and take the same shift.'); continue; }
@@ -97,6 +113,10 @@ function verdict(parts) {
 
 // Checks a whole exchange. moves: [{ key, to }]. Returns { status: 'ok' | 'check' | 'blocked', problems, cautions, notes, people }.
 export function checkExchange({ moves, ...world }, shared = null) {
+  if (!Array.isArray(moves) || !moves.length || moves.some(move => !move?.key || typeof move.to !== 'string' || !move.to.trim()))
+    return {status:'blocked',problems:['Choose the shifts and people for this exchange.'],cautions:[],notes:[],people:[]};
+  if (world.basis !== undefined && world.basis !== exchangeBasis(world, moves))
+    return {status:'blocked',problems:['The schedule, qualifications or rules changed after this proposal. Make a new proposal so everyone agrees to the same details.'],cautions:[],notes:[],people:[]};
   const check = shared || checker(world), problems = [];
   const rows = moves.map(move => check.rows.get(move.key));
   if (rows.some(row => !row)) return { status: 'blocked', problems: ['A shift in this exchange is no longer on the schedule as it was.'], cautions: [], notes: [], people: [] };
@@ -135,7 +155,8 @@ export function describe(result, viewer = '') {
 // Each kind is sorted so the simplest come first, and only `limit` of each are returned. counts says how many passed.
 export function findOptions({ target, offers = [], limit = 5, loops = false, ...world }) {
   const check = checker(world), me = target.person, today = world.today || '';
-  const others = world.roster.filter(row => key(row.person) !== key(me) && row.date >= today);
+  const now = Date.parse(world.now || '');
+  const others = world.roster.filter(row => key(row.person) !== key(me) && row.date >= today && (!Number.isFinite(now) || shiftInterval(row)[0] > now));
   const people = [...new Map(world.roster.filter(row => key(row.person) !== key(me)).map(row => [key(row.person), row.person])).values()];
   const offered = name => offers.some(offer => key(offer.person) === key(name) && offer.date === target.date && offer.shift === target.shift);
   const at = Date.parse(target.date), found = { keep: [], keepLoops: [], swaps: [], pickups: [], chains: [], loops: [] };
