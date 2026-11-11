@@ -59,7 +59,7 @@ The owner's rules for reading it:
 
 - Ignore handwriting unless a printed name is crossed out.
 - Pink highlighter means charge. Green means ICU. Blue means nothing.
-- Handwritten initials next to a change belong to the lead, who has final say.
+- Handwritten approval marks are ignored during import. The reviewer confirms the resulting assignment from the enlarged cell crop.
 - "VA" with a time is a volume adjusted absence, a low-census cut.
 
 What the branch adds:
@@ -74,6 +74,12 @@ What the branch adds:
 Checked in a browser against one real photographed day page, compared with a hand transcription: 91 of 105 printed names were accepted with none wrong, the other 14 all sat in flagged cells, all five crossed-out names were flagged with no false alarms, and all 28 dates, every role colour and every partial shift read correctly. The fictional calendar fixture reads 192 of 192. The original ten-page fixture still reads 217 of 217. One real page is a small sample. Night pages and other months are not yet checked.
 
 Not done yet: reading the handwritten replacement next to a crossed-out name, recording VA times, and yellow highlighter (the page legend says "Extra", the owner has not confirmed it).
+
+### Change review direction clarified 2026-11-11
+
+The app will replace the paper approval convention with an explicit review workflow. Keep paper approval marks outside structured assignments, receipts and public fixtures. Continue dropping handwriting and flagging crossed-out printed names for correction.
+
+Keep the original assignment, the reviewed replacement or partial hours, the source image reference and the review event together. A review of a photo records what the reviewer confirmed from the page. In the current local prototype, the selected profile and device time describe that event. The shared service should record a coordinator's review through that person's authenticated account, authorized role and server time. Agreement, coordinator review and entry in the official system remain separate events.
 
 ## Added on branch `claude/review-flow`
 

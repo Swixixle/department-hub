@@ -54,10 +54,10 @@ test('a missing Sunday header and a misread date do not move the calendar', () =
   assert.deepEqual(result.assignments.filter(row => row.date === '2026-12-03').map(row => row.person), ['Avery', 'Blair', 'Casey']);
 });
 
-test('handwriting is ignored, initials and partial hours are kept, and highlighter sets the role', () => {
+test('handwriting is ignored, printed surname initials and partial hours are kept, and highlighter sets the role', () => {
   const cells = {
     '11/30': ['AVERY', 'JORDAN K', 'CASEY 7-3'],
-    '12/1': ['AVERY', 'BLAIR', 'CASEY', 'Lee Jn', 'ivtc student'],
+    '12/1': ['AVERY', 'BLAIR', 'CASEY', 'changed', 'ivtc student'],
     '12/2': ['AVERY', 'JORDAN K7-3', 'CASEY']
   };
   const tintOf = ([x0, y0]) => (y0 - 100) % 300 === 45 ? 'pink' : (y0 - 100) % 300 === 90 ? 'green' : null;
