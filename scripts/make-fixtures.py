@@ -99,6 +99,48 @@ def calendar_pages():
         image.save(OUT / file, optimize=True)
     (OUT / "calendar.json").write_text(json.dumps({"files": ["calendar-day.png", "calendar-night.png"], "truth": truth, "struck": struck}, indent=2) + "\n")
 
+def phone_list():
+    """A fictional department telephone list: sections, ruled tables, and 555-01xx numbers that reach no one."""
+    surnames = ["Lane", "Moss", "Reyes", "Park", "Stone", "Vale", "Hart", "Quill", "Rowe", "Finch", "Marsh", "Cole", "Wren", "Dale", "Poe", "Shaw", "Birch"]
+    formal = {"Frankie": "Francesca", "Sam": "Samantha"}
+    sections = [("", DAY, "Staff"), ("CONTRACT/RESERVE STAFF", NIGHT[:4], "Contract"), ("PRN STAFF", NIGHT[4:], "PRN")]
+    image = Image.new("RGB", (1500, 2100), "#fbfaf7")
+    draw = ImageDraw.Draw(image)
+    draw.text((330, 60), "RESPIRATORY CARE DEPARTMENT", fill="#111111", font=font(44, True))
+    draw.text((470, 120), "EMPLOYEE TELEPHONE LIST", fill="#111111", font=font(32, True))
+    people, y, number = [], 210, 100
+    names = iter(surnames)
+    for heading, firsts, group in sections:
+        if heading:
+            draw.text((520, y), heading, fill="#222222", font=font(28))
+            y += 48
+        rows = [("EMPLOYEE", "OFFICE", "CELL")] + [(f"{next(names).upper()}, {formal.get(first, first).upper()}", "", first) for first in firsts]
+        if group == "Staff":
+            rows.append(("AMES, ROBIN \u2013 MANAGER", "5501", "Robin"))
+        for index, (name, office, first) in enumerate(rows):
+            draw.rectangle((120, y, 1380, y + 58), outline="#555555", width=2)
+            draw.line((640, y, 640, y + 58), fill="#555555", width=2)
+            draw.line((960, y, 960, y + 58), fill="#555555", width=2)
+            if index == 0:
+                for x, text in ((300, name), (740, office), (1120, first)):
+                    draw.text((x, y + 12), text, fill="#222222", font=font(28))
+            else:
+                cell = f"317.555.{number:04d}"
+                number += 1
+                draw.text((380 - draw.textlength(name, font=font(28)) / 2, y + 12), name, fill="#141414", font=font(28))
+                draw.text((770, y + 12), office, fill="#141414", font=font(28))
+                draw.text((1080, y + 12), cell, fill="#141414", font=font(28))
+                last, given = name.split(",")
+                manager = "MANAGER" in given
+                people.append({"last": last.title(), "first": given.split("\u2013")[0].strip().title(), "group": "Leadership" if manager else group,
+                               "role": "Manager" if manager else "", "cell": cell.replace(".", ""), "office": office})
+            y += 58
+        y += 50
+    image = image.rotate(-1.2, resample=Image.BICUBIC, expand=True, fillcolor="#e9e6df")
+    image.save(OUT / "phone-list.png", optimize=True)
+    (OUT / "phone-list.json").write_text(json.dumps({"files": ["phone-list.png"], "people": people}, indent=2) + "\n")
+
 if __name__ == "__main__":
     main()
     calendar_pages()
+    phone_list()

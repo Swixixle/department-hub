@@ -1,0 +1,133 @@
+/* Sizes, loaded after style.css. One place for how big things are.
+   - A main action is 60 CSS px tall, any other control 48, body text 16.
+   - Text is set in rem, so it follows the browser's own text size and the app's Aa button.
+   - On a phone: one day per row, names in full, dialogs rise from the bottom, tabs stay at the bottom with labels.
+   CSS px match Apple's points and Android's dp by design. Their physical size differs between devices. */
+
+:root{--scale:1;--tap:3rem;--tap-main:3.75rem}
+html{font-size:calc(100% * var(--scale))}
+body,p{font-size:1rem}
+button,input,select,textarea{font-size:1rem}
+
+/* text: anything read as a sentence is 16 px. Only short labels, captions and table headings are smaller, never under 12. */
+.subtle,.empty-shift,.compact,.roster-status,.notice,form label,.fair,.flash,.refusal,.person-lines,.contact-link,.segments button,.shift-label,.chip,
+.primary,.secondary,.danger,.text-button,.staff,.match,.play-link,.dialog-body h3,.edit-shift,.import-stats b,.thread article b,.post-file span,.actor,.calendar-foot{font-size:1rem}
+small,.stat-grid span,.breadcrumbs,.aside-bottom,.where,footer,.badge,.badge.learning,.drop span,.source-image figcaption,.day-card header span,.shift-label span,.nav-item{font-size:.875rem}
+.eyebrow,.brand small,.space-label,.staff em,.match em,.avatar,.staff .tag,.fair thead th,.count-note{font-size:.75rem}
+.fair-line{font-size:1.0625rem}
+.staff span:not(.avatar){white-space:normal;overflow-wrap:anywhere}
+
+/* controls: 48 px, and 60 px for the main action */
+.primary,.secondary,.danger,.segments button,.staff,.match,.edit-shift,.chip,.contact-link,.link-button,.close,.text-size,button.count-note,.post-action{min-height:var(--tap);min-width:var(--tap)}
+.primary,.play-link,.post-file,.attach{min-height:var(--tap-main)}
+.primary,.secondary,.danger,.link-button,.contact-link,.chip,.post-action,.edit-shift,button.count-note{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.5rem 1rem;text-align:center}
+.text-button{min-height:var(--tap);display:inline-flex;align-items:center;padding:0 .25rem}
+.edit-shift,button.count-note{display:flex;width:100%}
+.staff,.match{padding:.5rem .6rem}
+.close{display:grid;place-items:center;padding:0;font-size:1.6rem}
+input:not([type=file]):not([type=checkbox]):not([type=hidden]),select,textarea,.actor select{min-height:var(--tap);padding:.6rem .7rem}
+input[type=checkbox]{width:1.5rem;height:1.5rem;flex:none;margin:0}
+label:has(>span>input[type=checkbox]){min-height:var(--tap);display:flex;align-items:center}
+label:has(>span>input[type=checkbox])>span{display:flex;align-items:center;gap:.6rem;min-height:var(--tap);width:100%}
+summary{min-height:var(--tap);display:flex;align-items:center}
+.post-file,.attach{justify-content:center}
+.text-size{border:1px solid var(--line);border-radius:8px;background:#f7faf7;color:#1f392e;font-weight:750;padding:0 .6rem}
+.app-top{height:auto;min-height:63px;padding-top:.4rem;padding-bottom:.4rem}
+.top-tools{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:.5rem;min-width:0}
+.app-top,.actor,.segments{flex-wrap:wrap}
+.actor select{max-width:100%}
+.attach{grid-template-columns:minmax(0,1fr);overflow:hidden;justify-items:start;align-content:center}
+.attach>*,.composer>*{min-width:0;max-width:100%}
+input[type=file]{width:100%;min-width:0}
+.brand,.space-name{font-size:.9375rem}
+
+/* an over-staffed shift is a row of its own under the label */
+button.count-note.over{border-radius:8px;margin:0 0 4px;justify-content:space-between;font-size:.9375rem}
+.shift-label .count-note{padding:.15rem .5rem}
+
+/* what a post offers, as real buttons */
+.post-actions{gap:.5rem;flex-wrap:wrap}
+.post-action{border:1px solid #cbd9ce;border-radius:8px;background:#fff;color:#24483d;font-weight:690}
+.post-action:hover{background:#f0f5ee}
+.post-action.quiet{border-color:transparent;color:var(--muted)}
+
+/* the usage list in Workspace data */
+.usage{display:grid;gap:2px;margin:6px 0}
+.usage div{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:.9375rem}
+
+@media(max-width:780px){
+  .content{padding-bottom:calc(6.5rem + env(safe-area-inset-bottom))}
+  nav{padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+  /* tab labels stop growing where five of them still fit across the screen */
+  .nav-item{min-height:var(--tap-main);font-size:min(.875rem,3.7vw);font-weight:650;gap:3px;padding:6px 2px}
+  .voice-start{white-space:normal}
+  .attach,.composer{min-width:0}
+  .nav-item span{font-size:1.375rem}
+  h1{font-size:2rem}
+  .intro{margin-bottom:12px}
+  .intro p{display:none}
+  .intro .primary,.intro .secondary{width:100%}
+  .app-top{padding-left:14px;padding-right:14px}
+  .actor select{max-width:9.5rem}
+
+  /* one day per row, names side by side while they fit */
+  .calendar,.calendar.week{grid-template-columns:minmax(0,1fr);overflow:visible;gap:10px}
+  .day-card header,.shift{padding:10px}
+  .day-card header strong{font-size:1.6rem}
+  .shift{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:6px}
+  .shift-label,.edit-shift,.empty-shift,button.count-note{grid-column:1/-1;margin:0}
+  .staff{border-color:#e3ebe2;background:#fbfdfb}
+  .calendar-toolbar{flex-wrap:wrap}
+  .controls{width:100%;justify-content:space-between}
+  .stat-grid{grid-template-columns:1fr 1fr}
+
+  /* one person per block in the name lines: the name in full, then role and hours */
+  .name-row{grid-template-columns:1fr 1fr;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .name-row input[name=person]{grid-column:1/-1}
+
+  /* dialogs rise from the bottom, with the main action nearest the thumb */
+  dialog{position:fixed;inset:auto 0 0 0;margin:0;width:100%;max-width:100%;max-height:92dvh;border-radius:18px 18px 0 0;border-bottom:0;animation:sheet .25s ease-out}
+  dialog::backdrop{animation:fade .2s ease-out}
+  /* the title stays put, the middle scrolls, and the main action stays in reach at the bottom */
+  dialog[open]{display:flex;flex-direction:column;overflow:hidden}
+  .dialog-head{flex:none}
+  .dialog-body{overflow-y:auto;min-height:0;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+  dialog form>.actions{--foot:calc(20px + env(safe-area-inset-bottom));position:sticky;bottom:calc(-1 * var(--foot));background:#fff;padding:.6rem 0 var(--foot);margin:0 0 calc(-1 * var(--foot));box-shadow:0 -10px 10px -10px #0e2d2a22}
+  .actions{flex-direction:column;align-items:stretch}
+  .actions.wrap{flex-direction:column}
+  form>button.primary,.composer>button.primary{width:100%;justify-self:stretch}
+  .post-action{flex:1}
+  footer{flex-direction:column;align-items:flex-start}
+}
+@keyframes sheet{from{transform:translateY(100%)}to{transform:none}}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after,dialog::backdrop{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* the record */
+.panel h3{margin:16px 0 6px;font-size:1rem}
+.panel h3:first-child{margin-top:0}
+.fair.holiday td,.fair.holiday thead th{text-align:center;white-space:normal}
+.fair.holiday th small{font-weight:400}
+details>summary{cursor:pointer;font-weight:650;color:#276143}
+
+/* Ask */
+.ask-trigger{flex:none;min-height:var(--tap-main);padding:0 1rem;border:0;border-radius:999px;background:#d4eeaa;color:#102e2a;font-weight:750;font-size:1.0625rem;display:inline-flex;align-items:center;gap:.5rem}
+.ask-trigger span{display:inline-grid;place-items:center;width:1.6rem;height:1.6rem;border-radius:50%;background:#102e2a;color:#d4eeaa;font-size:1rem}
+.ask-answer{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:#fbfdfb}
+.ask-answer p{margin:0}
+.ask-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.ask-item small{display:block;margin-top:2px}
+.chip.plain{background:#f0f5ee;border-color:#cbd9ce;color:#24483d;white-space:normal;text-align:left;justify-content:flex-start}
+.badge.dated{background:#fff4d6;color:#7a4b00;border-radius:999px;padding:2px 9px;font-weight:700}
+.doc-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:1rem;line-height:1.55;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fbfdfb}
+.doc-text mark{background:#fff0a8;padding:2px 0}
+.pair{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:780px){.ask-item{align-items:flex-start}.line-list>div{flex-wrap:wrap}}
+@media(max-width:780px){dialog form>.actions.inline{position:static;margin:0;padding:.4rem 0 0;box-shadow:none}}
+
+/* the standing notice */
+.unofficial{display:block;width:100%;min-height:var(--tap);text-align:left;border:0;border-bottom:1px solid #d9b25c;border-radius:0;background:#fff4d6;color:#5c3a00;padding:.5rem 1rem;font-size:.875rem;line-height:1.35;font-weight:400;cursor:pointer}
+.unofficial u{white-space:nowrap}
+@media(max-width:780px){.unofficial{padding:.5rem 14px}}
+.mark{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.875rem;overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;background:#f0f5ee;border:1px solid var(--line);border-radius:8px;padding:.6rem}
+.refusal.shown{display:block}

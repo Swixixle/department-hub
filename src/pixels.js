@@ -84,10 +84,12 @@ export function backgroundColor({ data, width, height }, [x0, y0, x1, y1], pad =
 
 // Names the highlighter colour behind a word, or null for plain paper. `paper` is the page's own paper saturation.
 export function tintName({ hue, saturation }, paper = 0.05) {
-  if (saturation < Math.max(0.1, paper + 0.03)) return null;
+  // Green sits far from the colour of paper, so a pale green still counts. Warm colours need a wider margin,
+  // because paper itself photographs slightly pink or yellow.
+  if (hue >= 75 && hue < 170) return saturation >= Math.max(0.055, paper + 0.03) ? 'green' : null;
+  if (saturation < Math.max(0.1, paper + 0.045)) return null;
   if (hue >= 290 || hue < 20) return 'pink';
   if (hue < 75) return hue >= 35 && saturation > 0.25 ? 'yellow' : null;
-  if (hue < 170) return 'green';
   if (hue < 265) return 'blue';
   return null;
 }
@@ -121,4 +123,25 @@ export function longStrokes(mask, width, { x0, y0, x1, y1 }, minLength) {
     [previous, current] = [current, previous];
   }
   return found;
+}
+
+// A copy of the ink mask with long straight runs erased. Table rules confuse the text reader, and no letter
+// has a run this long. Sizes assume the longest side of the image is about 3000 pixels.
+export function withoutRules(mask, width, height, across = 48, down = 56) {
+  const out = Uint8Array.from(mask);
+  for (let y = 0; y < height; y++) {
+    let run = 0;
+    for (let x = 0; x <= width; x++) {
+      if (x < width && mask[y * width + x]) run++;
+      else { if (run >= across) out.fill(0, y * width + x - run, y * width + x); run = 0; }
+    }
+  }
+  for (let x = 0; x < width; x++) {
+    let run = 0;
+    for (let y = 0; y <= height; y++) {
+      if (y < height && mask[y * width + x]) run++;
+      else { if (run >= down) for (let k = y - run; k < y; k++) out[k * width + x] = 0; run = 0; }
+    }
+  }
+  return out;
 }

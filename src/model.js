@@ -4,7 +4,7 @@ export const SHIFTS = {
 };
 
 export const POLICY = {
-  version: 'pilot-2',
+  version: 'pilot-3',
   source: 'Illustrative department rules',
   zone: 'America/Indiana/Indianapolis',
   overtimeLimitMinutes: 40 * 60,
@@ -12,6 +12,7 @@ export const POLICY = {
   minimumByShift: { D: 4, N: 3 },
   allowPrnTrade: false,
   allowPrnCoverage: true,
+  allowStudents: false,
   allowOvertimeTrade: false,
   allowOvertimeCoverage: false
 };
@@ -89,6 +90,61 @@ export function mergeAssignments(items) {
   return [...unique.values()].sort((a, b) => a.date.localeCompare(b.date) || a.shift.localeCompare(b.shift) || a.person.localeCompare(b.person));
 }
 
+// Turns what was typed into name boxes into a clean list with one person per line.
+// - A box that holds several people is split: commas, slashes, semicolons, new lines, "and", or several known names in
+//   a row ("Avery Blair"). A known name that contains a space ("Jordan K") is never split.
+// - A name entered twice is kept once. The first line wins and takes a role or hours from the repeat if it had none.
+// - A name that matches a known one takes the known spelling.
+// entries: [{ person, role, hours }]. Returns { rows, split, duplicates, fresh }, the last three for telling the user.
+export function tidyNames(entries, known = []) {
+  const spelling = new Map(known.map(name => [normalizeName(name), name.trim().replace(/\s+/g, ' ')]));
+  const segment = text => {
+    if (spelling.has(normalizeName(text))) return [spelling.get(normalizeName(text))];
+    const words = text.split(' ');
+    const walk = start => {                 // longest known name first, and only if the whole box is used up
+      if (start === words.length) return [];
+      for (let end = words.length; end > start; end--) {
+        const name = spelling.get(normalizeName(words.slice(start, end).join(' ')));
+        const rest = name && walk(end);
+        if (rest) return [name, ...rest];
+      }
+      return null;
+    };
+    const found = words.length > 1 ? walk(0) : null;
+    return found && found.length > 1 ? found : [text];
+  };
+  const rows = [], split = [], duplicates = [], fresh = [];
+  for (const entry of entries) {
+    const typed = String(entry.person || '').trim();
+    if (!typed) continue;
+    const names = typed.split(/[,;\/\n]+|\s+(?:and|&)\s+/i).map(part => part.trim().replace(/\s+/g, ' ')).filter(Boolean).flatMap(segment);
+    if (names.length > 1) split.push(typed.replace(/\s+/g, ' '));
+    names.forEach((person, position) => {
+      const details = position === 0 ? { ...(entry.role ? { role: entry.role } : {}), ...(entry.hours ? { hours: entry.hours } : {}) } : {};
+      const same = rows.find(row => normalizeName(row.person) === normalizeName(person));
+      if (same) {
+        if (!duplicates.includes(same.person)) duplicates.push(same.person);
+        if (!same.role && details.role) same.role = details.role;
+        if (!same.hours && details.hours) same.hours = details.hours;
+        return;
+      }
+      if (!spelling.has(normalizeName(person))) fresh.push(person);
+      rows.push({ person, ...details });
+    });
+  }
+  return { rows, split, duplicates, fresh };
+}
+
+// One sentence for each thing tidyNames changed, for a notice.
+export function tidyNotes({ split, duplicates, fresh }) {
+  const list = names => names.length < 3 ? names.join(' and ') : names.slice(0, -1).join(', ') + ' and ' + names.at(-1);
+  return [
+    duplicates.length ? list(duplicates) + (duplicates.length === 1 ? ' was' : ' were') + ' entered twice and ' + (duplicates.length === 1 ? 'is' : 'are') + ' listed once.' : '',
+    split.length ? 'A line with several names was split so each person has a line: ' + split.join('; ') + '.' : '',
+    fresh.length ? (fresh.length === 1 ? 'New name' : 'New names') + ': ' + list(fresh) + '. Check the spelling.' : ''
+  ].filter(Boolean);
+}
+
 export function verifyRoster(rows, policy = POLICY) {
   const issues = [];
   const byPerson = Map.groupBy(rows, row => normalizeName(row.person));
@@ -150,6 +206,9 @@ export function evaluateChange({ roster, from, to, recipient, kind, directory, h
   const allowPrn = kind === 'trade' ? policy.allowPrnTrade : policy.allowPrnCoverage;
   if (!allowPrn && [owner?.status, candidate?.status].includes('PRN')) {
     return { status: 'blocked', reason: 'The current trade rules exclude PRN staff.' };
+  }
+  if (!policy.allowStudents && [owner?.status, candidate?.status].includes('Student')) {
+    return { status: 'blocked', reason: 'Students are not part of trades or coverage.' };
   }
   const candidates = [{ person: second, outgoing: to, incoming: from, profile: candidate }];
   if (kind === 'trade') candidates.push({ person: from.person, outgoing: from, incoming: to, profile: owner });

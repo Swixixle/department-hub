@@ -1,9 +1,21 @@
 import './style.css';
-import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster } from './model.js';
+import './sizes.css';
+import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
+import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
+import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
+import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
+import { localBoard } from './backend.js';
+import { SUGGESTIONS, ask, pretty as prettyDate } from './ask.js';
+import { keywords, qualifiers } from './words.js';
+import { patientSigns } from './guard.js';
+import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
+const draftKey = storageKey + '-draft';
+const BUILD = 10;
+const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
 const sample = await fetch(asset('fixtures/manifest.json')).then(response => {
@@ -15,8 +27,26 @@ const sampleDirectory = Object.fromEntries([...new Set(sample.truth.map(row => r
 ]));
 sampleDirectory['robin'] = { person: 'Robin', status: 'PRN', skills: ['D','N'] };
 const staffSample = mergeAssignments(sample.truth.map(row => ({ ...row, sources: [] })));
+// Fictional contacts for the demo. 555-01xx numbers are reserved for fiction and reach no one.
+const SAMPLE_SURNAMES = ['Lane', 'Moss', 'Reyes', 'Park', 'Stone', 'Vale', 'Hart', 'Quill', 'Rowe', 'Finch', 'Marsh', 'Cole', 'Wren', 'Dale', 'Poe', 'Shaw', 'Birch', 'Ames'];
+const samplePeople = Object.values(sampleDirectory).map((profile, index) => {
+  const person = { last: SAMPLE_SURNAMES[index % SAMPLE_SURNAMES.length], first: profile.person, title: '', role: '', group: profile.status === 'PRN' ? 'PRN' : 'Staff',
+    cell: '317555' + String(100 + index).padStart(4, '0'), office: '' };
+  return { ...person, id: personId(person) };
+});
 const initial = {
   mode: 'sample',
+  people: samplePeople,
+  peopleSource: 'sample',
+  manualLinks: {},
+  releases: [],
+  custodians: ['jordan'],
+  holidayRules: { off: [], extra: [] },
+  history: [],
+  documents: [],
+  answers: [],
+  unanswered: [],
+  learned: [],
   assignments: staffSample,
   directory: sampleDirectory,
   hoursVerified: true,
@@ -29,18 +59,134 @@ const initial = {
   posts: [{ id: 'sample-welcome', author: 'Avery', body: 'Use the schedule to start a trade or coverage request. The conversation stays attached to the shift.', created: null }],
   events: []
 };
-let state = loadState(storageKey, initial);
-// The starter rules live in code. A saved workspace picks up a new rule version on load.
-if (state.policy?.version !== POLICY.version) state = { ...state, policy: POLICY };
+// Readies a workspace that was saved by any earlier version, whether it comes from this browser or from a backup file.
+function prepare(loaded) {
+  let next = loaded;
+  if (!next.people) next = { ...next, people: next.mode === 'sample' ? samplePeople : [], peopleSource: next.mode === 'sample' ? 'sample' : 'import', manualLinks: {} };
+  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}], ['history', []], ['documents', []], ['answers', []], ['unanswered', []], ['learned', []],
+    ['custodians', next.mode === 'sample' ? ['jordan'] : []], ['holidayRules', { off: [], extra: [] }]]) if (!next[field]) next = { ...next, [field]: empty };
+  next = withContacts(next);
+  // The starter rules live in code. A saved workspace picks up a new rule version on load.
+  if (next.policy?.version !== POLICY.version) next = { ...next, policy: POLICY };
+  return next;
+}
+let state = prepare(loadState(storageKey, initial));
+const localToday = () => new Date().toLocaleDateString('en-CA');
+// Open on today when the roster covers it. Otherwise on its first day.
+function startDate() {
+  const dates = state.assignments.map(row => row.date).sort();
+  if (dates.length && localToday() >= dates[0] && localToday() <= dates.at(-1)) return localToday();
+  return state.mode === 'sample' || !dates.length ? '2026-11-13' : dates[0];
+}
+// An import that was read but not yet published is kept, so closing or reloading the page does not lose the review.
+function loadDraft() {
+  const draft = loadState(draftKey, null);
+  return draft && Array.isArray(draft.assignments) && Array.isArray(draft.flags) && Array.isArray(draft.pages) ? draft : null;
+}
+function saveDraft() {
+  try { ui.pending ? localStorage.setItem(draftKey, JSON.stringify(ui.pending)) : localStorage.removeItem(draftKey); } catch { /* storage full: the draft stays in memory */ }
+}
 const agreedRequestFor = row => state.requests.find(request => request.status === AGREED_STATUS &&
   [request.from?.key, request.to?.key].includes(row.key));
 const checkChange = (details, exceptId = null) => evaluateChange({
   roster: projectRoster(state.assignments, state.requests), directory: state.directory,
   hoursVerified: state.hoursVerified, policy: state.policy, committed: committedKeys(state.requests, exceptId), ...details
 });
-let ui ={ tab: 'schedule', date: '2026-11-13', view: 'weekend', dialog: null, pending: null, busy: null, notice: '' };
+// The notice is shown once on each device and answered with a press, before anything else.
+const noticeKey = 'department-hub-notice-v2';
+let noticeSeen = loadState(noticeKey, null);
+let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: noticeSeen ? null : { type:'notice' }, pending: loadDraft(), busy: null, notice: '', flash: '' };
+// Text size is a setting of this device, not of the workspace. It scales every rem in sizes.css.
+const TEXT_SIZES = [1, 1.15, 1.3], TEXT_NAMES = ['normal', 'large', 'larger'], textKey = 'department-hub-text-size';
+let textSize = Math.max(0, TEXT_SIZES.indexOf(Number(loadState(textKey, 1))));
+const applyTextSize = () => document.documentElement.style.setProperty('--scale', TEXT_SIZES[textSize]);
+applyTextSize();
+// Which buttons get pressed, as fixed button names and totals only. Never a person's name, a shift, a typed word or a
+// recording: a value is kept only for the few controls whose values are fixed words, such as the tab that was opened.
+// Kept apart from the workspace, so it is not in backups or receipts, and not counted at all in the public demo.
+const usageKey = 'department-hub-usage-v1', FIXED_VALUES = new Set(['tab', 'view', 'board-filter', 'pool', 'fair-scope']);
+function countPress(action, value) {
+  if (publicDemo || !/^[a-z][a-z-]*(:[a-z-]+)?$/.test(action || '')) return;
+  const name = FIXED_VALUES.has(action) && /^[A-Za-z-]{1,12}$/.test(value || '') ? action + ':' + value.toLowerCase() : action;
+  try {
+    const usage = loadState(usageKey, null) || { since: localToday(), counts: {} };
+    usage.counts[name] = (usage.counts[name] || 0) + 1;
+    localStorage.setItem(usageKey, JSON.stringify(usage));
+  } catch { /* counting must never get in the way */ }
+}
+const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory',
+  shift:'Opened a shift', 'ask-yes':'Said an answer helped', 'ask-no':'Said an answer did not help', 'ask-send':'Sent a question to the record keeper', verify:'Checked the receipts', 'notice-ok':'Acknowledged the notice', notice:'Opened the notice', 'mark-copy':'Copied the latest fingerprint', 'form:mark':'Looked for an earlier fingerprint', 'form:teach':'Taught an answer', 'ask-open':'Opened Ask', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
+  voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
+  import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
+  over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog' };
+// When the board was last opened on this device, so Ask can say what is new since then.
+const seenKey = storageKey + '-seen';
+let sourceVersions = {};
+const versionsFor = async documents => Object.fromEntries(await Promise.all(documents.map(async doc => [doc.id, await documentVersion(doc)])));
+let boardSeen = loadState(seenKey, null);
+function markBoardSeen(value = new Date().toISOString()) {
+  boardSeen = value;
+  try { value ? localStorage.setItem(seenKey, JSON.stringify(value)) : localStorage.removeItem(seenKey); } catch { /* only affects what is new */ }
+}
+const askWorld = () => ({ today: localToday(), now:new Date().toISOString(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
+  documents: state.documents, releases: state.releases, requests: state.requests, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt,
+  answers: state.answers, learned: state.learned, last: ui.askContext, versions:sourceVersions });
+function currentAsk(dialog = ui.dialog) {
+  const signs = patientSigns(dialog?.q || '');
+  if (signs.length) return { title:'Remove patient details before asking.', lines:['The text screen flagged ' + signs.join(', ') + '. No records were searched.'],
+    items:[], source:'Patient-information screen; it cannot detect every disclosure.', empty:true, kind:'blocked', context:null };
+  return ask(dialog.q, { ...askWorld(), last:dialog.previousContext });
+}
+async function askAndLog(q) {
+  sourceVersions = await versionsFor(state.documents);
+  const dialog = { type:'ask', q, previousContext:ui.askContext }, result = currentAsk(dialog);
+  ui.askContext = result.context;
+  ui.lastAsk = ui.dialog = dialog;
+  await commit(result.kind === 'blocked' ? 'Question blocked by text screen' : 'Question asked', {
+    ...(result.kind === 'blocked' ? {} : { fingerprint:await sha256(q.trim().toLowerCase()) }),
+    engine:'ask-10-review-1', build:BUILD, kind:result.kind, answered:!result.empty,
+    resolved:result.context?.when || null,
+    sources:result.items.map(item => ({ reference:item.go || 'note',
+      ...(item.go?.startsWith('doc|') ? { version:sourceVersions[item.go.split('|')[1]] } : {}) })),
+    answerHash:await sha256(JSON.stringify({ title:result.title, lines:result.lines, items:result.items, source:result.source }))
+  }, previous => previous);
+}
+// A repeated press never overrides this screen. Files' contents are not inspected; the visible notice explains that.
+function patientCheck(form, text) {
+  const signs = patientSigns(text);
+  if (!signs.length) return signs;
+  let note = form.querySelector('.refusal');
+  if (!note) { note = document.createElement('p'); note.className = 'refusal'; note.setAttribute('role', 'alert'); form.append(note); }
+  note.textContent = 'Remove possible patient details before saving: ' + signs.join(', ') + '. Repeated presses do not override this screen. It can miss other forms of patient information.';
+  note.scrollIntoView({ block:'nearest' });
+  void commit('Text screen blocked saving', { surface:form.dataset.form, signs }, previous => previous).catch(error => { note.textContent += ' The audit could not be saved: ' + error.message; });
+  return null;
+}
+
+const DOC_LIMIT = 300000, DOC_TOTAL = 1500000;
+// Attachments on board posts: the files themselves, and addresses the page can show them from.
+const mediaBlobs = new Map(), mediaUrls = new Map();
+// The one place the board keeps posts and files. A hosted service replaces this line (see src/backend.js).
+const boardStore = localBoard({
+  getPosts: () => state.posts,
+  change: (type, details, update) => commit(type, details, previous => ({ ...previous, posts: update(previous.posts) }))
+});
+let voice = null;         // a voice message being recorded or reviewed
+async function hydrateMedia() {
+  const wanted = state.posts.flatMap(post => post.media || []).filter(item => !mediaBlobs.has(item.id));
+  if (!wanted.length) return;
+  for (const item of wanted) {
+    const blob = await boardStore.file(item.id).catch(() => null);
+    mediaBlobs.set(item.id, blob);
+    if (blob) mediaUrls.set(item.id, URL.createObjectURL(blob));
+  }
+  render();
+}
+function forgetMedia(ids) {
+  for (const id of ids) { if (mediaUrls.get(id)) URL.revokeObjectURL(mediaUrls.get(id)); mediaUrls.delete(id); mediaBlobs.delete(id); }
+}
 let sourceUrl = null;
-let writing = false;
+let saveQueue = Promise.resolve();
 const h = value => String(value ?? '').replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[char]);
@@ -55,25 +201,55 @@ const isSame = (a,b) => normalizeName(a) === normalizeName(b);
 const isMine = row => isSame(row.person, state.actor);
 const ROLE_LABELS = { charge: 'Charge', icu: 'ICU', extra: 'Extra' };
 
-async function receipt(type, details) {
+// Ties schedule names to people on the telephone list, then fills in what the list and the roster already say:
+// employment status from the list's section, and which shifts a person works from the roster itself.
+function withContacts(next) {
+  const names = [...new Set(next.assignments.map(item => item.person))];
+  const manual = next.manualLinks || {};
+  const claimed = new Set(Object.values(manual).filter(Boolean));
+  const auto = linkNames(names.filter(name => !(normalizeName(name) in manual)), next.people.filter(person => person.group !== 'Physician' && !claimed.has(person.id)));
+  const links = { ...auto.links, ...Object.fromEntries(Object.entries(manual).filter(([, id]) => id)) };
+  const directory = { ...next.directory };
+  for (const name of names) {
+    const key = normalizeName(name);
+    const profile = directory[key] || { person: name, status: null, skills: [] };
+    const person = next.people.find(item => item.id === links[key]);
+    const worked = [...new Set(next.assignments.filter(item => normalizeName(item.person) === key).map(item => item.shift))];
+    directory[key] = {
+      ...profile, status: profile.status || (person && STATUS_BY_GROUP[person.group]) || null,
+      skills: profile.skills?.length || next.mode !== 'local' ? profile.skills : worked
+    };
+  }
+  return { ...next, links, linkGuesses: auto.guessed, directory };
+}
+const contactFor = name => state.people.find(person => person.id === state.links?.[normalizeName(name)]) || null;
+const contactButtons = (person, body) => {
+  const call = phoneLink('tel', person?.cell), text = phoneLink('sms', person?.cell, body);
+  return call ? '<a class="contact-link" href="' + h(call) + '">Call</a><a class="contact-link" href="' + h(text) + '">Text</a>' : '';
+};
+
+async function receipt(type, details, actor) {
   const payload = {
     id: crypto.randomUUID(), time: new Date().toISOString(), type,
     rosterRevision: state.revision, policyVersion: state.policy.version,
-    previousHash: state.events.at(-1)?.hash || null, actor: state.actor, details
+    previousHash: state.events.at(-1)?.hash || null, actor, details
   };
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(payload)));
   return { ...payload, hash: Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('') };
 }
-async function commit(type, details, update) {
-  if (writing) throw new Error('Another change is still being saved.');
-  writing = true;
-  try {
-    const event = await receipt(type, details);
-    const next = update(state);
+function commit(type, details, update) {
+  const actor = state.actor, recorded = structuredClone(details);
+  const task = saveQueue.then(async () => {
+    const event = await receipt(type, recorded, actor);
+    const next = { ...update(state) };
     next.events = [...state.events, event];
+    const versions = next.documents !== state.documents ? await versionsFor(next.documents) : sourceVersions;
     saveState(storageKey, next);
     state = next;
-  } finally { writing = false; }
+    sourceVersions = versions;
+  });
+  saveQueue = task.catch(() => {});
+  return task;
 }
 
 function top() {
@@ -81,8 +257,9 @@ function top() {
     'class="nav-item ' + (ui.tab === id ? 'active' : '') + '" ' + valueAttr(id) + (ui.tab === id ? ' aria-current="page"' : ''));
   return '<aside><div class="brand"><img src="' + h(asset('mark.svg')) + '" alt=""><div><b>Department Hub</b><small>WORKSPACE</small></div></div>' +
     '<div class="space-label">YOUR DEPARTMENT</div><div class="space-name">Respiratory Care</div><nav aria-label="Workspace">' +
-    nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Department board') + nav('requests', '⇄', 'Requests') +
-    '</nav><div class="aside-bottom"><span class="status-dot"></span>' + (publicDemo ? 'Public demo · fictional data' : 'Local workspace · this browser') + '</div></aside>';
+    nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Board') + nav('requests', '⇄', 'Requests') + nav('fairness', '⚖', 'Fairness') + nav('people', '☎', 'Directory') +
+    '</nav><div class="aside-bottom"><span class="status-dot"></span>' + (publicDemo ? 'Public demo · fictional data' :
+      button('Saved in this browser · ' + h(location.host), 'data', 'class="where" title="Backup, restore and where this workspace is kept"')) + '</div></aside>';
 }
 
 function displayDates() {
@@ -91,29 +268,43 @@ function displayDates() {
   return Array.from({ length: 3 }, (_, i) => addDays(friday, i));
 }
 
+const countNote = item => item.people.length + ' listed · ' + Math.abs(item.extra) + (item.extra > 0 ? ' over' : ' short');
+const firstInLine = order => order.filter(item => item.first).map(item => item.person);
+
 function schedule() {
   const dates = displayDates();
+  const usual = { D: staffing(state.assignments, 'D', state.directory), N: staffing(state.assignments, 'N', state.directory) };
+  const offUsual = (date, shift) => usual[shift].over.find(item => item.date === date) || usual[shift].short.find(item => item.date === date);
   const title = dayLabel(dates[0], { month:'long', day:'numeric' }) + ' – ' + dayLabel(dates.at(-1), { month:'short', day:'numeric' });
-  const cells = dates.map(date => '<article class="day-card"><header><span>' + h(dayLabel(date, { weekday:'long' })) +
+  const cells = dates.map(date => '<article class="day-card" data-date="' + date + '"><header><span>' + h(dayLabel(date, { weekday:'long' })) +
     '</span><strong>' + h(dayLabel(date, { day:'numeric' })) + '</strong></header>' + Object.entries(SHIFTS).map(([shift, def]) => {
       const rows = state.assignments.filter(row => row.date === date && row.shift === shift);
       return '<section class="shift"><div class="shift-label ' + (shift === 'N' ? 'night' : 'day') + '"><b>' + def.label + '</b><span>' +
-        (shift === 'N' ? '7 PM – 7 AM' : '7 AM – 7 PM') + '</span></div>' +
+        (shift === 'N' ? '7 PM – 7 AM' : '7 AM – 7 PM') + '</span>' +
+        (offUsual(date, shift)?.extra < 0 ? '<i class="count-note">' + h(countNote(offUsual(date, shift))) + '</i>' : '') + '</div>' +
+        (offUsual(date, shift)?.extra > 0 ? button('<span>' + h(countNote(offUsual(date, shift))) + '</span><span>Who is next ›</span>', 'over',
+          'class="count-note over" title="More people than usual. See who is next for low census." ' + valueAttr(date + '|' + shift)) : '') +
         (rows.length ? rows.map(row => button(avatar(row.person) + '<span class="name">' + h(row.person) + '</span>' +
           (row.hours ? '<i class="tag">' + h(row.hours) + '</i>' : '') +
           (isMine(row) ? '<em>You</em>' : ''), 'shift', 'class="staff ' + (isMine(row) ? 'mine ' : '') + h(row.role || '') + '" ' +
           (row.role ? 'title="' + h(ROLE_LABELS[row.role] || row.role) + '" ' : '') + valueAttr(row.key))).join('') :
-          '<p class="empty-shift">No assignments in this roster.</p>') + '</section>';
+          '<p class="empty-shift">No assignments in this roster.</p>') +
+        button(rows.length ? 'Edit names' : 'Add names', 'edit-shift', 'class="edit-shift" ' + valueAttr(date + '|' + shift)) + '</section>';
     }).join('') + '</article>').join('');
   return '<section class="intro"><div><div class="eyebrow">TEAM ROSTER</div><h1>Schedule</h1><p>See who’s working. Start a trade or find coverage from your shift.</p></div>' +
-    button('＋ Import schedule', 'import', 'class="primary"') + '</section>' +
+    button('＋ Import schedule', 'import', 'class="secondary"') + '</section>' +
     '<div class="roster-status"><span class="status-dot"></span><b>' + (state.mode === 'sample' ? 'Fictional practice roster' : 'Imported roster') +
-    '</b><span>' + h(state.mode === 'sample' ? 'Try the full flow with sample staff' : 'Published ' + timeLabel(state.importedAt)) +
-    '</span><span class="spacer"></span>' + (state.mode === 'local' ? '<span>Hours and pickups need verification</span>' + button('Staff details', 'staff-setup', 'class="text-button"') + '' : '<span>Demo hours only</span>') + '</div>' +
+    '</b><span>' + h(state.mode !== 'sample' ? 'Published ' + timeLabel(state.importedAt) : publicDemo ? 'Try the full flow with sample staff' :
+      'No schedule is saved in this browser at ' + location.host + '. These are sample names.') +
+    '</span><span class="spacer"></span>' + (state.mode === 'local' ? '<span>Hours and pickups need verification</span>' + button('Staff details', 'staff-setup', 'class="text-button"') + '' :
+      publicDemo ? '<span>Demo hours only</span>' : button('Restore a backup', 'data', 'class="text-button"')) + '</div>' +
+    (ui.pending && !ui.busy ? '<div class="roster-status waiting"><span class="status-dot"></span><b>An import is waiting to be finished</b><span>' + ui.pending.assignments.length + ' shifts read, ' +
+      ui.pending.flags.filter(flag => flag.status === 'open').length + ' to check</span><span class="spacer"></span>' + button('Continue', 'import', 'class="text-button"') +
+      button('Discard', 'clear-draft', 'class="text-button"') + '</div>' : '') +
     '<div class="calendar-toolbar"><div><div class="eyebrow">ROSTER VIEW</div><h2>' + h(title) + '</h2></div><div class="controls">' +
     '<div class="segments">' + button('Weekend', 'view', 'class="' + (ui.view === 'weekend' ? 'selected' : '') + '" data-value="weekend"') +
     button('Week', 'view', 'class="' + (ui.view === 'week' ? 'selected' : '') + '" data-value="week"') + '</div>' +
-    '<div class="segments">' + button('‹', 'navigate', 'aria-label="Previous week" data-value="-7"') +
+    '<div class="segments">' + button('Today', 'today') + button('‹', 'navigate', 'aria-label="Previous week" data-value="-7"') +
     button('›', 'navigate', 'aria-label="Next week" data-value="7"') + '</div></div></div>' +
     '<div class="calendar ' + ui.view + '">' + cells + '</div>' +
     (state.assignments.some(row => row.role) ? '<p class="calendar-foot legend"><span class="name charge">Pink</span> charge <span class="name icu">Green</span> ICU' +
@@ -121,13 +312,162 @@ function schedule() {
     '<p class="calendar-foot">Night shifts appear on their start date. Payroll checks split hours at the workweek boundary.</p>';
 }
 
+const RULE = 'No patient information: no names, faces, monitors, charts or record numbers. Posts, uploads and questions are logged with a fingerprint and the name in use.';
+function postMarkup(post) {
+  const link = videoLink(post.body);
+  const words = post.body ? '<p>' + linkParts(post.body).map(part => part.href ?
+    '<a href="' + h(part.href) + '" target="_blank" rel="noopener noreferrer">' + h(part.text) + '</a>' : h(part.text)).join('') + '</p>' : '';
+  const piece = item => {
+    const url = mediaUrls.get(item.id);
+    if (!mediaBlobs.has(item.id)) return '<p class="subtle">Loading ' + h(item.name) + '…</p>';
+    if (!url) return '<p class="subtle">' + h(item.name) + ' is not in this browser.</p>';
+    if (item.kind === 'image') return '<a href="' + url + '" target="_blank" rel="noopener"><img class="post-image" src="' + url + '" alt="' + h(item.name) + '" loading="lazy"></a>';
+    if (item.kind === 'video') return '<video class="post-video" data-media="' + h(item.id) + '" src="' + url + '" controls playsinline preload="metadata"></video>';
+    if (item.kind === 'audio') return '<audio class="post-audio" data-media="' + h(item.id) + '" src="' + url + '" controls preload="metadata"></audio>' + (post.voice ? '' : '<small>' + h(item.name) + '</small>');
+    return '<a class="post-file" href="' + url + '" download="' + h(item.name) + '"><b>' + h(item.name) + '</b><span>' + fileSize(item.size) + ' · Download</span></a>';
+  };
+  return '<article class="panel post" data-post="' + h(post.id) + '"><div class="post-head">' + avatar(post.author) +
+    '<div><b>' + h(post.author) + '</b><small>' + h(post.created ? timeLabel(post.created) : 'Sample announcement') +
+    (post.voice ? ' · Voice message' + (post.media?.[0]?.seconds ? ' · ' + clock(post.media[0].seconds) : '') : '') + '</small></div>' +
+    (post.learning ? '<span class="badge learning">Learning</span>' : '') + '</div>' +
+    (post.when ? '<p><span class="badge dated">' + ({ due:'Due', meeting:'Meeting', event:'Event' }[post.when.kind] || 'Date') + ' · ' + h(prettyDate(post.when.date)) + '</span></p>' : '') + words +
+    (post.media?.length ? '<div class="post-media">' + post.media.map(piece).join('') + '</div>' : '') +
+    (link ? '<div class="link-player" data-embed="' + h(link.embed) + '">' + button('▶ Play here · ' + h(link.site), 'play-link', 'class="play-link"') + '</div>' : '') +
+    '<div class="post-actions">' + (post.inside ? '<span class="subtle">Department only</span>' : button('↗ Share', 'share', 'class="post-action" ' + valueAttr(post.id))) +
+    (post.created && isSame(post.author, state.actor) ? button('Remove', 'remove-post', 'class="post-action quiet" ' + valueAttr(post.id)) : '') + '</div></article>';
+}
+
 function board() {
-  return '<section class="intro"><div><div class="eyebrow">TEAM SPACE</div><h1>Department board</h1><p>Announcements and updates for the whole workspace.</p></div></section>' +
-    '<form data-form="post" class="panel form-panel"><label for="post-text">Write an update</label>' +
-    '<textarea id="post-text" name="body" maxlength="1200" required placeholder="Share something with the department"></textarea><button class="primary">Post update</button></form>' +
-    '<div class="post-list">' + [...state.posts].reverse().map(post => '<article class="panel post"><div class="post-head">' + avatar(post.author) +
-      '<div><b>' + h(post.author) + '</b><small>' + h(post.created ? timeLabel(post.created) : 'Sample announcement') +
-      '</small></div></div><p>' + h(post.body) + '</p></article>').join('') + '</div>';
+  const filter = ui.boardFilter || 'all';
+  const shown = [...state.posts].reverse().filter(post => matchesFilter(post, filter));
+  return '<section class="intro"><div><div class="eyebrow">TEAM SPACE</div><h1>Department board</h1><p>News, pictures, files, video and voice for the whole department.</p></div>' +
+    button('🎙 Voice message to everyone', 'voice', 'class="primary voice-start"') + '</section>' +
+    (boardStore.shared ? '' : '<div class="roster-status"><span class="status-dot"></span><b>Kept in ' + h(boardStore.where) + '</b><span>Nobody else sees a post until the shared version is switched on. Share sends one out now.</span></div>') +
+    '<form data-form="post" class="panel form-panel composer"><label for="post-text">Write to the department</label>' +
+    '<textarea id="post-text" name="body" maxlength="2000" placeholder="Share something with the department. A YouTube or Vimeo link plays right on the board.">' + h(ui.draftPost || '') + '</textarea>' +
+    '<div class="cell-when"><label>Does it have a date?<select name="whenKind"><option value="">No date</option><option value="due">Due by</option><option value="meeting">Meeting on</option><option value="event">Event on</option></select></label>' +
+    '<label>Date<input name="whenDate" type="date"></label></div>' +
+    '<label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple></label>' +
+    '<label><span><input type="checkbox" name="learning"> Add to Learning (instructional, CEU-type)</span></label>' +
+    '<label><span><input type="checkbox" name="inside"> Keep inside the department (no Share button)</span></label>' +
+    '<p class="subtle">' + RULE + '</p><p class="refusal" role="alert"></p><button class="primary">Post</button></form>' +
+    '<div class="calendar-toolbar board-bar"><div class="segments">' + FILTERS.map(([id, label]) => button(label, 'board-filter', 'class="' + (filter === id ? 'selected' : '') + '" ' + valueAttr(id))).join('') + '</div></div>' +
+    '<div class="post-list">' + (shown.map(postMarkup).join('') || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>';
+}
+
+// Fairness is a kept record. Everyone sees their own sheet and the department picture, without names. Whoever keeps the
+// record sees who is carrying more, the holiday tracker and the low-census ledger, and can export it.
+const isKeeper = () => state.custodians.includes(normalizeName(state.actor));
+const keeperNames = () => state.custodians.map(id => state.directory[id]?.person || id);
+const recordRows = () => ui.fairScope === 'record' && state.history.length ? [...state.history, ...state.assignments] : state.assignments;
+const signed = value => (value >= 0 ? '+' : '−') + Math.abs(value).toFixed(1);
+const plural = (count, word) => count + ' ' + word + (count === 1 ? '' : 's');
+
+function fairness() {
+  const rows = recordRows(), rules = state.holidayRules;
+  const mine = rows.filter(row => isSame(row.person, state.actor));
+  const pool = ui.pool || (mine.filter(row => row.shift === 'N').length > mine.length / 2 ? 'N' : 'D');
+  const table = ledger(rows, pool, state.directory, rules), stand = standing(table), tracker = holidayTracker(rows, state.directory, rules);
+  const sheet = statSheet(state.actor, { ...state, assignments: rows, rules }), me = sheet.row;
+  const line = (label, value) => '<div><b>' + h(value) + '</b><span>' + h(label) + '</span></div>';
+  const verdict = !me ? '' : me.weekendOnly ? 'Weekend-only position.' :
+    me.weekendVolunteer ? 'You have taken ' + sheet.weekendExtra.toFixed(1) + ' weekend turns beyond a regular share by choice.' :
+    me.weekendGap >= 1 ? 'You are carrying ' + me.weekendGap.toFixed(1) + ' weekend turns more than your share.' :
+    me.weekendGap <= -1 ? 'You are ' + Math.abs(me.weekendGap).toFixed(1) + ' weekend turns under your share.' : 'You are within one weekend turn of your share.';
+  const card = me ? '<div class="panel stat-sheet"><div class="eyebrow">YOUR SHEET · ' + h(state.actor.toUpperCase()) + '</div><p class="fair-line">' + h(verdict) + '</p><div class="stat-grid">' +
+    line('shifts', me.shifts) + line(me.weekendOnly || me.weekendVolunteer ? 'weekend turns' : 'weekend turns, share ' + me.weekendFair.toFixed(1), me.weekend) +
+    line('holidays' + (me.holidays.length ? ': ' + me.holidays.join(', ') : ''), me.holidays.length) + line('charge', me.charge) + line('ICU', me.icu) +
+    line('trades accepted', sheet.tradesAccepted) + line('shifts covered', sheet.shiftsCovered) + line('went home for someone', sheet.wentHomeForSomeone) + line('low-census hours', sheet.releasedHours) + '</div></div>' : '';
+  const holidayShifts = tracker.people.reduce((sum, entry) => sum + entry.count, 0);
+  const picture = !table.people.length ? '<div class="panel empty"><strong>No ' + (pool === 'N' ? 'night' : 'day') + ' shifts on record.</strong></div>' :
+    '<div class="panel"><p class="fair-line"><b>' + table.withinOne + ' of ' + table.regulars + '</b> regulars are within one weekend turn of their share. The spread is <b>' + table.spread.toFixed(1) + '</b> turns. The aim is under one.</p>' +
+    '<p><b>' + stand.over.length + '</b> carrying more than a turn extra. <b>' + stand.under.length + '</b> more than a turn under.' +
+    (holidayShifts ? ' ' + plural(holidayShifts, 'holiday shift') + ' worked by ' + plural(tracker.people.length, 'person').replace('persons', 'people') + '; the most by one person is ' + tracker.people[0].count + '.' : '') + '</p>' +
+    '<p class="subtle">A weekend turn is a Saturday or Sunday day shift, or a Friday, Saturday or Sunday night. A share follows how many shifts a person works. Students are left out. Calling in sick and declined requests are never counted.</p></div>';
+  const access = '<div class="panel"><p><b>' + (state.custodians.length ? 'The full record is kept by ' + h(keeperNames().join(' and ')) + '.' : 'Nobody keeps the record yet.') + '</b></p>' +
+    '<p class="subtle">You see your own sheet and the department picture. Whoever keeps the record sees who is carrying more, tracks the holidays and can export it.</p>' +
+    (state.custodians.length ? '' : '<p>' + button('I will keep the record', 'claim-record', 'class="secondary"') + '</p>') + '</div>';
+  return '<section class="intro"><div><div class="eyebrow">WHO CARRIED WHAT</div><h1>Fairness</h1><p>A kept record, so nobody quietly ends up with more than their share.</p></div></section>' + card +
+    '<div class="calendar-toolbar"><div><div class="eyebrow">' + (table.from ? h(dayLabel(table.from, { month:'short', day:'numeric' }) + ' – ' + dayLabel(table.to, { month:'short', day:'numeric', year:'numeric' })) : 'NOTHING ON RECORD') +
+    '</div><h2>' + (pool === 'N' ? 'Night shift' : 'Day shift') + '</h2></div><div class="controls">' +
+    (state.history.length ? '<div class="segments">' + button('This schedule', 'fair-scope', 'class="' + (ui.fairScope === 'record' ? '' : 'selected') + '" data-value="schedule"') +
+      button('Everything on record', 'fair-scope', 'class="' + (ui.fairScope === 'record' ? 'selected' : '') + '" data-value="record"') + '</div>' : '') +
+    '<div class="segments">' + button('Days', 'pool', 'class="' + (pool === 'D' ? 'selected' : '') + '" data-value="D"') + button('Nights', 'pool', 'class="' + (pool === 'N' ? 'selected' : '') + '" data-value="N"') + '</div></div></div>' +
+    picture + (isKeeper() ? recordMarkup(table, stand, tracker, pool, rows) : access);
+}
+
+function recordMarkup(table, stand, tracker, pool, rows) {
+  const person = entry => '<div><span><b>' + h(entry.person) + '</b> <small>' + plural(entry.weekend, 'weekend turn') + ', share ' + entry.weekendFair.toFixed(1) +
+    (entry.holidays.length ? ' · ' + plural(entry.holidays.length, 'holiday') : '') + '</small></span><b class="gap ' + (entry.weekendGap > 0 ? 'over' : 'under') + '">' + signed(entry.weekendGap) + '</b></div>';
+  const full = table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + (entry.regular || entry.weekendVolunteer ? '' : ' light') + '"><th scope="row">' + h(entry.person) +
+    (entry.weekendOnly ? ' <small>weekend only</small>' : entry.weekendVolunteer ? ' <small>extra weekends by choice</small>' : entry.regular ? '' : ' <small>' + h(entry.status === 'PRN' ? 'PRN' : 'few shifts') + '</small>') +
+    '</th><td>' + entry.shifts + '</td><td>' + entry.weekend + '</td><td>' + (entry.weekendOnly ? '–' : entry.weekendFair.toFixed(1)) + '</td><td class="gap ' +
+    (entry.weekendVolunteer ? 'credit' : entry.weekendOnly || Math.abs(entry.weekendGap) < 1 ? 'even' : entry.weekendGap > 0 ? 'over' : 'under') + '">' +
+    (entry.weekendOnly ? '–' : entry.weekendVolunteer ? '+' + entry.weekendExtra.toFixed(1) + ' by choice' : signed(entry.weekendGap)) + '</td><td>' + entry.holidays.length + '</td><td>' + entry.charge + '</td><td>' + entry.icu + '</td></tr>').join('');
+  return '<div class="calendar-toolbar"><div><div class="eyebrow">KEPT BY ' + h(keeperNames().join(' AND ').toUpperCase()) + '</div><h2>The record</h2></div></div>' +
+    '<div class="panel"><h3>Carrying more than their share</h3>' + (stand.over.length ? '<div class="line-list">' + stand.over.map(person).join('') + '</div>' : '<p class="subtle">Nobody is more than a weekend turn over.</p>') +
+    '<h3>Under their share</h3>' + (stand.under.length ? '<div class="line-list">' + stand.under.map(person).join('') + '</div>' : '<p class="subtle">Nobody is more than a weekend turn under.</p>') +
+    (table.next.length && table.spread >= 1 ? '<p class="subtle">The next weekend turns would go first to ' + h(table.next.join(', ')) + '.</p>' : '') +
+    table.volunteers.map(item => '<p class="subtle"><b>' + h(item.person) + '</b> has taken ' + item.extra.toFixed(1) + ' weekend turns beyond a regular share by choice. Those turns are out of the rotation, so nobody else is measured against them.</p>').join('') +
+    table.people.filter(entry => !entry.weekendOnly && !entry.weekendVolunteer && entry.shifts >= 4 && entry.weekend === entry.shifts).map(entry => '<p class="subtle"><b>' + h(entry.person) +
+      '</b> is listed only on weekends. If that is a weekend-only position, set it in Staff details, so nobody else is measured against it.</p>').join('') +
+    '<details><summary>Everyone, in one table</summary><div class="fair-scroll"><table class="fair"><thead><tr><th scope="col">Name</th><th scope="col">Shifts</th><th scope="col">Weekend</th><th scope="col">Share</th><th scope="col">Difference</th><th scope="col">Holidays</th><th scope="col">Charge</th><th scope="col">ICU</th></tr></thead><tbody>' +
+    full + '</tbody></table></div></details></div>' +
+    '<div class="panel"><h3>Holiday tracker</h3>' + (tracker.days.length ? '<div class="fair-scroll"><table class="fair holiday"><thead><tr><th scope="col">Name</th>' +
+      tracker.days.map(day => '<th scope="col">' + h(day.name) + '<br><small>' + h(dayLabel(day.date, { month:'short', day:'numeric', year:'2-digit' })) + '</small></th>').join('') + '<th scope="col">Total</th></tr></thead><tbody>' +
+      (tracker.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + '"><th scope="row">' + h(entry.person) + '</th>' +
+        tracker.days.map(day => '<td>' + (entry.worked[day.date] ? h(entry.worked[day.date].replace('D', 'Day ').replace('N', 'Night').trim()) : '·') + '</td>').join('') + '<td><b>' + entry.count + '</b></td></tr>').join('') ||
+        '<tr><td colspan="' + (tracker.days.length + 2) + '">Nobody is listed on these days.</td></tr>') + '</tbody></table></div>' : '<p class="subtle">No holiday falls inside these dates.</p>') +
+    '<p>' + button('Which holidays count', 'holiday-rules', 'class="secondary"') + '</p></div>' + lowCensus(pool, rows) +
+    '<div class="panel"><h3>Keeping the record</h3><p class="subtle">Every schedule that is published, every shift edited by hand and every low-census entry leaves a dated receipt. When a new schedule replaces an old one, the old one stays on record.' +
+    (state.history.length ? ' ' + state.history.length + ' shifts are carried from earlier schedules.' : '') + '</p><div class="actions wrap">' + button('Export the record', 'export-record', 'class="primary"') +
+    button('Who keeps the record', 'staff-setup', 'class="secondary"') + button('Activity log', 'audit', 'class="secondary"') + '</div></div>';
+}
+
+function lowCensus(pool, rows) {
+  const table = census(rows, pool, state.directory, state.releases, localToday());
+  const word = pool === 'N' ? 'night' : 'day';
+  const chip = item => {
+    const label = h(dayLabel(item.date, { weekday:'short', month:'short', day:'numeric' }));
+    return state.assignments.some(row => row.date === item.date && row.shift === pool)
+      ? button(label, 'over', 'class="chip" ' + valueAttr(item.date + '|' + pool)) : '<span class="chip">' + label + ' · archived</span>';
+  };
+  const next = item => firstInLine(item.order).length === 1 ? 'next in line is ' + firstInLine(item.order)[0] : 'tied for next: ' + firstInLine(item.order).join(', ');
+  const shortDates = table.short.map(item => dayLabel(item.date, { month:'short', day:'numeric' }));
+  return '<div class="calendar-toolbar"><div><div class="eyebrow">MORE PEOPLE THAN USUAL</div><h2>Low census</h2></div></div><div class="panel">' +
+    (table.over.length ? '<p class="fair-line"><b>' + table.over.length + '</b> ' + word + ' shift' + (table.over.length === 1 ? ' lists' : 's list') + ' more than the usual <b>' + table.usual +
+      '</b>. Someone is likely to be released on each.</p>' : '<p class="fair-line">No ' + word + ' shift in this roster lists more than the usual <b>' + table.usual + '</b>.</p>') +
+    (table.upcoming.length ? '<div class="chip-list"><span class="subtle">Coming up</span>' + table.upcoming.map(item => '<div>' + chip(item) + ' <span class="subtle">' + h(next(item)) + '</span></div>').join('') + '</div>' : '') +
+    (table.unrecorded.length ? '<div class="chip-list"><span class="subtle">Past, nothing recorded yet</span><div>' + table.unrecorded.map(chip).join(' ') + '</div></div>' : '') +
+    (table.people.length ? '<div class="fair-scroll"><table class="fair"><thead><tr><th scope="col">Name</th><th scope="col">On those shifts</th><th scope="col">Share of the cuts</th><th scope="col">Released</th><th scope="col">Hours</th><th scope="col">Offered</th></tr></thead><tbody>' +
+      table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + '"><th scope="row">' + h(entry.person) + '</th><td>' + entry.onOver + '</td><td>' + entry.share.toFixed(2) +
+        '</td><td>' + entry.turns + '</td><td>' + entry.hours + '</td><td>' + entry.offered + '</td></tr>').join('') + '</tbody></table></div>' +
+      '<p class="subtle">Totals follow the dates shown. Who is next uses all recorded hours: whoever has lost the fewest is next. Hours count the same whether a person offered or was sent, so offering never moves anyone to the front. Share of the cuts splits each extra person evenly between everyone listed on that shift.</p>' : '') +
+    (shortDates.length ? '<p class="subtle">' + shortDates.length + ' ' + word + ' shift' + (shortDates.length === 1 ? ' lists' : 's list') + ' fewer than usual: ' + h(shortDates.slice(0, 8).join(', ')) +
+      (shortDates.length > 8 ? ' and ' + (shortDates.length - 8) + ' more' : '') + '. Handwritten additions are not read, so check the page.</p>' : '') + '</div>';
+}
+
+function people() {
+  const linkedAs = person => Object.entries(state.links || {}).filter(([, id]) => id === person.id).map(([key]) => state.directory[key]?.person || key);
+  const card = person => {
+    const names = linkedAs(person);
+    const guess = names.some(name => (state.linkGuesses || []).includes(normalizeName(name)));
+    return '<article class="panel person"><div class="post-head">' + avatar(fullName(person).replace(/^Dr\.\s*/, '')) + '<div><b>' + h(fullName(person)) + '</b><small>' +
+      h([person.role, names.length ? 'On the schedule as ' + names.join(', ') + (guess ? ' (best guess)' : '') : ''].filter(Boolean).join(' · ') || person.group) +
+      '</small></div></div><div class="person-lines">' +
+      (person.cell ? '<span>' + h(formatPhone(person.cell)) + '</span>' + contactButtons(person) : '') +
+      (person.office ? '<span class="subtle">Office ' + h(person.office) + '</span>' : '') + '</div></article>';
+  };
+  const unlinked = [...new Set(state.assignments.map(item => item.person))].filter(name => !contactFor(name) || (state.linkGuesses || []).includes(normalizeName(name)));
+  const choices = name => '<label class="link-row"><span>' + h(name) + (contactFor(name) ? ' <small>(best guess)</small>' : '') + '</span><select data-link="' + h(name) + '" aria-label="Contact for ' + h(name) + '"><option value="">No contact</option>' +
+    state.people.filter(person => person.group !== 'Physician').map(person => '<option value="' + h(person.id) + '"' + (contactFor(name)?.id === person.id ? ' selected' : '') + '>' + h(fullName(person)) + '</option>').join('') + '</select></label>';
+  return '<section class="intro"><div><div class="eyebrow">DEPARTMENT CONTACTS</div><h1>Directory</h1><p>Call or text a coworker. Numbers stay in this workspace.</p></div>' +
+    (publicDemo ? '' : button('＋ Import phone list', 'import', 'class="primary"')) + '</section>' +
+    (!state.people.length ? '<div class="panel empty"><strong>No contacts yet.</strong><p>Import a photo of the department telephone list. It is read on this device.</p></div>' :
+      (state.peopleSource === 'sample' ? '<div class="roster-status"><span class="status-dot"></span><b>Fictional contacts</b><span>These numbers reach no one</span></div>' : '') +
+      (unlinked.length && state.people.length ? '<div class="panel form-panel"><b>Schedule names to match</b><p class="subtle">Pick the person each schedule name belongs to.</p>' + unlinked.map(choices).join('') + '</div>' : '') +
+      GROUPS.map(group => { const list = state.people.filter(person => person.group === group).sort((a, b) => (a.last + a.first).localeCompare(b.last + b.first));
+        return list.length ? '<div class="eyebrow group-head">' + h({ Contract: 'CONTRACT AND RESERVE', Student: 'STUDENTS', Physician: 'PHYSICIANS' }[group] || group.toUpperCase()) + '</div><div class="post-list">' + list.map(card).join('') + '</div>' : ''; }).join(''));
 }
 
 function requests() {
@@ -146,25 +486,55 @@ function shiftCaption(row) {
 
 function render() {
   const focus = document.activeElement;
+  const playing = [...app.querySelectorAll('[data-media]')].filter(player => player.currentTime > 0 && !player.ended)
+    .map(player => ({ id: player.dataset.media, time: player.currentTime, on: !player.paused }));
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
-  app.innerHTML = top() + '<main><header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
+  app.innerHTML = top() + '<main>' + button('<b>Independent staff project—not an official CRH product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
+    '<div class="top-tools">' + button('Aa', 'text-size', 'class="text-size" title="Text size" aria-label="Text size: ' + TEXT_NAMES[textSize] + '. Press to change."') +
+    button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board or the documents"') +
     '<label class="actor">Viewing as <select id="actor" aria-label="Viewing as">' +
     (actorNames().length ? actorNames() : [state.actor]).map(name => '<option ' + (isSame(name, state.actor) ? 'selected' : '') + '>' + h(name) + '</option>').join('') +
-    '</select></label></header><div class="content">' +
+    '</select></label></div></header><div class="content">' +
     (ui.notice ? '<div role="status" class="notice">' + h(ui.notice) + '</div>' : '') +
-    (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : schedule()) +
+    (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : schedule()) +
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
-    ' · No payroll or official schedule changes</span>' + button('Decision history', 'audit', 'class="text-button"') + '</footer></div></main>' + dialogMarkup();
+    ' · No payroll or official schedule changes · Version ' + BUILD + '</span><span>' + (publicDemo ? '' : button('Backup and restore', 'data', 'class="text-button"') + ' ') +
+    button('Activity log', 'audit', 'class="text-button"') + '</span></footer></div></main>' + dialogMarkup();
+  for (const item of playing) {
+    const player = app.querySelector('[data-media="' + CSS.escape(item.id) + '"]');
+    if (player) { player.currentTime = item.time; if (item.on) player.play().catch(() => {}); }
+  }
   const dialog = app.querySelector('dialog');
   if (dialog) {
     dialog.showModal();
     if (sameDialog && focus?.id) document.getElementById(focus.id)?.focus();
   }
+  if (ui.scrollTo) { app.querySelector(ui.scrollTo)?.scrollIntoView({ block:'start' }); ui.scrollTo = null; }
 }
 
 function shell(title, body) {
   return '<dialog data-dialog="' + ui.dialog.type + '" aria-labelledby="dialog-title"><div class="dialog-head"><h2 id="dialog-title">' +
-    h(title) + '</h2>' + button('×', 'close', 'class="close" aria-label="Close dialog"') + '</div><div class="dialog-body">' + body + '</div></dialog>';
+    h(title) + '</h2>' + (ui.dialog.type === 'notice' && !noticeSeen ? '' : button('×', 'close', 'class="close" aria-label="Close dialog"')) + '</div><div class="dialog-body">' +
+    (ui.dialog.type === 'notice' ? '' : '<p class="subtle">Independent staff project—not an official CRH product. No patient information. Recorded actions use audit receipts.</p>') +
+    (ui.flash ? '<p class="flash" role="status">' + h(ui.flash) + '</p>' : '') + body + '</div></dialog>';
+}
+
+// One line per person: name, role, partial hours.
+function nameLine(row, index, focus = -1) {
+  return '<div class="name-row' + (row?.check ? ' check' : '') + '"><input name="person" list="known-names" maxlength="80" autocomplete="off" placeholder="Name" aria-label="Name ' +
+    (index + 1) + '" value="' + h(row?.person || '') + '"' + (index === focus ? ' autofocus' : '') + '><select name="role" aria-label="Role for name ' + (index + 1) + '">' +
+    [['', 'No role'], ...Object.entries(ROLE_LABELS)].map(([value, label]) => '<option value="' + value + '"' + ((row?.role || '') === value ? ' selected' : '') + '>' + label + '</option>').join('') +
+    '</select><input name="hours" maxlength="9" autocomplete="off" placeholder="7-3" pattern="\\d{1,2}(:\\d{2})?-\\d{1,2}(:\\d{2})?" title="Partial hours like 7-3 or 7-3:30" aria-label="Partial hours for name ' + (index + 1) + '" value="' + h(row?.hours || '') + '"></div>';
+}
+const nameLines = (rows, focus) => '<div class="name-rows">' + Array.from({ length: Math.max(rows.length + 2, 5) }, (_, index) => nameLine(rows[index], index, focus)).join('') + '</div>' +
+  '<p>' + button('＋ More lines', 'more-lines', 'class="text-button"') + '</p>';
+const knownList = names => '<datalist id="known-names">' + names.map(name => '<option value="' + h(name) + '">').join('') + '</datalist>';
+// Reads the name lines of a form into clean rows, one person each.
+function readNameLines(form, known) {
+  const fields = new FormData(form), roles = fields.getAll('role'), times = fields.getAll('hours');
+  const entries = fields.getAll('person').map((person, position) => ({ person, role: roles[position], hours: times[position].trim() }));
+  if (entries.some(entry => entry.person.trim() && entry.hours && !HOURS.test(entry.hours))) throw new Error('Write partial hours like 7-3 or 7-3:30.');
+  return tidyNames(entries, known);
 }
 
 function dialogMarkup() {
@@ -180,13 +550,15 @@ function dialogMarkup() {
     const { pending } = ui;
     const unresolved = pending.flags.filter(flag => flag.status === 'open').length;
     return shell('Review import', '<div class="import-stats"><b>' + pending.pages.length + ' pages</b><b>' + pending.assignments.length +
-      ' assignments</b><b>' + (unresolved + pending.issues.length) + ' to review</b></div>' +
+      ' assignments</b><b>' + unresolved + ' to check</b></div>' +
       '<p>Review the flagged cells and check the date span. Duplicate assignments are combined with their source references.</p>' +
       '<details' + (pending.pages.some(page => page.shift) ? ' open' : '') + '><summary>Pages and extracted dates</summary><ul class="compact">' + pending.pages.map(page => '<li>' +
         h(page.name + ' · ' + page.status + (page.dates.length ? ' · ' + page.dates.at(0) + ' to ' + page.dates.at(-1) : '')) +
         (page.shift ? ' · <b>' + (page.shift === 'N' ? 'Night' : 'Day') + ' schedule</b>' + (page.shiftGuessed ? ' (guessed) ' : ' ') +
           button('Switch to ' + (page.shift === 'N' ? 'Day' : 'Night'), 'flip-page', 'class="text-button" ' + valueAttr(page.page)) : '') +
         '</li>').join('') + '</ul></details>' +
+      (pending.people?.length ? '<div class="flag"><p><b>Telephone list: ' + pending.people.length + ' people read.</b> ' +
+        pending.people.filter(person => person.check).length + ' need a closer look.</p>' + button('Check and save the directory', 'people-review', 'class="primary"') + '</div>' : '') +
       (unresolved ? '<p>' + button('Review ' + unresolved + ' flagged ' + (unresolved === 1 ? 'shift' : 'shifts'), 'review-flags', 'class="primary"') + '</p>' : '') +
       (pending.flags.length ? '<div class="flags">' + pending.flags.map((flag, index) => '<div class="flag"><p>' + h(flag.message) + '</p><small>' +
         h((flag.draft.date ? flag.draft.date.slice(5).replace('-', '/') + ' · ' : '') + flag.source.file + ' · ' + flag.status) + '</small> ' +
@@ -195,6 +567,46 @@ function dialogMarkup() {
         h(issue.date + ' · ' + issue.message) + '</li>').join('') + '</ul>' : '<p class="good">No structural issues were flagged.</p>') +
       '<div class="actions">' + button('Start over', 'clear-draft', 'class="secondary"') +
       button('Publish to this workspace', 'publish', 'class="primary" ' + (!pending.assignments.length || unresolved ? 'disabled' : '')) + '</div>');
+  }
+  if (type === 'over') {
+    const { date, shift } = ui.dialog;
+    const listed = state.assignments.filter(item => item.date === date && item.shift === shift && state.directory[normalizeName(item.person)]?.status !== 'Student');
+    const order = releaseOrder([...new Set(listed.map(item => item.person))], state.releases);
+    const first = firstInLine(order);
+    const usual = staffing(state.assignments, shift, state.directory).usual;
+    const done = state.releases.filter(item => item.date === date && item.shift === shift);
+    return shell('Low census · ' + shiftCaption({ date, shift }), '<p><b>' + order.length + '</b> people are listed and <b>' + usual + '</b> is usual.</p>' +
+      (first.length === 1 ? '<p>Next in line: <b>' + h(first[0]) + '</b>.</p>' : '<p>Tied for next: <b>' + h(first.join(', ')) + '</b>. They have lost the same hours, so this app has no basis to choose between them.</p>') +
+      (done.length ? '<p class="subtle">Recorded: ' + h(done.map(item => item.person + ', ' + item.hours + ' h, ' + (item.voluntary ? 'offered' + (item.inPlaceOf ? ' in place of ' + item.inPlaceOf : '') : 'sent home')).join('; ')) + '</p>' : '') +
+      '<div class="line-list">' + order.map(item => '<div><span><b>' + h(item.person) + '</b> <small>' + item.hours + ' hours lost so far' + (item.last ? ', last released ' + h(dayLabel(item.last, { month:'short', day:'numeric' })) : '') +
+        '</small></span>' + button('Went home', 'release', 'class="secondary" ' + valueAttr(listed.find(entry => isSame(entry.person, item.person)).key)) + '</div>').join('') + '</div>' +
+      '<p class="subtle">Whoever has lost the fewest hours goes first. Hours count the same whether a person offered or was sent.</p>');
+  }
+  if (type === 'release') {
+    const working = state.assignments.filter(item => item.date === row.date && item.shift === row.shift && state.directory[normalizeName(item.person)]?.status !== 'Student').map(item => item.person);
+    const order = releaseOrder([...new Set(working)], state.releases);
+    const first = firstInLine(order);
+    return shell('Low census · ' + shiftCaption(row), '<p><b>' + h(row.person) + '</b> went home early.</p>' +
+      '<p class="subtle">' + (first.length === 1 ? 'Next in line for a cut on this shift: <b>' + h(first[0]) + '</b> (' + order[0].hours + ' hours so far).' : 'Tied for next on this shift: <b>' + h(first.join(', ')) + '</b>.') +
+      ' Hours count the same whether someone offered or was sent, so offering never moves a person to the front.</p>' +
+      '<form data-form="release"><input type="hidden" name="key" value="' + h(row.key) + '"><label>Hours not worked<input name="hours" type="number" min="0.5" max="12" step="0.5" required></label>' +
+      '<label>How it happened<select name="how"><option value="voluntary">Offered to go home</option><option value="directed">Was sent home</option></select></label>' +
+      '<label>If they offered, whose turn did they take?<select name="inPlaceOf"><option value="">Nobody else was up</option>' +
+      order.filter(item => !isSame(item.person, row.person)).map(item => '<option' + (first.length === 1 && isSame(first[0], item.person) ? ' selected' : '') + '>' + h(item.person) + '</option>').join('') +
+      '</select></label><div class="actions"><button class="primary">Save</button></div></form>');
+  }
+  if (type === 'people-review') {
+    const list = ui.pending.people;
+    const row = (person, index) => '<div class="person-row' + (person.check ? ' check' : '') + '">' + (ui.dialog.images?.[person.source.page] ? stripMarkup(ui.dialog.images[person.source.page], person.source.box) : '') +
+      '<div class="person-fields"><input name="last" aria-label="Last name ' + (index + 1) + '" placeholder="Last name" maxlength="60" value="' + h(person.last) + '">' +
+      '<input name="first" aria-label="First name ' + (index + 1) + '" placeholder="First name" maxlength="60" value="' + h(person.first) + '">' +
+      '<select name="group" aria-label="Group ' + (index + 1) + '">' + GROUPS.map(group => '<option' + (person.group === group ? ' selected' : '') + '>' + group + '</option>').join('') + '</select>' +
+      '<input name="cell" aria-label="Cell ' + (index + 1) + '" placeholder="Cell" inputmode="tel" maxlength="16" value="' + h(formatPhone(person.cell)) + '">' +
+      '<input name="office" aria-label="Office ' + (index + 1) + '" placeholder="Office" maxlength="8" value="' + h(person.office) + '">' +
+      '<input type="hidden" name="title" value="' + h(person.title) + '"><input type="hidden" name="role" value="' + h(person.role) + '"></div></div>';
+    return shell('Check the directory', '<p>Compare each line with the strip of the photo above it. Shaded lines are the ones the reader was unsure of. Clear a last name to leave someone out.</p>' +
+      '<form data-form="people"><div class="person-rows">' + list.map(row).join('') + '</div><div class="actions">' +
+      button('Back', 'import', 'class="secondary"') + '<button class="primary">Save ' + list.length + ' people</button></div></form>');
   }
   if (type === 'flag') {
     const flag = ui.pending.flags[id];
@@ -211,25 +623,26 @@ function dialogMarkup() {
     const known = [...new Set([...ui.pending.assignments.map(item => item.person), ...actorNames()])].sort((a, b) => a.localeCompare(b));
     const blank = rows.findIndex(row => row.check);
     const focus = blank >= 0 ? blank : rows.length;
-    const line = (row, index) => '<div class="name-row' + (row?.check ? ' check' : '') + '"><input name="person" list="known-names" maxlength="80" autocomplete="off" placeholder="Name" aria-label="Name ' +
-      (index + 1) + '" value="' + h(row?.person || '') + '"' + (index === focus ? ' autofocus' : '') + '><select name="role" aria-label="Role for name ' + (index + 1) + '">' +
-      [['', 'No role'], ...Object.entries(ROLE_LABELS)].map(([value, label]) => '<option value="' + value + '"' + ((row?.role || '') === value ? ' selected' : '') + '>' + label + '</option>').join('') +
-      '</select><input name="hours" maxlength="9" autocomplete="off" placeholder="7-3" pattern="\\d{1,2}(:\\d{2})?-\\d{1,2}(:\\d{2})?" title="Partial hours like 7-3 or 7-3:30" aria-label="Partial hours for name ' + (index + 1) + '" value="' + h(row?.hours || '') + '"></div>';
     return shell('Check this shift · ' + left + ' left', '<p>' + h(flag.message) + '</p>' + (chosen ? cropMarkup(chosen, flag.source) : '') +
       '<form data-form="correct" data-index="' + id + '"><div class="cell-when"><label>Date<input name="date" type="date" value="' + h(flag.draft.date) +
       '" required></label><label>Shift<select name="shift"><option value="D"' + (flag.draft.shift === 'D' ? ' selected' : '') +
       '>Day</option><option value="N"' + (flag.draft.shift === 'N' ? ' selected' : '') + '>Night</option></select></label></div>' +
-      '<p class="subtle">One box per person. Fix a name, add anyone missing, or clear a box to remove someone.' +
+      '<p class="subtle">One line per person. Fix a name, add anyone missing, or clear a line to remove someone. A name entered twice is kept once.' +
       (suggested.length ? ' Shaded names are unsure readings.' : '') + '</p>' +
-      '<div class="name-rows">' + Array.from({ length: Math.max(rows.length + 2, 5) }, (_, index) => line(rows[index], index)).join('') + '</div>' +
-      '<datalist id="known-names">' + known.map(name => '<option value="' + h(name) + '">').join('') + '</datalist><div class="actions">' +
+      nameLines(rows, focus) + knownList(known) + '<div class="actions">' +
       button('Leave as read', 'dismiss-flag', 'class="secondary" ' + valueAttr(id)) +
       '<button class="primary">Save and next</button></div></form>');
   }
   if (type === 'shift') return shell(shiftCaption(row), '<p><b>' + h(row.person) + '</b> · ' + h(row.date) +
     (row.role ? ' · ' + h(ROLE_LABELS[row.role] || row.role) : '') + (row.hours ? ' · ' + h(row.hours) : '') + '</p>' +
+    (contactFor(row.person)?.cell && !isMine(row) ? '<p class="person-lines"><span>' + h(formatPhone(contactFor(row.person).cell)) + '</span>' + contactButtons(contactFor(row.person)) + '</p>' : '') +
     (row.sources.length ? '<p>' + button('See photo source', 'source', 'class="text-button" ' + valueAttr(row.key)) +
-      ' <small>' + h(row.sources.length + ' source page(s)') + '</small></p>' : '<p class="subtle">Fictional starting roster. Import sample photos to see image evidence.</p>') +
+      ' <small>' + h(row.sources.length + ' source page(s)') + '</small></p>' : '<p class="subtle">' + (row.manual ? 'Added by hand. There is no photo for this line.' :
+      state.mode === 'sample' ? 'Fictional starting roster. Import sample photos to see image evidence.' : 'There is no photo for this line.') + '</p>') +
+    (state.releases.some(item => item.key === row.key) ? '<p class="subtle">Low census recorded: ' + h(state.releases.filter(item => item.key === row.key).map(item =>
+      item.hours + ' h, ' + (item.voluntary ? 'offered to go' + (item.inPlaceOf ? ' in place of ' + item.inPlaceOf : '') : 'sent home')).join('; ')) + '</p>' : '') +
+    '<p>' + button('Record low census (VA)', 'release', 'class="text-button" ' + valueAttr(row.key)) + ' ' +
+      button('Edit names on this shift', 'edit-shift', 'class="text-button" ' + valueAttr(row.date + '|' + row.shift)) + '</p>' +
     (agreedRequestFor(row) ? '<p class="subtle">This shift is part of an agreed request that is queued for review. It cannot be offered again until that is settled.</p>' +
       '<div class="actions">' + button('Open the request', 'thread', 'class="secondary" ' + valueAttr(agreedRequestFor(row).id)) + '</div>' :
     isMine(row) ? '<div class="actions">' + button('Trade this shift', 'matches', 'class="primary" data-kind="trade" ' + valueAttr(row.key)) +
@@ -259,13 +672,25 @@ function dialogMarkup() {
       (request.status === 'Awaiting reply' && isSame(state.actor, request.recipient) ?
         '<div class="actions">' + button('Decline', 'decision', 'class="secondary" data-value="decline"') +
         button('Accept and queue for review', 'decision', 'class="primary" data-value="accept"') + '</div>' : '') +
+      (request.status === 'Awaiting reply' && isSame(state.actor, request.from.person) && contactFor(request.recipient)?.cell ?
+        '<p class="person-lines"><span class="subtle">This app cannot notify ' + h(request.recipient) + ' yet. Send it from your phone:</span>' +
+        contactButtons(contactFor(request.recipient), requestText(request)) + '</p>' : '') +
       (request.status.startsWith('Both agreed') ? '<p class="subtle">Agreement recorded here. A coordinator can review and enter it in the official system.</p>' : ''));
   }
-  if (type === 'audit') return shell('Decision history', '<p class="subtle">Local receipts are linked by hash. Exported receipts can be checked independently. A local owner can replace the whole history.</p>' +
-    (state.events.length ? '<ul class="compact">' + [...state.events].reverse().slice(0,25).map(event => '<li>' +
-      h(event.type + ' · ' + timeLabel(event.time) + ' · ' + event.hash.slice(0,12)) + '</li>').join('') + '</ul>' : '<p>No decisions recorded yet.</p>') +
-    '<div class="actions">' + button('Export receipts', 'export', 'class="secondary"') +
-    (!publicDemo ? button('Manage local data', 'data', 'class="text-button"') : '') + '</div>');
+  if (type === 'audit') {
+    const head = state.events.at(-1)?.hash || '';
+    const who = event => isKeeper() || isSame(event.actor, state.actor) ? ' · ' + event.actor : '';
+    return shell('Activity log', '<p class="subtle">Changes, questions and recorded access requests leave hash-linked receipts. They record the selected profile, device time and source fingerprints. No authenticated identity or active human monitoring is provided. Internal changes and missing middle entries can be detected; detecting a missing tail or replaced log requires a checkpoint kept separately. ' +
+      (isKeeper() ? 'You keep the record, so you see every name.' : 'You see your own name. Whoever keeps the record sees them all.') + '</p>' +
+      (state.events.length ? '<p><b>' + state.events.length + ' receipts.</b> The newest 25:</p><ul class="compact">' + [...state.events].reverse().slice(0,25).map(event => '<li>' +
+        h(event.type + who(event) + ' · ' + timeLabel(event.time) + ' · ' + event.hash.slice(0,12)) + '</li>').join('') + '</ul>' : '<p>Nothing recorded yet.</p>') +
+      '<div class="actions">' + button('Check every receipt', 'verify', 'class="secondary"') + button('Check retained posts, files and documents', 'verify-content', 'class="secondary"') + (isKeeper() ? button('Export receipts', 'export', 'class="secondary"') : '') +
+      (!publicDemo ? button('Backup and restore', 'data', 'class="text-button"') : '') + '</div>' +
+      (head ? '<h3>Latest fingerprint</h3><p class="mark">' + h(head) + '</p><p class="subtle">Whoever holds this device could replace the whole log. A fingerprint kept somewhere else is what catches that. Copy this one and send it to yourself or a coworker now and then. ' +
+        'Later, paste the complete fingerprint below to check it against the whole current chain. This checks integrity, not the truth of the entries or the identity of a person.</p><div class="actions">' + button('Copy the latest fingerprint', 'mark-copy', 'class="secondary"') + '</div>' +
+        '<form data-form="mark"><label>An earlier fingerprint<input name="mark" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="64" placeholder="Paste it here"></label>' +
+        '<div class="actions inline"><button class="secondary">Look for it in the log</button></div></form>' : ''));
+  }
   if (type === 'staff-setup') {
     const name = chosen || state.actor;
     const profile = state.directory[normalizeName(name)] || { skills:[] };
@@ -274,13 +699,154 @@ function dialogMarkup() {
       actorNames().map(person => '<option' + (isSame(name,person) ? ' selected' : '') + '>' + h(person) + '</option>').join('') +
       '</select><form data-form="profile"><input type="hidden" name="person" value="' + h(name) + '">' +
       '<label>Status<select name="status"><option value="">Unknown</option><option' + (profile.status === 'Staff' ? ' selected' : '') +
-      '>Staff</option><option' + (profile.status === 'PRN' ? ' selected' : '') + '>PRN</option></select></label>' +
+      '>Staff</option>' + ['Contract', 'PRN', 'Student'].map(status => '<option' + (profile.status === status ? ' selected' : '') + '>' + status + '</option>').join('') + '</select></label>' +
       '<label><span><input type="checkbox" name="day"' + (profile.skills.includes('D') ? ' checked' : '') + '> Qualified for day shift</span></label>' +
       '<label><span><input type="checkbox" name="night"' + (profile.skills.includes('N') ? ' checked' : '') + '> Qualified for night shift</span></label>' +
+      '<label>Weekends<select name="arrangement"><option value="">Regular rotation</option><option value="weekend-only"' + (profile.arrangement === 'weekend-only' ? ' selected' : '') +
+      '>Weekend-only position</option><option value="weekend-volunteer"' + (profile.arrangement === 'weekend-volunteer' ? ' selected' : '') + '>Regular position, taking extra weekends by choice</option></select></label>' +
+      '<p class="subtle">Either choice takes this person’s weekend shifts out of the rotation, so nobody else is measured against them. Extra weekends taken by choice are shown as credit.</p>' +
+      '<label><span><input type="checkbox" name="keeper"' + (state.custodians.includes(normalizeName(name)) ? ' checked' : '') + '> Keeps the fairness record (sees everyone’s numbers)</span></label>' +
       '<button class="primary">Save staff details</button></form>');
   }
-  if (type === 'data') return shell('Local workspace data', '<p>Clear the imported roster, source photos, messages and receipts from this browser and restore the sample workspace.</p>' +
-    button('Erase local workspace', 'erase', 'class="danger"'));
+  if (type === 'voice') {
+    const body = !voice || voice.state === 'asking' ? '<p>Allow the microphone when the browser asks. Recording starts right away.</p>' :
+      voice.state === 'error' ? '<p>' + h(voice.message) + '</p><div class="actions">' + button('Try again', 'voice', 'class="primary"') + '</div>' :
+      voice.state === 'recording' ? '<div class="recording"><span class="rec-dot"></span><b id="voice-clock">0:00</b></div>' +
+        '<div class="actions center">' + button('■ Stop', 'voice-stop', 'class="primary big"') + '</div><p class="subtle center">Stops by itself at ' + clock(VOICE_LIMIT_SECONDS) + '. ' + RULE + '</p>' :
+      '<audio class="post-audio" data-media="voice-preview" src="' + voice.url + '" controls></audio><form data-form="voice">' +
+        '<label>What is it about? (optional)<input name="caption" maxlength="200" autocomplete="off" placeholder="Shift change at 7, new filters in the supply room"></label>' +
+        '<label><span><input type="checkbox" name="inside"> Keep inside the department (no Share button)</span></label>' +
+        '<p class="subtle">' + clock(voice.seconds) + ' recorded. ' + RULE + '</p><p class="refusal" role="alert"></p>' +
+        '<div class="actions">' + button('Record again', 'voice', 'class="secondary"') + '<button class="primary">Send to the department</button></div></form>';
+    return shell('Voice message to everyone', body);
+  }
+  if (type === 'share') {
+    const post = state.posts.find(item => item.id === id);
+    if (!post) return '';
+    const text = shareText(post), files = (post.media || []).filter(item => mediaUrls.get(item.id));
+    return shell('Share this post', '<p class="subtle">On a phone, Share opens the phone’s own share sheet, which sends the file itself to Messages, Mail, YouTube or any other app. Here, use these.</p>' +
+      '<textarea id="share-text" readonly rows="3">' + h(text) + '</textarea>' +
+      '<div class="actions wrap">' + button('Copy the words', 'copy-share', 'class="secondary" ' + valueAttr(post.id)) +
+      '<a class="secondary link-button" href="mailto:?subject=' + encodeURIComponent('From the department board') + '&body=' + encodeURIComponent(text) + '">Email</a>' +
+      '<a class="secondary link-button" href="sms:?&body=' + encodeURIComponent(text) + '">Text message</a></div>' +
+      (files.length ? '<h3>Files</h3><p class="subtle">Email and text carry the words only. Download the file, then attach or upload it wherever it needs to go.</p>' +
+        files.map(item => '<a class="post-file" href="' + mediaUrls.get(item.id) + '" download="' + h(item.name) + '"><b>' + h(item.name) + '</b><span>' + fileSize(item.size) + ' · Download</span></a>').join('') : ''));
+  }
+  if (type === 'remove-post') return shell('Remove this post?', '<p>It is taken off the board together with its files. This cannot be undone.</p><div class="actions">' +
+    button('Keep it', 'close', 'class="secondary"') + button('Remove it', 'remove-post-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
+  if (type === 'notice') return shell('Before you use this', '<p><b>This is not an official hospital product.</b> It is run by department staff to make the schedule and department news easier to follow. The hospital’s own systems stay the official record.</p>' +
+    '<p><b>Never put patient information here.</b> No names, faces, monitors, charts, record numbers or anything that could point to a patient, in a post, a picture, a video, a recording or a question.</p>' +
+    '<p><b>Recorded actions use cryptographic audit receipts.</b> Changes, question lookups and recorded access requests keep fingerprints and selected source versions. Routine receipts do not keep question text. Sending a reviewed question or remembering wording saves that text or its search words in this browser and in backups.</p>' +
+    '<p><b>Hashing does not protect patient information.</b> It is not encryption, a patient-information detector, hospital approval or proof of who acted. The text screen checks only some patterns; it does not inspect uploaded images, video, audio or document-file contents. No one is actively monitoring this device. Deleted content cannot be recovered from its fingerprint.</p>' +
+    '<p class="subtle">Receipts use the selected Viewing as profile and this device’s clock. Whoever controls this browser can replace the whole history; keep an independent checkpoint to detect replacement. Keep backups and exports private.</p>' +
+    (noticeSeen ? '<p class="subtle">Acknowledged on this device ' + h(timeLabel(noticeSeen.at)) + ', viewing as ' + h(noticeSeen.by) + '.</p><div class="actions">' + button('Close', 'close', 'class="secondary"') + '</div>' :
+      '<div class="actions">' + button('I understand', 'notice-ok', 'class="primary"') + '</div>'));
+  if (type === 'teach') {
+    if (!isKeeper()) return shell('Record keeper access', '<p>Switch to the record keeper’s profile to manage taught answers. Profile selection is a local courtesy until accounts exist.</p>');
+    const picked = state.unanswered.find(item => item.id === ui.dialog.pick);
+    if (picked) return shell('Answer this once', '<p class="fair-line">' + h(picked.text) + '</p><form data-form="teach"><input type="hidden" name="id" value="' + h(picked.id) + '">' +
+      '<label>The answer<textarea name="answer" rows="4" required maxlength="1200" placeholder="Write it the way you would say it to a coworker"></textarea></label>' +
+      '<label>Who says so, or which document<input name="source" maxlength="120" autocomplete="off" placeholder="Lead, Nov 10. Or: Time off policy, section 3"></label>' +
+      '<label>Link an added source document<select name="documentId"><option value="">General department note; no document authority</option>' + state.documents.map(doc => '<option value="' + h(doc.id) + '">' + h(doc.title) + '</option>').join('') + '</select></label>' +
+      '<p class="subtle">This is a human-written custodian note, not official policy approval. A linked note stops matching when its source changes or is removed. Live roster answers and document passages take precedence. ' + RULE + '</p><p class="refusal" role="alert"></p>' +
+      '<div class="actions">' + button('Back', 'teach-list', 'class="secondary"') + '<button class="primary">Save the answer</button></div></form>');
+    return shell('What Ask has been taught', '<h3>Waiting for an answer</h3>' + (state.unanswered.length ? '<div class="line-list">' + state.unanswered.map(item => '<div><span><b>' + h(item.text) + '</b> <small>sent ' + h(prettyDate(item.at.slice(0, 10))) +
+        '</small></span><span class="pair">' + button('Answer it', 'teach-pick', 'class="secondary" ' + valueAttr(item.id)) + button('Dismiss', 'teach-drop', 'class="secondary" ' + valueAttr(item.id)) + '</span></div>').join('') + '</div>' : '<p class="subtle">Nothing is waiting.</p>') +
+      '<h3>Taught answers</h3>' + (state.answers.length ? '<div class="line-list">' + state.answers.map(item => '<div><span><b>' + h(item.asks[0]) + '</b> <small>' + h(item.answer.slice(0, 120)) + ' · ' + h(item.by) + ', ' + h(prettyDate(item.at.slice(0, 10))) +
+        '</small></span>' + button('Remove', 'teach-remove', 'class="secondary" ' + valueAttr(item.id)) + '</div>').join('') + '</div>' : '<p class="subtle">None yet.</p>') +
+      '<div class="actions">' + button('Back to Ask', 'ask-back', 'class="secondary"') + '</div>');
+  }
+  if (type === 'note') {
+    const note = state.answers.find(entry => entry.id === id);
+    return shell('Custodian note', note ? '<p class="fair-line">' + h(note.answer) + '</p><p class="subtle">Recorded as ' + h(note.by) + ' · ' + h(timeLabel(note.at)) + '. Not official policy. ' + h(note.source || 'No source named.') + '</p>' +
+      (note.documentId ? '<p>' + button('Open linked document', 'doc-open', 'class="secondary" ' + valueAttr(note.documentId)) + '</p>' : '') +
+      '<p>' + button('Back to Ask', 'ask-back', 'class="secondary"') + '</p>' : '<p>This note has been removed.</p>');
+  }
+  if (type === 'send-question') return shell('Review the question to save', '<form data-form="send-question"><label>Question<textarea name="question" maxlength="200" required>' + h(ui.dialog.q || '') + '</textarea></label>' +
+    '<p class="subtle">Sending saves these exact words for the record keeper in this browser and in backups. They remain in a taught answer if the keeper answers it. Remove personal or patient details first. Everyone with control of this browser can access its data.</p><p class="refusal" role="alert"></p><div class="actions">' +
+    button('Cancel', 'ask-back', 'class="secondary"') + '<button class="primary">Save reviewed question</button></div><input type="hidden" name="teach" value="' + (ui.dialog.teach ? 'yes' : '') + '"></form>');
+  if (type === 'ask') {
+    const { q = '' } = ui.dialog;
+    // Recheck the current records and viewer every time; never reopen a cached keeper-only answer.
+    const result = q ? currentAsk() : null;
+    const canRemember = result?.taught || (ui.dialog.opened?.startsWith('doc|') && result?.items.some(entry => entry.go === ui.dialog.opened));
+    const item = entry => '<div class="ask-item"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h(entry.sub) + '</small>' : '') + '</div>' +
+      (entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
+    return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
+      '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
+      (result ? '<div class="ask-answer" role="status">' + (result.read ? '<p class="subtle">Read as: “' + h(result.read) + '”</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') + result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.map(item).join('') +
+        '<p class="subtle">From: ' + h(result.source) + '</p>' +
+        (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' : ui.dialog.no || result.empty ? '<div class="actions wrap">' + button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
+          (isKeeper() ? button('Teach the answer', 'ask-teach', 'class="secondary"') : '') + '</div>' :
+          '<div class="actions wrap"><span class="subtle">Did that answer it?</span>' + button(canRemember ? 'Yes, remember this wording' : 'Yes', 'ask-yes', 'class="secondary"') + button('No', 'ask-no', 'class="secondary"') + '</div>' +
+          (canRemember ? '<p class="subtle">Remembering saves wording or search words in this browser and backups. It records relevance feedback, not policy approval.</p>' : '')) + '</div>' :
+        '<p class="subtle">It looks up supported questions and opens the records it finds. Nothing is sent to an AI service. Question text is not routinely saved; sending it or remembering wording saves a reviewed example. Receipts record fingerprints and source versions.</p>') +
+      '<div class="chip-list"><span class="subtle">Try</span><div>' + SUGGESTIONS.map((text, index) => button(h(text), 'ask-try', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' +
+      '<p>' + button('Documents it can search (' + state.documents.length + ')', 'docs', 'class="text-button"') + ' ' +
+        (isKeeper() ? button('Taught answers (' + state.answers.length + '), waiting (' + state.unanswered.length + ')', 'teach-list', 'class="text-button"') : '') + '</p>');
+  }
+  if (type === 'docs') {
+    const about = doc => [doc.kind, doc.effective ? 'effective ' + doc.effective : 'no effective date given', 'added by ' + doc.by + ' on ' + prettyDate(doc.added.slice(0, 10)), fileSize(doc.text.length)].join(' · ');
+    return shell('Documents', '<p class="subtle">Ask searches these and quotes them with their title, section and date. Add only what the department is allowed to share. They are kept in this browser and go into backups.</p>' +
+      (state.documents.length ? '<div class="line-list">' + state.documents.map(doc => '<div><span><b>' + h(doc.title) + '</b> <small>' + h(about(doc)) + '</small></span><span class="pair">' +
+        button('Open', 'doc-open', 'class="secondary" ' + valueAttr(doc.id)) + (ui.dialog.confirm === doc.id ? button('Remove for good', 'doc-remove-yes', 'class="danger" ' + valueAttr(doc.id)) :
+          button('Remove', 'doc-remove', 'class="secondary" ' + valueAttr(doc.id))) + '</span></div>').join('') + '</div>' : '<p>No documents yet.</p>') +
+      '<h3>Add a document</h3><form data-form="doc"><label>Title<input name="title" maxlength="120" required autocomplete="off" placeholder="Time off requests"></label>' +
+      '<div class="cell-when"><label>What it is<select name="kind">' + ['Policy', 'Procedure', 'Protocol', 'Manual', 'Other'].map(kind => '<option>' + kind + '</option>').join('') + '</select></label>' +
+      '<label>Effective date<input name="effective" type="date"></label></div>' +
+      '<label class="attach"><b>＋ A text file (.txt or .md)</b><input id="doc-file" name="file" type="file" accept=".txt,.md,text/plain,text/markdown"></label>' +
+      '<label>Or paste the words<textarea name="text" rows="5" placeholder="Paste the text of the document here"></textarea></label>' +
+      '<p class="subtle">A PDF cannot be read yet. Open it, select all, copy, and paste the words here. ' + RULE + '</p>' +
+      '<div class="actions">' + button('Back to Ask', 'ask-back', 'class="secondary"') + '<button class="primary">Add the document</button></div></form>');
+  }
+  if (type === 'doc') {
+    const doc = state.documents.find(entry => entry.id === id);
+    if (!doc) return '';
+    const at = ui.dialog.at, end = at == null ? 0 : (doc.text.indexOf('\n\n', at) < 0 ? doc.text.length : doc.text.indexOf('\n\n', at));
+    return shell(doc.title, '<p class="subtle">' + h([doc.kind, doc.effective ? 'effective ' + doc.effective : 'no effective date given', 'added by ' + doc.by + ' on ' + prettyDate(doc.added.slice(0, 10))].join(' · ')) + '</p>' +
+      '<div class="doc-text">' + (at == null ? h(doc.text) : h(doc.text.slice(0, at)) + '<mark id="doc-mark">' + h(doc.text.slice(at, end)) + '</mark>' + h(doc.text.slice(end))) + '</div>' +
+      '<div class="actions">' + button('Back to Ask', 'ask-back', 'class="secondary"') + '</div>');
+  }
+  if (type === 'holiday-rules') {
+    const rules = state.holidayRules;
+    return shell('Which holidays count', '<form data-form="holidays"><p class="subtle">Untick a day your department does not treat as a holiday. Add any day of your own.</p>' +
+      HOLIDAY_NAMES.map(name => '<label><span><input type="checkbox" name="on" value="' + h(name) + '"' + (rules.off.includes(name) ? '' : ' checked') + '> ' + h(name) + '</span></label>').join('') +
+      rules.extra.map((item, index) => '<label><span><input type="checkbox" name="keep" value="' + index + '" checked> ' + h(item.name + ' · ' + item.date) + '</span></label>').join('') +
+      '<h3>Add a day</h3><div class="cell-when"><label>Name<input name="name" maxlength="40" autocomplete="off" placeholder="Easter"></label><label>Date<input name="date" type="date"></label></div>' +
+      '<div class="actions"><button class="primary">Save</button></div></form>');
+  }
+  if (type === 'edit-shift') {
+    const { date, shift } = ui.dialog;
+    const rows = state.assignments.filter(item => item.date === date && item.shift === shift);
+    return shell('Who is on · ' + shiftCaption({ date, shift }), '<form data-form="edit-shift"><input type="hidden" name="date" value="' + h(date) + '"><input type="hidden" name="shift" value="' + h(shift) + '">' +
+      '<p class="subtle">One line per person. Add a name, fix one, or clear a line to take someone off. A name entered twice is kept once.</p>' +
+      nameLines(rows, rows.length) + knownList(actorNames()) + '<div class="actions"><button class="primary">Save</button></div></form>');
+  }
+  if (type === 'data') {
+    const { restore, confirmErase } = ui.dialog;
+    // A step that replaces or removes everything gets the sheet to itself: one question, two answers.
+    if (restore) return shell('Restore this backup?', '<p><b>' + h(restore.name) + '</b> holds ' + restore.state.assignments.length + ' shifts and ' + (restore.state.people || []).length + ' contacts' +
+      (restore.savedAt ? ', saved ' + h(timeLabel(restore.savedAt)) : '') + '.</p><p>Restoring replaces what is in this browser now' +
+      (state.mode === 'sample' ? ' (sample names).' : ' (' + state.assignments.length + ' shifts).') + '</p><div class="actions">' +
+      button('Cancel', 'data', 'class="secondary"') + button('Replace this workspace with the backup', 'restore', 'class="danger"') + '</div>');
+    if (confirmErase) return shell('Erase everything in this browser?', '<p><b>This cannot be undone.</b> ' + (state.mode === 'sample' ? 'The sample workspace will be reset.' :
+      state.assignments.length + ' shifts and ' + state.people.length + ' contacts will be removed. Save a backup file first if you might want them back.') + '</p><div class="actions">' +
+      button('Cancel', 'data', 'class="secondary"') + button('Erase everything in this browser', 'erase', 'class="danger"') + '</div>');
+    return shell('Workspace data', '<p>This workspace is kept in this browser only, at <b>' + h(location.host) + '</b>. A different browser, or a different address, starts with sample names.</p>' +
+      '<p><b>' + state.assignments.length + '</b> shifts · <b>' + state.people.length + '</b> contacts · ' + h(state.mode === 'sample' ? 'sample workspace' : 'published ' + timeLabel(state.importedAt)) + ' · version ' + BUILD + '</p>' +
+      '<h3>Backup</h3><p class="subtle">A backup file holds the schedule, the contacts with their phone numbers, requests, history and added documents. Photos, videos and recordings are not included. Keep the file somewhere private.</p>' +
+      '<p>' + button('Save a backup file', 'backup', 'class="primary"') + '</p>' +
+      '<label class="drop"><b>Restore from a backup file</b><span>Choose a file saved with the button above</span><input id="backup-file" type="file" accept="application/json,.json"></label>' +
+      (() => {
+        const usage = loadState(usageKey, null), rows = Object.entries(usage?.counts || {}).sort((a, b) => b[1] - a[1]);
+        return '<h3>How this copy gets used</h3><p class="subtle">Which buttons get pressed, by button name and total only. No names, no shifts, no typed words, no recordings. Kept in this browser and left out of backups.</p>' +
+          (rows.length ? '<div class="usage">' + rows.slice(0, 15).map(([name, total]) => '<div><span>' + h(USAGE_NAMES[name] || name) + '</span><b>' + total + '</b></div>').join('') + '</div>' +
+            '<p class="subtle">' + rows.reduce((sum, row) => sum + row[1], 0) + ' presses since ' + h(usage.since) + '.</p><p>' + button('Copy the counts', 'usage-copy', 'class="secondary"') + ' ' +
+            button('Reset the counts', 'usage-reset', 'class="secondary"') + '</p>' : '<p class="subtle">Nothing counted yet.</p>');
+      })() +
+      '<h3>Start over</h3><p class="subtle">Clears the roster, contacts, source photos, messages and receipts from this browser and brings back the sample names.</p>' +
+      button('Erase local workspace', 'erase-ask', 'class="secondary"'));
+  }
   return '';
 }
 
@@ -338,9 +904,37 @@ function matches(row, kind) {
       a.recipient.localeCompare(b.recipient)).slice(0,40);
 }
 
+const pageUrls = new Map();
 function clearPreview() {
   if (sourceUrl) URL.revokeObjectURL(sourceUrl);
   sourceUrl = null;
+  for (const url of pageUrls.values()) URL.revokeObjectURL(url);
+  pageUrls.clear();
+}
+async function loadPages(pages) {
+  const images = {};
+  for (const page of new Set(pages)) {
+    const data = await getSource(page);
+    if (!data) continue;
+    pageUrls.set(page, URL.createObjectURL(data.file));
+    images[page] = { ...data, url: pageUrls.get(page) };
+  }
+  return images;
+}
+// One line of a photographed list, shown as a wide strip.
+function stripMarkup(image, box) {
+  const padX = image.width * 0.02, padY = (box[3] - box[1]) * 0.35;
+  const left = Math.max(0, box[0] - padX), top = Math.max(0, box[1] - padY);
+  const width = Math.min(image.width, box[2] + padX) - left, height = Math.min(image.height, box[3] + padY) - top;
+  const percent = value => (value * 100).toFixed(3) + '%';
+  return '<div class="source-crop strip" style="aspect-ratio:' + width + '/' + height + '"><img src="' + h(image.url) + '" alt="" style="width:' +
+    percent(image.width / width) + ';left:' + percent(-left / width) + ';top:' + percent(-top / height) + '"></div>';
+}
+function requestText(request) {
+  const first = contactFor(request.recipient)?.first || request.recipient;
+  return 'Hi ' + first + ', it is ' + state.actor + '. ' + (request.to
+    ? 'Could you trade your ' + shiftCaption(request.to) + ' shift for my ' + shiftCaption(request.from) + ' shift?'
+    : 'Could you take my ' + shiftCaption(request.from) + ' shift?');
 }
 async function showSource(source) {
   clearPreview();
@@ -368,6 +962,7 @@ async function importFiles(files, sampleImport = false) {
     ui.pending.sample = sampleImport;
   } finally {
     ui.busy = null;
+    saveDraft();
     render();
   }
 }
@@ -375,21 +970,61 @@ async function importFiles(files, sampleImport = false) {
 app.addEventListener('click', event => {
   const control = event.target.closest('[data-action]');
   if (!control || control.disabled) return;
+  countPress(control.dataset.action, control.dataset.value);
+  if (control.dataset.action === 'play-link') {
+    const box = control.closest('.link-player'), frame = document.createElement('iframe');
+    frame.src = box.dataset.embed;
+    frame.title = 'Video player';
+    frame.allow = 'autoplay; fullscreen; picture-in-picture';
+    frame.allowFullscreen = true;
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    box.replaceChildren(frame);
+    return;
+  }
   void act(control.dataset).catch(error => {
     ui.notice = error.message || String(error);
     if (!ui.busy) ui.dialog = null;
     render();
-  });
+  }).finally(saveDraft);
 });
 app.addEventListener('change', event => {
   if (event.target.id === 'actor') {
     state = { ...state, actor: event.target.value };
+    ui.lastAsk = null;
+    ui.askContext = null;
+    ui.dialog = null;
     saveState(storageKey, state);
     render();
   }
   if (event.target.id === 'staff-select') { ui.dialog = { type:'staff-setup', chosen:event.target.value }; render(); }
+  if (event.target.dataset.link) {
+    const key = normalizeName(event.target.dataset.link), value = event.target.value;
+    void commit('Contact matched', { name: key }, previous => withContacts({ ...previous, manualLinks: { ...previous.manualLinks, [key]: value } })).then(render).catch(fail);
+  }
   if (event.target.id === 'photos') void importFiles([...event.target.files]).catch(fail);
+  if (event.target.id === 'backup-file' && event.target.files[0]) void readBackup(event.target.files[0]).catch(fail);
 });
+// A backup file made by this app, or a bare workspace. Nothing is replaced until the person confirms.
+async function readBackup(file) {
+  if (file.size > 30 * 1024 * 1024) throw new Error('That file is too large to be a Department Hub backup.');
+  let parsed;
+  try { parsed = JSON.parse(await file.text()); } catch { throw new Error('That file could not be read as a Department Hub backup.'); }
+  const saved = parsed?.app === 'department-hub' && parsed.state ? parsed.state : parsed;
+  const valid = saved && Array.isArray(saved.assignments) && saved.assignments.every(row => /^\d{4}-\d{2}-\d{2}$/.test(row?.date) && SHIFTS[row.shift] && typeof row.person === 'string' && Array.isArray(row.sources)) &&
+    ['sample', 'local'].includes(saved.mode) && typeof saved.actor === 'string';
+  if (!valid) throw new Error('That file is not a Department Hub backup.');
+  ui.dialog = { type:'data', restore:{ name:file.name, savedAt:parsed.savedAt || saved.importedAt || null, state:saved } };
+  render();
+}
+// A recording made in the browser often carries no length, so the player cannot show one or seek. Asking it to jump far
+// past the end makes the browser work the length out. Media events do not bubble, so this listens on the way down.
+app.addEventListener('loadedmetadata', event => {
+  const player = event.target;
+  if (!player.matches?.('audio, video') || Number.isFinite(player.duration)) return;
+  const back = () => { player.removeEventListener('timeupdate', back); player.currentTime = 0; };
+  player.addEventListener('timeupdate', back);
+  player.currentTime = 1e101;
+}, true);
 app.addEventListener('dragover', event => { if (event.target.closest('#drop-zone')) event.preventDefault(); });
 app.addEventListener('drop', event => {
   if (!event.target.closest('#drop-zone')) return;
@@ -399,18 +1034,277 @@ app.addEventListener('drop', event => {
 app.addEventListener('cancel', event => {
   if (event.target.tagName !== 'DIALOG') return;
   event.preventDefault();
-  if (!ui.busy) { clearPreview(); ui.dialog = null; render(); }
+  if (!ui.busy && (ui.dialog?.type !== 'notice' || noticeSeen)) { clearPreview(); stopVoice(); ui.dialog = null; render(); }
 }, true);
-function fail(error) { ui.notice = error.message || String(error); ui.dialog = null; render(); }
+// A browser closes a dialog by itself when Escape is pressed more than once. The notice comes straight back, and so does
+// a dialog that is in the middle of saving.
+app.addEventListener('close', event => {
+  if (event.target.tagName !== 'DIALOG' || !ui.dialog) return;
+  if ((ui.dialog.type !== 'notice' || noticeSeen) && !ui.busy) { clearPreview(); stopVoice(); ui.dialog = null; }
+  render();
+}, true);
+// Voice message: one tap starts, one tap stops, then send.
+// AAC in an .m4a plays almost anywhere, so it comes first. Plain "audio/mp4" comes last: Safari makes AAC from it, but
+// Chrome would put Opus inside the mp4, which few other players open.
+const voiceType = () => ['audio/mp4;codecs=mp4a.40.2', 'audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(type => window.MediaRecorder?.isTypeSupported?.(type)) || '';
+function stopVoice() {
+  if (!voice) return;
+  const session = voice;
+  voice = null;
+  clearInterval(session.timer);
+  try { if (session.recorder?.state === 'recording') session.recorder.stop(); } catch { /* already stopped */ }
+  session.stream?.getTracks().forEach(track => track.stop());
+  if (session.url) URL.revokeObjectURL(session.url);
+}
+async function startVoice() {
+  stopVoice();
+  const session = voice = { state: 'asking' };
+  ui.dialog = { type:'voice' };
+  ui.notice = '';
+  render();
+  try {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) throw new Error('This browser cannot record on this page. A voice message needs a microphone and a secure address.');
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (voice !== session) { stream.getTracks().forEach(track => track.stop()); return; }      // closed while the browser was asking
+    const type = voiceType(), recorder = new MediaRecorder(stream, type ? { mimeType: type } : undefined), chunks = [];
+    Object.assign(session, { state: 'recording', stream, recorder, started: performance.now() });
+    recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach(track => track.stop());
+      clearInterval(session.timer);
+      if (voice !== session) return;
+      const blob = new Blob(chunks, { type: recorder.mimeType || type || 'audio/webm' });
+      voice = { state: 'review', blob, url: URL.createObjectURL(blob), seconds: Math.max(1, Math.round((performance.now() - session.started) / 1000)) };
+      if (ui.dialog?.type === 'voice') render();
+    };
+    recorder.start();
+    session.timer = setInterval(() => {
+      const elapsed = (performance.now() - session.started) / 1000, shown = document.getElementById('voice-clock');
+      if (shown) shown.textContent = clock(elapsed);
+      if (elapsed >= VOICE_LIMIT_SECONDS && recorder.state === 'recording') recorder.stop();
+    }, 250);
+    render();
+  } catch (error) {
+    if (voice !== session) return;
+    voice = { state: 'error', message: error.name === 'NotAllowedError' ? 'The microphone was not allowed. Allow it for this page in the browser’s site settings, then try again.' :
+      error.name === 'NotFoundError' ? 'No microphone was found on this device.' : error.message || String(error) };
+    if (ui.dialog?.type === 'voice') render();
+  }
+}
+
+function fail(error) { ui.notice = error.message || String(error); ui.flash = ui.notice; ui.dialog = noticeSeen ? null : { type:'notice' }; render(); }
 
 async function act({action, value, kind}) {
+  if (!noticeSeen && !['notice-ok', 'notice'].includes(action)) { ui.dialog = { type:'notice' }; render(); return; }
   const row = state.assignments.find(item => item.key === value);
+  // A request to open or export is recorded, not a claim that an external share/download finished.
+  if (['shift', 'source', 'thread', 'doc-open', 'ask-go', 'share', 'copy-share', 'backup', 'export', 'export-record', 'audit', 'verify', 'verify-content', 'mark-copy'].includes(action)) {
+    void commit('Record access requested', { action, reference:value || null, ...(action === 'doc-open' ? { version:sourceVersions[value] || null } : {}) }, previous => previous).catch(fail);
+  }
+  if (action === 'more-lines') {          // added in place, so nothing already typed is lost
+    const rows = app.querySelector('dialog .name-rows');
+    if (rows) rows.insertAdjacentHTML('beforeend', Array.from({ length: 3 }, (_, index) => nameLine(null, rows.children.length + index)).join(''));
+    return;
+  }
   ui.notice = '';
+  ui.flash = '';
   switch (action) {
-    case 'tab': ui.tab = value; ui.dialog = null; break;
+    case 'tab':
+      ui.tab = value;
+      ui.dialog = null;
+      if (value === 'board') markBoardSeen();
+      break;
+    case 'ask-open': ui.dialog = ui.lastAsk || { type:'ask' }; break;
+    case 'ask-back': ui.dialog = ui.lastAsk || { type:'ask' }; break;
+    case 'ask-try': await askAndLog(SUGGESTIONS[Number(value)]); break;
+    case 'ask-post': if (patientSigns(ui.dialog.q).length) return; ui.draftPost = ui.dialog.q || ''; ui.tab = 'board'; ui.boardFilter = 'all'; ui.dialog = null; ui.scrollTo = '.composer'; markBoardSeen(); break;
+    case 'ask-go': {
+      const [kind, first, second] = String(value).split('|');
+      if (ui.dialog?.type === 'ask' && ui.lastAsk) ui.lastAsk = { ...ui.lastAsk, opened:value };      // the one they chose to read is the one a yes is about
+      if (kind === 'doc') { ui.dialog = { type:'doc', id:first, at:Number(second) }; ui.scrollTo = '#doc-mark'; break; }
+      if (kind === 'note') { ui.dialog = { type:'note', id:first }; break; }
+      ui.dialog = null;
+      if (kind === 'date') { ui.tab = 'schedule'; ui.view = 'week'; ui.date = first; ui.scrollTo = '.day-card[data-date="' + first + '"]'; }
+      else if (kind === 'post') { ui.tab = 'board'; ui.boardFilter = 'all'; ui.scrollTo = '[data-post="' + CSS.escape(first) + '"]'; markBoardSeen(); }
+      else if (kind === 'people' || kind === 'fairness') ui.tab = kind;
+      break;
+    }
+    case 'docs': ui.dialog = { type:'docs' }; break;
+    case 'doc-open': ui.dialog = { type:'doc', id:value }; break;
+    case 'doc-remove': ui.dialog = { type:'docs', confirm:value }; break;
+    case 'doc-remove-yes': {
+      const doc = state.documents.find(entry => entry.id === value);
+      if (!doc) return;
+      await commit('Document removed', { id:doc.id, title:doc.title, version:sourceVersions[doc.id] }, previous => ({ ...previous,
+        documents:previous.documents.filter(entry => entry.id !== value), learned:previous.learned.filter(link => !link.go.startsWith('doc|' + doc.id + '|')) }));
+      ui.dialog = { type:'docs' };
+      ui.flash = 'Removed ' + doc.title + '.';
+      break;
+    }
     case 'view': ui.view = value; break;
     case 'navigate': ui.date = addDays(ui.date, Number(value)); break;
-    case 'close': if (ui.busy) return; clearPreview(); ui.dialog = null; break;
+    case 'today': ui.date = localToday(); break;
+    case 'fair-scope': ui.fairScope = value; break;
+    case 'holiday-rules': if (isKeeper()) ui.dialog = { type:'holiday-rules' }; break;
+    case 'claim-record':
+      if (state.custodians.length) return;
+      await commit('Record keeper set', { keeper:state.actor }, previous => ({ ...previous, custodians:[normalizeName(previous.actor)] }));
+      break;
+    case 'export-record': {
+      if (!isKeeper()) return;
+      const rows = recordRows(), quote = value => '"' + String(value).replace(/"/g, '""') + '"';
+      const lines = [['Name', 'Shift', 'Shifts', 'Weekend turns', 'Share', 'Difference', 'Holidays worked', 'Which holidays', 'Charge', 'ICU', 'Low-census turns', 'Low-census hours', 'Offered to go'].map(quote).join(',')];
+      for (const pool of ['D', 'N']) {
+        const table = ledger(rows, pool, state.directory, state.holidayRules), low = census(rows, pool, state.directory, state.releases, localToday());
+        for (const entry of table.people) {
+          const cut = low.people.find(item => isSame(item.person, entry.person));
+          lines.push([entry.person, pool === 'N' ? 'Night' : 'Day', entry.shifts, entry.weekend, entry.weekendOnly ? '' : entry.weekendFair.toFixed(1),
+            entry.weekendOnly ? 'weekend only' : entry.weekendVolunteer ? '+' + entry.weekendExtra.toFixed(1) + ' by choice' : entry.weekendGap.toFixed(1),
+            entry.holidays.length, entry.holidays.join('; '), entry.charge, entry.icu, cut?.turns || 0, cut?.hours || 0, cut?.offered || 0].map(quote).join(','));
+        }
+      }
+      const url = URL.createObjectURL(new Blob([lines.join('\r\n') + '\r\n'], { type:'text/csv' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'department-hub-record-' + localToday() + '.csv';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+      ui.notice = 'The record was saved to your downloads as ' + link.download + '. It lists people by name. Keep it private.';
+      break;
+    }
+    case 'text-size':
+      textSize = (textSize + 1) % TEXT_SIZES.length;
+      try { localStorage.setItem(textKey, JSON.stringify(TEXT_SIZES[textSize])); } catch { /* still applies for this visit */ }
+      applyTextSize();
+      ui.notice = 'Text size: ' + TEXT_NAMES[textSize] + '.';
+      break;
+    case 'usage-reset': localStorage.removeItem(usageKey); ui.flash = 'Counts reset.'; break;
+    case 'usage-copy': {
+      const usage = loadState(usageKey, null);
+      const text = Object.entries(usage?.counts || {}).sort((a, b) => b[1] - a[1]).map(([name, total]) => total + '\t' + (USAGE_NAMES[name] || name)).join('\n');
+      try { await navigator.clipboard.writeText('Department Hub button counts since ' + (usage?.since || '') + '\n' + text); ui.flash = 'Counts copied.'; }
+      catch { ui.flash = 'Copying was not allowed here.'; }
+      break;
+    }
+    case 'edit-shift': { const [date, shift] = value.split('|'); ui.dialog = { type:'edit-shift', date, shift }; break; }
+    case 'erase-ask': ui.dialog = { type:'data', confirmErase:true }; break;
+    case 'backup': {
+      const file = { app:'department-hub', kind:'backup', version:1, savedAt:new Date().toISOString(), from:location.host, state };
+      const url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type:'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'department-hub-backup-' + localToday() + '.json';
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+      ui.flash = 'Backup saved to your downloads as ' + link.download + '.';
+      break;
+    }
+    case 'restore': {
+      const { restore } = ui.dialog;
+      if (!restore) return;
+      state = prepare(restore.state);
+      sourceVersions = await versionsFor(state.documents);
+      ui.lastAsk = null;
+      ui.askContext = null;
+      ui.draftPost = '';
+      markBoardSeen(null);
+      saveState(storageKey, state);
+      await commit('Workspace restored from a backup', { savedAt:restore.savedAt || null, assignmentCount:state.assignments.length }, previous => previous);
+      void hydrateMedia();
+      ui.pending = null;
+      ui.dialog = null;
+      ui.date = startDate();
+      ui.view = 'week';
+      ui.notice = 'Backup restored: ' + state.assignments.length + ' shifts and ' + state.people.length + ' contacts.';
+      break;
+    }
+    case 'notice': ui.dialog = { type:'notice' }; break;
+    case 'close': if (ui.busy || (ui.dialog?.type === 'notice' && !noticeSeen)) return; clearPreview(); stopVoice(); ui.dialog = null; break;
+    case 'notice-ok':
+      await commit('Notice acknowledged', { by:state.actor }, previous => previous);
+      noticeSeen = { at:new Date().toISOString(), by:state.actor };
+      try { localStorage.setItem(noticeKey, JSON.stringify(noticeSeen)); } catch { /* asked again next time */ }
+      ui.dialog = null;
+      break;
+    case 'verify': {
+      const check = await verifyReceipts(state.events);
+      ui.flash = check.ok ? 'All ' + check.count + ' receipt links and hashes check out. A missing tail or replaced history cannot be detected without a separately saved checkpoint. Content and identities are not verified by this check.' : 'Receipt ' + check.at + ' ' + check.why + '. The history from there on cannot be relied on.';
+      break;
+    }
+    case 'verify-content': {
+      const chain = await verifyReceipts(state.events);
+      if (!chain.ok) { ui.flash = 'Check failed: receipt ' + chain.at + ' ' + chain.why + '.'; break; }
+      const check = await verifyContent({ events:state.events, posts:state.posts, documents:state.documents, file:id => boardStore.file(id) });
+      ui.flash = check.checked + ' retained items checked. ' + (check.issues.length ? check.issues.join(' ') : 'No content mismatches among checked items.') +
+        (check.unavailable.length ? ' Unavailable files (including files excluded from backups): ' + check.unavailable.length + '.' : '') +
+        (check.legacy.length ? ' Older or partially fingerprinted items not fully verified: ' + check.legacy.length + '.' : '') + ' This does not establish policy approval or recover deleted content.';
+      break;
+    }
+    case 'mark-copy':
+      try { await navigator.clipboard.writeText(state.events.at(-1)?.hash || ''); ui.flash = 'Copied. Keep it somewhere outside this app.'; }
+      catch { ui.flash = 'Copying was not allowed here. Press and hold the fingerprint to copy it.'; }
+      break;
+    case 'ask-no': ui.lastAsk = ui.dialog = { ...ui.dialog, no:true }; break;
+    case 'ask-yes': {
+      const { q } = ui.dialog, result = currentAsk(), opened = ui.dialog.opened;
+      const top = result.items.some(item => item.go === opened) ? opened : '';
+      if (!result || ui.dialog.yes) return;
+      if (result.kind === 'blocked') return;
+      const terms = keywords(result.read || q), documentId = top.startsWith('doc|') ? top.split('|')[1] : '', sourceHash = sourceVersions[documentId];
+      const same = link => link.go === top && link.terms.join(' ') === terms.join(' ') && link.sourceHash === sourceHash, asked = q.trim();
+      // Two ways it learns from a yes: a confirmed passage comes first next time, and a taught answer picks up this wording.
+      await commit('Answer relevance feedback', { fingerprint:await sha256(asked.toLowerCase()), kind:result.kind, opened:result.taught || top || null, sourceHash:sourceHash || null,
+        wordingSaved:Boolean(result.taught || sourceHash) }, previous => ({ ...previous,
+        learned: !sourceHash || !terms.length ? previous.learned : previous.learned.some(same) ? previous.learned.map(link => same(link) ? { ...link, count:link.count + 1 } : link) : [...previous.learned, { terms, go:top, count:1, sourceHash, qualifiers:qualifiers(result.read || q) }].slice(-400),
+        answers: !result.taught ? previous.answers : previous.answers.map(item => item.id !== result.taught || item.asks.some(text => text.toLowerCase() === asked.toLowerCase()) ? item : { ...item, asks:[...item.asks, asked].slice(-12) }) }));
+      ui.lastAsk = ui.dialog = { ...ui.dialog, yes:sourceHash ? 'Search words remembered for this source version. This records relevance, not policy approval.' : result.taught ? 'Wording saved with the custodian note. This is not policy approval.' : 'Feedback recorded. Open a passage before remembering wording for it.' };
+      break;
+    }
+    case 'ask-send': case 'ask-teach': {
+      const q = (ui.dialog.q || '').trim();
+      if (!q) return;
+      if (patientSigns(q).length) { ui.flash = 'That question looks like it has patient details in it. Ask it again without them, and then send it.'; break; }     // a waiting question is kept as typed
+      if (action === 'ask-teach' && !isKeeper()) return;
+      ui.dialog = { type:'send-question', q, teach:action === 'ask-teach' };
+      break;
+    }
+    case 'teach-list': if (isKeeper()) ui.dialog = { type:'teach' }; break;
+    case 'teach-pick': if (isKeeper()) ui.dialog = { type:'teach', pick:value }; break;
+    case 'teach-drop': if (isKeeper()) await commit('Question dismissed', { id:value }, previous => ({ ...previous, unanswered:previous.unanswered.filter(item => item.id !== value) })); break;
+    case 'teach-remove': if (isKeeper()) await commit('Taught answer removed', { id:value }, previous => ({ ...previous, answers:previous.answers.filter(item => item.id !== value) })); break;
+    case 'board-filter': ui.boardFilter = value; break;
+    case 'voice': void startVoice(); return;
+    case 'voice-stop': if (voice?.recorder?.state === 'recording') voice.recorder.stop(); return;
+    case 'share': {
+      const post = state.posts.find(item => item.id === value);
+      if (!post || post.inside) return;
+      // Everything up to navigator.share stays synchronous, so the browser still counts it as the person's own tap.
+      const files = (post.media || []).map(item => mediaBlobs.get(item.id) ? new File([mediaBlobs.get(item.id)], item.name, { type: item.type || mediaBlobs.get(item.id).type }) : null).filter(Boolean);
+      if (navigator.share) {
+        const words = { title: 'Department Hub', text: shareText(post) };
+        try { await navigator.share(files.length && navigator.canShare?.({ files }) ? { ...words, files } : words); return; }
+        catch (error) { if (error.name === 'AbortError') return; }
+      }
+      ui.dialog = { type:'share', id:post.id };
+      break;
+    }
+    case 'copy-share': {
+      const post = state.posts.find(item => item.id === value);
+      if (!post) return;
+      try { await navigator.clipboard.writeText(shareText(post)); ui.flash = 'Copied.'; }
+      catch { ui.flash = 'Select the words in the box and copy them.'; }
+      break;
+    }
+    case 'remove-post': ui.dialog = { type:'remove-post', id:value }; break;
+    case 'remove-post-yes': {
+      const post = state.posts.find(item => item.id === value);
+      if (!post || !isSame(post.author, state.actor)) return;
+      await boardStore.remove(post.id);
+      forgetMedia((post.media || []).map(item => item.id));
+      ui.dialog = null;
+      ui.notice = 'Post removed.';
+      break;
+    }
     case 'import': ui.dialog = { type:'import' }; break;
     case 'samples': {
       ui.busy = 'Opening fictional screenshots…';
@@ -443,6 +1337,7 @@ async function act({action, value, kind}) {
     }
     case 'flag': ui.dialog = { type:'flag', id:Number(value), chosen:await showSource(ui.pending.flags[value].source) }; break;
     case 'review-flags': await nextFlag(); break;
+    case 'people-review': clearPreview(); ui.dialog = { type:'people-review', images:await loadPages(ui.pending.people.map(person => person.source.page)) }; break;
     case 'dismiss-flag': ui.pending.flags[value].status = 'dismissed'; await nextFlag(Number(value)); break;
     case 'publish': {
       const draft = ui.pending;
@@ -458,14 +1353,18 @@ async function act({action, value, kind}) {
         posts: (previous.mode === 'sample') === draft.sample ? previous.posts : [],
         requests: (previous.mode === 'sample') === draft.sample ? previous.requests : [],
         hoursVerified: draft.sample,
-        directory: draft.sample ? sampleDirectory : Object.fromEntries(
-          [...new Set(draft.assignments.map(item => item.person))].map(person => [
-            normalizeName(person), previous.mode === 'local' && previous.directory[normalizeName(person)] || { person, status: null, skills: [] }
-          ])
-        ),
-        actor: draft.assignments.some(item => isSame(item.person, previous.actor)) ? previous.actor : draft.assignments[0].person
+        ...(draft.sample ? { directory:sampleDirectory, history:[] } : publicationRecord(previous.mode === 'local' ? previous : {}, draft.assignments)),
+        actor: draft.assignments.some(item => isSame(item.person, previous.actor)) ? previous.actor : draft.assignments[0].person,
+        people: draft.sample ? samplePeople : previous.peopleSource === 'import' ? previous.people : [],
+        peopleSource: draft.sample ? 'sample' : 'import',
+        manualLinks: (previous.mode === 'sample') === draft.sample ? previous.manualLinks : {},
+        releases: (previous.mode === 'sample') === draft.sample ? previous.releases || [] : [],
+        holidayRules: (previous.mode === 'sample') === draft.sample ? previous.holidayRules : { off:[], extra:[] },
+        custodians: (previous.mode === 'sample') === draft.sample ? previous.custodians : []
       }));
-      ui.date = draft.assignments[0].date;
+      state = withContacts(state);
+      saveState(storageKey, state);
+      ui.date = startDate();
       ui.view = 'week';
       ui.pending = null;
       ui.dialog = null;
@@ -497,18 +1396,29 @@ async function act({action, value, kind}) {
       break;
     }
     case 'audit': ui.dialog = { type:'audit' }; break;
+    case 'pool': ui.pool = value; break;
+    case 'release': if (row) ui.dialog = { type:'release', row }; break;
+    case 'over': { const [date, shift] = value.split('|'); ui.dialog = { type:'over', date, shift }; break; }
     case 'data': ui.dialog = { type:'data' }; break;
     case 'staff-setup': ui.dialog = { type:'staff-setup' }; break;
     case 'erase':
       await clearSources();
+      await boardStore.clear();
+      forgetMedia([...mediaBlobs.keys()]);
       localStorage.removeItem(storageKey);
-      state = structuredClone(initial);
+      state = withContacts(structuredClone(initial));
+      sourceVersions = {};
+      ui.lastAsk = null;
+      ui.askContext = null;
+      ui.draftPost = '';
+      markBoardSeen(null);
       ui.pending = null;
       ui.dialog = null;
-      ui.date = '2026-11-13';
+      ui.date = startDate();
       ui.notice = 'Local workspace cleared.';
       break;
     case 'export': {
+      if (!isKeeper()) return;
       const url = URL.createObjectURL(new Blob([JSON.stringify({ format:1, rules:state.policy, events:state.events }, null, 2)], { type:'application/json' }));
       const link = document.createElement('a');
       link.href = url;
@@ -526,22 +1436,146 @@ app.addEventListener('submit', event => {
   const form = event.target.closest('[data-form]');
   if (!form) return;
   event.preventDefault();
-  void submit(form).catch(fail);
+  if (!noticeSeen) { ui.dialog = { type:'notice' }; render(); return; }
+  countPress('form:' + form.dataset.form);
+  void submit(form).catch(fail).finally(saveDraft);
 });
 async function submit(form) {
+  ui.flash = '';
   const data = Object.fromEntries(new FormData(form));
   const body = (data.body || '').trim();
   const message = { author:state.actor, body, created:new Date().toISOString() };
   switch (form.dataset.form) {
-    case 'post':
-      if (!body) return;
-      await commit('Board update', {}, previous => ({ ...previous, posts:[...previous.posts, { id:crypto.randomUUID(), ...message }] }));
+    case 'post': {
+      const files = [...(form.querySelector('#post-files')?.files || [])];
+      if (!body && !files.length) return;
+      const refusal = refuseFiles(files);
+      if (refusal) { form.querySelector('.refusal').textContent = refusal; return; }     // said in place, so nothing typed is lost
+      const media = files.map(file => ({ id:crypto.randomUUID(), name:file.name, type:file.type, size:file.size, kind:mediaKind(file.type, file.name) }));
+      if (data.whenKind && !/^\d{4}-\d{2}-\d{2}$/.test(data.whenDate || '')) { form.querySelector('.refusal').textContent = 'Pick the date, or set it back to No date.'; return; }
+      const warned = patientCheck(form, [body, ...files.map(file => file.name)].join('\n'));
+      if (!warned) return;
+      const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}),
+        ...(data.whenKind ? { when:{ kind:data.whenKind, date:data.whenDate } } : {}) };
+      const send = form.querySelector('button.primary');
+      send.disabled = true;
+      send.textContent = 'Posting…';
+      try { await boardStore.publish(post, media.map((item, index) => [item.id, files[index]]), { fingerprint:await sha256(body), postHash:await postVersion(post), files:await Promise.all(files.map(file => fileFingerprint(file))) }); }
+      catch (error) { throw error.name === 'QuotaExceededError' ? new Error('This browser is out of room for files. Remove an old post with a large file, or post a smaller one.') : error; }
+      media.forEach((item, index) => { mediaBlobs.set(item.id, files[index]); mediaUrls.set(item.id, URL.createObjectURL(files[index])); });
+      ui.boardFilter = 'all';
+      ui.draftPost = '';
       break;
+    }
+    case 'mark': {
+      const mark = (data.mark || '').trim().toLowerCase();
+      const check = await verifyReceipts(state.events, mark || 'invalid');
+      ui.flash = check.ok ? 'The complete chain checks out and includes the saved checkpoint at receipt ' + check.checkpoint + '. Integrity has been checked against that checkpoint; identity and factual correctness have not.' : 'Checkpoint check failed: ' + check.why + '.';
+      break;
+    }
+    case 'ask': {
+      const q = (data.q || '').trim();
+      if (!q) return;
+      await askAndLog(q);
+      break;
+    }
+    case 'teach': {
+      if (!isKeeper()) return;
+      const waiting = state.unanswered.find(item => item.id === data.id), words = (data.answer || '').trim();
+      if (!waiting || !words) return;
+      const warned = patientCheck(form, [waiting.text, words, data.source || ''].join('\n'));
+      if (!warned) return;
+      const source = state.documents.find(doc => doc.id === data.documentId);
+      const entry = { id:crypto.randomUUID(), asks:[waiting.text], answer:words, source:(data.source || '').trim(), by:state.actor, at:new Date().toISOString(),
+        ...(source ? { documentId:source.id, sourceHash:sourceVersions[source.id] } : {}) };
+      await commit('Answer taught', { id:entry.id, question:await sha256(waiting.text.toLowerCase()), answer:await sha256(words), sourceHash:entry.sourceHash || null }, previous => ({ ...previous, answers:[...previous.answers, entry], unanswered:previous.unanswered.filter(item => item.id !== waiting.id) }));
+      ui.dialog = { type:'teach' };
+      ui.flash = 'Saved. Ask will give this answer to questions like it.';
+      break;
+    }
+    case 'send-question': {
+      const q = (data.question || '').trim().slice(0, 200);
+      if (!q || !patientCheck(form, q)) return;
+      const entry = state.unanswered.find(item => item.text.toLowerCase() === q.toLowerCase()) || { id:crypto.randomUUID(), text:q, at:new Date().toISOString() };
+      if (!state.unanswered.includes(entry)) await commit('Reviewed question saved', { id:entry.id, fingerprint:await sha256(q.toLowerCase()), textSaved:true }, previous => ({ ...previous, unanswered:[...previous.unanswered, entry].slice(-200) }));
+      ui.dialog = data.teach && isKeeper() ? { type:'teach', pick:entry.id } : { type:'ask', q, previousContext:ui.lastAsk?.previousContext, yes:'Reviewed question saved for the record keeper in this browser and backups.' };
+      break;
+    }
+    case 'doc': {
+      const file = form.querySelector('#doc-file')?.files[0];
+      if (file && file.size > DOC_LIMIT * 2) throw new Error('That file is too large to be the text of one document.');
+      const text = ((file ? await file.text() : '') + '\n\n' + (data.text || '')).replace(/\r\n?/g, '\n').replace(/\u0000/g, '').trim();
+      const title = (data.title || '').trim().replace(/\s+/g, ' ');
+      if (!title || text.length < 20) throw new Error('A document needs a title and its words. Choose a text file or paste the text.');
+      if (text.length > DOC_LIMIT) throw new Error('That is ' + fileSize(text.length) + ' of text. One document can be up to ' + fileSize(DOC_LIMIT) + '. Add it in parts.');
+      if (state.documents.reduce((sum, doc) => sum + doc.text.length, 0) + text.length > DOC_TOTAL) throw new Error('The documents together are at the limit this browser can keep. Remove one first.');
+      const doc = { id:crypto.randomUUID(), title, kind:data.kind || 'Other', effective:/^\d{4}-\d{2}-\d{2}$/.test(data.effective || '') ? data.effective : '', added:new Date().toISOString(), by:state.actor, text };
+      await commit('Document added', { id:doc.id, title, kind:doc.kind, effective:doc.effective, characters:text.length, sha256:await sha256(text), version:await documentVersion(doc) }, previous => ({ ...previous, documents:[...previous.documents, doc] }));
+      ui.dialog = { type:'docs' };
+      ui.flash = 'Added ' + title + '. Ask can now search it.';
+      break;
+    }
+    case 'voice': {
+      if (voice?.state !== 'review') return;
+      const warned = patientCheck(form, (data.caption || '').trim());
+      if (!warned) return;
+      const recording = voice;
+      const item = { id:crypto.randomUUID(), name:'voice-message-' + localToday() + (/mp4/.test(recording.blob.type) ? '.m4a' : '.webm'), type:recording.blob.type, size:recording.blob.size, kind:'audio', seconds:recording.seconds };
+      const file = new File([recording.blob], item.name, { type:recording.blob.type });
+      const post = { id:crypto.randomUUID(), author:state.actor, body:(data.caption || '').trim(), created:new Date().toISOString(), voice:true, media:[item], ...(data.inside ? { inside:true } : {}) };
+      await boardStore.publish(post, [[item.id, file]], { fingerprint:await sha256(post.body), postHash:await postVersion(post), files:[await fileFingerprint(file)] });
+      mediaBlobs.set(item.id, file);
+      mediaUrls.set(item.id, recording.url);
+      voice = null;
+      ui.dialog = null;
+      ui.tab = 'board';
+      ui.boardFilter = 'all';
+      ui.notice = 'Voice message posted to the board.' + (boardStore.shared ? '' : ' It is in this browser only for now. Press Share on it to send it out.');
+      break;
+    }
     case 'profile': {
-      const profile = { person:data.person, status:data.status || null, skills:[data.day && 'D', data.night && 'N'].filter(Boolean) };
-      await commit('Staff details recorded', { ...profile }, previous => ({
-        ...previous, directory:{ ...previous.directory, [normalizeName(profile.person)]:profile }
+      const profile = { person:data.person, status:data.status || null, skills:[data.day && 'D', data.night && 'N'].filter(Boolean),
+        ...(['weekend-only', 'weekend-volunteer'].includes(data.arrangement) ? { arrangement:data.arrangement } : {}) };
+      const id = normalizeName(profile.person);
+      await commit('Staff details recorded', { ...profile, keeper:Boolean(data.keeper) }, previous => ({
+        ...previous, directory:{ ...previous.directory, [id]:profile },
+        custodians: data.keeper ? [...new Set([...previous.custodians, id])] : previous.custodians.filter(item => item !== id)
       }));
+      break;
+    }
+    case 'release': {
+      const row = state.assignments.find(item => item.key === data.key);
+      const hours = Number(data.hours);
+      if (!row || !(hours > 0)) return;
+      const entry = { id:crypto.randomUUID(), key:row.key, date:row.date, shift:row.shift, person:row.person, hours,
+        voluntary:data.how === 'voluntary', inPlaceOf:data.how === 'voluntary' ? data.inPlaceOf || null : null };
+      await commit('Low census recorded', entry, previous => ({ ...previous, releases:[...(previous.releases || []), entry] }));
+      ui.dialog = { type:'shift', row };
+      break;
+    }
+    case 'people': {
+      const fields = new FormData(form);
+      const column = name => fields.getAll(name).map(value => String(value).trim());
+      const [last, first, group, cell, office, title, role] = ['last', 'first', 'group', 'cell', 'office', 'title', 'role'].map(column);
+      const listed = [];
+      last.forEach((surname, index) => {
+        if (!surname) return;
+        const person = { last: surname, first: first[index], title: title[index], role: role[index], group: group[index],
+          cell: cell[index].replace(/\D/g, ''), office: office[index] };
+        if (person.cell && person.cell.length !== 10) throw new Error('The cell number for ' + fullName(person) + ' needs ten digits.');
+        listed.push({ ...person, id: personId(person) });
+      });
+      const pages = [...new Set(ui.pending.people.map(person => person.source.page))];
+      // The receipt records that a list was saved and from which photos. It does not hold the numbers.
+      await commit('Directory saved', { count: listed.length, sourceHashes: pages }, previous => withContacts({
+        ...previous, peopleSource: 'import',
+        people: [...(previous.peopleSource === 'import' ? previous.people.filter(old => !listed.some(person => person.id === old.id)) : []), ...listed]
+      }));
+      clearPreview();
+      ui.pending.people = [];
+      if (ui.pending.assignments.length || ui.pending.flags.length) ui.dialog = { type:'import' };
+      else { ui.pending = null; ui.dialog = null; ui.tab = 'people'; }
+      ui.notice = 'Directory saved: ' + listed.length + ' people.';
       break;
     }
     case 'correct': {
@@ -550,30 +1584,69 @@ async function submit(form) {
       const fields = new FormData(form);
       const date = fields.get('date'), shift = fields.get('shift');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SHIFTS[shift]) return;
-      const roles = fields.getAll('role'), times = fields.getAll('hours');
-      // The boxes replace what was read for this date and shift on this photo.
+      // The lines replace what was read for this date and shift on this photo.
       const sameCell = date === flag.draft.date && shift === flag.draft.shift;
       const existing = sameCell ? flagCellRows(flag) : [];
-      const listed = [];
-      fields.getAll('person').forEach((value, position) => {
-        const person = value.trim().replace(/\s+/g, ' ');
-        if (!person || listed.some(row => isSame(row.person, person))) return;
-        const hours = times[position].trim();
-        if (hours && !/^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/.test(hours)) throw new Error('Write partial hours like 7-3 or 7-3:30.');
-        const before = existing.find(row => isSame(row.person, person));
-        listed.push({
-          date, shift, person, ...(roles[position] ? { role:roles[position] } : {}), ...(hours ? { hours } : {}),
-          sources: before?.sources || [{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
-        });
-      });
+      const tidy = readNameLines(form, [...new Set([...ui.pending.assignments.map(item => item.person), ...actorNames()])]);
+      const listed = tidy.rows.map(row => ({
+        date, shift, ...row,
+        sources: existing.find(item => isSame(item.person, row.person))?.sources || [{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
+      }));
       const settled = sameCell ? flagCellFlags(flag) : [flag];
       ui.pending.assignments = mergeAssignments([...ui.pending.assignments.filter(item => !existing.includes(item)), ...listed]);
       ui.pending.issues = verifyRoster(ui.pending.assignments);
       for (const item of [...settled, flag]) item.status = 'corrected';
       await nextFlag(index);
+      const notes = tidyNotes({ ...tidy, fresh: [] });
+      if (notes.length) ui.flash = 'On ' + dayLabel(date, { month:'short', day:'numeric' }) + ': ' + notes.join(' ');
+      break;
+    }
+    case 'holidays': {
+      if (!isKeeper()) return;
+      const fields = new FormData(form), on = fields.getAll('on'), keep = fields.getAll('keep').map(Number);
+      const extra = state.holidayRules.extra.filter((item, index) => keep.includes(index));
+      const name = (data.name || '').trim().replace(/\s+/g, ' ');
+      if (name && /^\d{4}-\d{2}-\d{2}$/.test(data.date || '')) extra.push({ name, date:data.date });
+      else if (name || data.date) throw new Error('A day to add needs both a name and a date.');
+      const rules = { off:HOLIDAY_NAMES.filter(item => !on.includes(item)), extra };
+      await commit('Holiday list changed', rules, previous => ({ ...previous, holidayRules:rules }));
+      ui.dialog = null;
+      ui.notice = 'Holiday list saved.';
+      break;
+    }
+    case 'edit-shift': {
+      const { date, shift } = data;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SHIFTS[shift]) return;
+      const tidy = readNameLines(form, actorNames());
+      const before = state.assignments.filter(item => item.date === date && item.shift === shift);
+      const after = tidy.rows.map(row => {
+        const kept = before.find(item => isSame(item.person, row.person));
+        const { role, hours, ...rest } = kept || { date, shift, person:row.person, sources:[], manual:true };
+        const next = { ...rest, ...(row.role ? { role:row.role } : {}), ...(row.hours ? { hours:row.hours } : {}) };
+        return { ...next, key:assignmentKey(next) };
+      });
+      const describe = item => item.person + (item.role ? ' (' + (ROLE_LABELS[item.role] || item.role) + ')' : '') + (item.hours ? ' ' + item.hours : '');
+      const notes = tidyNotes(tidy);
+      if (before.map(describe).sort().join('|') !== after.map(describe).sort().join('|')) {
+        const removed = before.filter(item => !after.some(row => isSame(row.person, item.person)));
+        const added = after.filter(row => !before.some(item => isSame(item.person, row.person)));
+        await commit('Shift edited', { date, shift, before:before.map(describe), after:after.map(describe) }, previous => ({
+          ...previous, assignments: mergeAssignments([...previous.assignments.filter(item => !(item.date === date && item.shift === shift)), ...after])
+        }));
+        state = withContacts(state);
+        saveState(storageKey, state);
+        for (const item of added) {
+          const other = state.assignments.find(entry => entry.date === date && entry.shift !== shift && isSame(entry.person, item.person));
+          if (other) notes.push(item.person + ' is also on the ' + SHIFTS[other.shift].label.toLowerCase() + ' shift that date.');
+        }
+        for (const item of removed) if (agreedRequestFor(item)) notes.push(item.person + '’s shift was part of an agreed request. Open Requests to sort that out.');
+        ui.notice = ['Saved ' + shiftCaption({ date, shift }) + ': ' + (after.map(item => item.person).join(', ') || 'nobody listed') + '.', ...notes].join(' ');
+      } else ui.notice = notes.length ? ['Nothing changed on ' + shiftCaption({ date, shift }) + '.', ...notes].join(' ') : '';
+      ui.dialog = null;
       break;
     }
     case 'request': {
+      if (!patientCheck(form, body)) return;
       const { row, kind, chosen } = ui.dialog;
       if (!isMine(row)) return;
       const check = checkChange({ from:row, to:chosen.to, recipient:chosen.recipient, kind });
@@ -595,6 +1668,7 @@ async function submit(form) {
     }
     case 'reply': {
       if (!body) return;
+      if (!patientCheck(form, body)) return;
       const id = ui.dialog.id;
       await commit('Thread reply', { id }, previous => ({
         ...previous, requests:previous.requests.map(item => item.id === id ? { ...item, messages:[...item.messages, message] } : item)
@@ -605,4 +1679,6 @@ async function submit(form) {
   }
   render();
 }
+sourceVersions = await versionsFor(state.documents);
 render();
+void hydrateMedia();
