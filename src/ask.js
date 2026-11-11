@@ -240,7 +240,9 @@ export function matchCorrection(question, corrections = [], tidy = text => text,
 // It cannot bring in a person or a date the question did not have, so it cannot point everyone's question at one
 // coworker or fix a relative question to one calendar date. The answer is computed from current records each time.
 const DATE_MARK = /\d+|\b(?:jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b|\bin may\b|\b(?:christmas|thanksgiving|easter|new year|memorial day|labor day|independence day)\b/g;
-const RELATIVE_MARK = /\b(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|today|tonight|tomorrow|yesterday|next|this|last|first|second|third|fourth|before|after|until|till|weeks?|weekends?|months?|years?)\b/g;
+// "Next", "this" and "last" set a date only in front of a day or a span: "next Friday", "this week", "last night". In
+// "when does Morgan work next" the word sets nothing, and that is the wording Ask reads best.
+const RELATIVE_MARK = /\b(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|today|tonight|tomorrow|yesterday|(?:next|this|last)(?=\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|weeks?|weekends?|months?|years?|night)\b)|last(?=\s+(?:shift|time)\b)|first|second|third|fourth|before|after|until|till|weeks?|weekends?|months?|years?)\b/g;
 export function readingProblem(asked, reads, world) {
   const names = [...new Set(world.assignments.map(row => row.person))], tidy = text => tidyQuestion(text, names).text;
   const from = tidy(asked), to = tidy(reads);

@@ -501,3 +501,16 @@ test('a fraction such as 24/7 is not a date, and a date that cannot exist is sti
   assert.deepEqual([policy.kind, /valid date/.test(policy.title)], ['look', false]);                        // a document search again, whatever it finds
   assert.match(reply('do i work 2/30').title, /not a valid date/);
 });
+
+// Measured on sixteen ordinary rewordings against a real schedule: the merged rule refused five, four of them only
+// because the wording Ask reads best ends in "next".
+test('a rewording may end in "next", and still may not add or drop a day, a span or a direction in time', () => {
+  for (const [from, to] of [['when is Morgan back', 'when does Morgan work next'], ['when am i up', 'when do i work next'], ['what do i have coming', 'when do i work next']])
+    assert.equal(readingProblem(from, to, world), '', from + ' -> ' + to);
+  for (const [from, to] of [['is Morgan around next Friday', 'does Morgan work Friday'], ['is Morgan around Friday', 'does Morgan work next Friday'], ['whats on my plate', 'what do i work this week'],
+    ['when am i up', 'when was my last shift'], ['when am i up', 'what did i work last week'], ['who is on the bench tonight', 'who was off last night']])
+    assert.notEqual(readingProblem(from, to, world), '', from + ' -> ' + to);
+  const corrections = [{ id: 'back', asks: ['when is Morgan back'], reads: 'when does Morgan work next', people: ['Morgan'], by: 'Jordan', at: '2026-11-11T12:00:00Z' }];
+  const other = ask('when is parker back', { ...world, corrections });
+  assert.deepEqual([other.read, other.kind, other.corrected.id], ['when does parker work next', 'when', 'back']);
+});
