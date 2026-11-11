@@ -57,7 +57,17 @@ What the branch adds:
 
 Checked in a browser against one real photographed day page, compared with a hand transcription: 91 of 105 printed names were accepted with none wrong, the other 14 all sat in flagged cells, all five crossed-out names were flagged with no false alarms, and all 28 dates, every role colour and every partial shift read correctly. The fictional calendar fixture reads 192 of 192. The original ten-page fixture still reads 217 of 217. One real page is a small sample. Night pages and other months are not yet checked.
 
-Not done yet: reading the handwritten replacement next to a crossed-out name, recording VA times, a faster way to clear flags, and yellow highlighter (the page legend says "Extra", the owner has not confirmed it).
+Not done yet: reading the handwritten replacement next to a crossed-out name, recording VA times, and yellow highlighter (the page legend says "Extra", the owner has not confirmed it).
+
+## Added on branch `claude/review-flow`
+
+The owner ran four real pages through the calendar reader and asked for two changes to the correction step.
+
+- **One screen per shift, one box per person.** A flag now opens every name read for that date and shift, in page order, each with its own name box, role and partial hours. Unsure readings are shaded. Saving replaces that shift's names, so a wholly highlighted cell can be fixed in one go. Flags on the same shift are settled together.
+- **Save moves to the next flag.** Saving or leaving a flag opens the next open one. The review screen has a single button to start, and the title counts what is left.
+- **The photo is cropped and enlarged** to the cell in question.
+
+Checked in a browser on the same real page: 20 flags became 16 screens, each save advanced on its own, and the published roster matched the hand transcription 105 of 105.
 
 ## Still open from the review
 

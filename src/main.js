@@ -187,8 +187,9 @@ function dialogMarkup() {
         (page.shift ? ' · <b>' + (page.shift === 'N' ? 'Night' : 'Day') + ' schedule</b>' + (page.shiftGuessed ? ' (guessed) ' : ' ') +
           button('Switch to ' + (page.shift === 'N' ? 'Day' : 'Night'), 'flip-page', 'class="text-button" ' + valueAttr(page.page)) : '') +
         '</li>').join('') + '</ul></details>' +
+      (unresolved ? '<p>' + button('Review ' + unresolved + ' flagged ' + (unresolved === 1 ? 'shift' : 'shifts'), 'review-flags', 'class="primary"') + '</p>' : '') +
       (pending.flags.length ? '<div class="flags">' + pending.flags.map((flag, index) => '<div class="flag"><p>' + h(flag.message) + '</p><small>' +
-        h(flag.source.file + ' · ' + flag.status) + '</small> ' +
+        h((flag.draft.date ? flag.draft.date.slice(5).replace('-', '/') + ' · ' : '') + flag.source.file + ' · ' + flag.status) + '</small> ' +
         button('Review', 'flag', 'class="text-button" ' + valueAttr(index)) + '</div>').join('') + '</div>' : '') +
       (pending.issues.length ? '<ul class="compact">' + pending.issues.slice(0,20).map(issue => '<li>' +
         h(issue.date + ' · ' + issue.message) + '</li>').join('') + '</ul>' : '<p class="good">No structural issues were flagged.</p>') +
@@ -197,13 +198,33 @@ function dialogMarkup() {
   }
   if (type === 'flag') {
     const flag = ui.pending.flags[id];
-    return shell('Check a flagged cell', '<p>' + h(flag.message) + '</p>' + (chosen ? imageMarkup(chosen, flag.source) : '') +
-      '<form data-form="correct" data-index="' + id + '"><label>Date<input name="date" type="date" value="' + h(flag.draft.date) +
+    const left = ui.pending.flags.filter(item => item.status === 'open').length;
+    const existing = flagCellRows(flag);
+    const suggested = flagCellFlags(flag).map(item => item.draft)
+      .filter((draft, index, all) => draft.person && !existing.some(row => isSame(row.person, draft.person)) &&
+        all.findIndex(other => other.person && isSame(other.person, draft.person)) === index);
+    // Listed top to bottom, the way they sit on the page.
+    const height = item => (item.sources || [item.source]).find(source => source?.page === flag.source.page)?.box?.[1] ?? Infinity;
+    const rows = [...existing.map(row => ({ ...row, check: false, y: height(row) })),
+      ...flagCellFlags(flag).filter(item => suggested.includes(item.draft)).map(item => ({ ...item.draft, check: true, y: height(item) }))]
+      .sort((a, b) => a.y - b.y);
+    const known = [...new Set([...ui.pending.assignments.map(item => item.person), ...actorNames()])].sort((a, b) => a.localeCompare(b));
+    const blank = rows.findIndex(row => row.check);
+    const focus = blank >= 0 ? blank : rows.length;
+    const line = (row, index) => '<div class="name-row' + (row?.check ? ' check' : '') + '"><input name="person" list="known-names" maxlength="80" autocomplete="off" placeholder="Name" aria-label="Name ' +
+      (index + 1) + '" value="' + h(row?.person || '') + '"' + (index === focus ? ' autofocus' : '') + '><select name="role" aria-label="Role for name ' + (index + 1) + '">' +
+      [['', 'No role'], ...Object.entries(ROLE_LABELS)].map(([value, label]) => '<option value="' + value + '"' + ((row?.role || '') === value ? ' selected' : '') + '>' + label + '</option>').join('') +
+      '</select><input name="hours" maxlength="9" autocomplete="off" placeholder="7-3" pattern="\\d{1,2}(:\\d{2})?-\\d{1,2}(:\\d{2})?" title="Partial hours like 7-3 or 7-3:30" aria-label="Partial hours for name ' + (index + 1) + '" value="' + h(row?.hours || '') + '"></div>';
+    return shell('Check this shift · ' + left + ' left', '<p>' + h(flag.message) + '</p>' + (chosen ? cropMarkup(chosen, flag.source) : '') +
+      '<form data-form="correct" data-index="' + id + '"><div class="cell-when"><label>Date<input name="date" type="date" value="' + h(flag.draft.date) +
       '" required></label><label>Shift<select name="shift"><option value="D"' + (flag.draft.shift === 'D' ? ' selected' : '') +
-      '>Day</option><option value="N"' + (flag.draft.shift === 'N' ? ' selected' : '') + '>Night</option></select></label>' +
-      '<label>Staff name<input name="person" maxlength="80" value="' + h(flag.draft.person) + '" required></label><div class="actions">' +
-      button('Mark as non-assignment', 'dismiss-flag', 'class="secondary" ' + valueAttr(id)) +
-      '<button class="primary">Save correction</button></div></form>');
+      '>Day</option><option value="N"' + (flag.draft.shift === 'N' ? ' selected' : '') + '>Night</option></select></label></div>' +
+      '<p class="subtle">One box per person. Fix a name, add anyone missing, or clear a box to remove someone.' +
+      (suggested.length ? ' Shaded names are unsure readings.' : '') + '</p>' +
+      '<div class="name-rows">' + Array.from({ length: Math.max(rows.length + 2, 5) }, (_, index) => line(rows[index], index)).join('') + '</div>' +
+      '<datalist id="known-names">' + known.map(name => '<option value="' + h(name) + '">').join('') + '</datalist><div class="actions">' +
+      button('Leave as read', 'dismiss-flag', 'class="secondary" ' + valueAttr(id)) +
+      '<button class="primary">Save and next</button></div></form>');
   }
   if (type === 'shift') return shell(shiftCaption(row), '<p><b>' + h(row.person) + '</b> · ' + h(row.date) +
     (row.role ? ' · ' + h(ROLE_LABELS[row.role] || row.role) : '') + (row.hours ? ' · ' + h(row.hours) : '') + '</p>' +
@@ -261,6 +282,40 @@ function dialogMarkup() {
   if (type === 'data') return shell('Local workspace data', '<p>Clear the imported roster, source photos, messages and receipts from this browser and restore the sample workspace.</p>' +
     button('Erase local workspace', 'erase', 'class="danger"'));
   return '';
+}
+
+// Rows and open flags that belong to the same date and shift on the same photo as a flag.
+function flagCellRows(flag) {
+  return flag.draft.date ? ui.pending.assignments.filter(item => item.date === flag.draft.date && item.shift === flag.draft.shift &&
+    item.sources.some(source => source.page === flag.source.page)) : [];
+}
+function flagCellFlags(flag) {
+  return flag.draft.date ? ui.pending.flags.filter(item => item.status === 'open' && item.source.page === flag.source.page &&
+    item.draft.date === flag.draft.date && item.draft.shift === flag.draft.shift) : [flag];
+}
+async function nextFlag(after = -1) {
+  clearPreview();
+  const open = ui.pending.flags.map((flag, index) => ({ flag, index })).filter(entry => entry.flag.status === 'open');
+  const next = open.find(entry => entry.index > after) || open[0];
+  ui.dialog = next ? { type:'flag', id:next.index, chosen:await showSource(next.flag.source) } : { type:'import' };
+}
+
+// The part of the photo a flag points at, enlarged. A small box is a single name, so its surroundings are included.
+function cropMarkup(image, source) {
+  const box = source.box;
+  if (!box || box[2] <= box[0] || box[3] <= box[1]) return imageMarkup(image, source);
+  const [x0, y0, x1, y1] = box;
+  const cell = x1 - x0 > image.width * 0.06 && y1 - y0 > image.height * 0.08;
+  const padX = cell ? (x1 - x0) * 0.1 : Math.max((x1 - x0) * 0.6, image.width * 0.05);
+  const padY = cell ? (y1 - y0) * 0.1 : (y1 - y0) * 3.5;
+  const left = Math.max(0, x0 - padX), top = Math.max(0, y0 - padY);
+  const width = Math.min(image.width, x1 + padX) - left, height = Math.min(image.height, y1 + padY) - top;
+  const percent = value => (value * 100).toFixed(3) + '%';
+  return '<figure class="source-image"><div class="source-crop" style="aspect-ratio:' + width + '/' + height + ';max-width:calc(44vh*' + (width / height).toFixed(3) + ')">' +
+    '<img src="' + h(image.url) + '" alt="' + h(source.file) + '" style="width:' + percent(image.width / width) + ';left:' + percent(-left / width) + ';top:' + percent(-top / height) + '">' +
+    (cell ? '' : '<span class="source-box" style="left:' + percent((x0 - left) / width) + ';top:' + percent((y0 - top) / height) +
+      ';width:' + percent((x1 - x0) / width) + ';height:' + percent((y1 - y0) / height) + '"></span>') +
+    '</div><figcaption>' + h(source.file) + '</figcaption></figure>';
 }
 
 function imageMarkup(image, source) {
@@ -387,7 +442,8 @@ async function act({action, value, kind}) {
       break;
     }
     case 'flag': ui.dialog = { type:'flag', id:Number(value), chosen:await showSource(ui.pending.flags[value].source) }; break;
-    case 'dismiss-flag': ui.pending.flags[value].status = 'dismissed'; ui.dialog = { type:'import' }; clearPreview(); break;
+    case 'review-flags': await nextFlag(); break;
+    case 'dismiss-flag': ui.pending.flags[value].status = 'dismissed'; await nextFlag(Number(value)); break;
     case 'publish': {
       const draft = ui.pending;
       if (!draft?.assignments.length || draft.flags.some(flag => flag.status === 'open')) return;
@@ -489,18 +545,32 @@ async function submit(form) {
       break;
     }
     case 'correct': {
-      const flag = ui.pending.flags[Number(form.dataset.index)];
-      const person = data.person.trim();
-      if (!person || !/^\d{4}-\d{2}-\d{2}$/.test(data.date) || !SHIFTS[data.shift]) return;
-      const { role, hours } = flag.draft;
-      ui.pending.assignments = mergeAssignments([...ui.pending.assignments, {
-        date:data.date, shift:data.shift, person, ...(role ? { role } : {}), ...(hours ? { hours } : {}),
-        sources:[{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
-      }]);
+      const index = Number(form.dataset.index);
+      const flag = ui.pending.flags[index];
+      const fields = new FormData(form);
+      const date = fields.get('date'), shift = fields.get('shift');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SHIFTS[shift]) return;
+      const roles = fields.getAll('role'), times = fields.getAll('hours');
+      // The boxes replace what was read for this date and shift on this photo.
+      const sameCell = date === flag.draft.date && shift === flag.draft.shift;
+      const existing = sameCell ? flagCellRows(flag) : [];
+      const listed = [];
+      fields.getAll('person').forEach((value, position) => {
+        const person = value.trim().replace(/\s+/g, ' ');
+        if (!person || listed.some(row => isSame(row.person, person))) return;
+        const hours = times[position].trim();
+        if (hours && !/^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/.test(hours)) throw new Error('Write partial hours like 7-3 or 7-3:30.');
+        const before = existing.find(row => isSame(row.person, person));
+        listed.push({
+          date, shift, person, ...(roles[position] ? { role:roles[position] } : {}), ...(hours ? { hours } : {}),
+          sources: before?.sources || [{ ...flag.source, box:flag.source.box || [0,0,0,0] }]
+        });
+      });
+      const settled = sameCell ? flagCellFlags(flag) : [flag];
+      ui.pending.assignments = mergeAssignments([...ui.pending.assignments.filter(item => !existing.includes(item)), ...listed]);
       ui.pending.issues = verifyRoster(ui.pending.assignments);
-      flag.status = 'corrected';
-      ui.dialog = { type:'import' };
-      clearPreview();
+      for (const item of [...settled, flag]) item.status = 'corrected';
+      await nextFlag(index);
       break;
     }
     case 'request': {
