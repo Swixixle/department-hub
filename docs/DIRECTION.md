@@ -16,7 +16,7 @@ The owner plans to introduce the app through his own department, invite willing 
 
 `docs/SERVER.md` turns this direction into proposed implementation stages and launch checks. Its detailed authentication flow and privacy recommendations remain design proposals; they are not features already built. Existing local storage, the fictional public demo and the Version 12 runtime are unchanged by this planning update.
 
-The owner subsequently clarified the broader ambition: useful adoption in his own department should provide evidence and advocates for interest from other departments and possibly a more substantial role inside the organization. The department pilot is the entry strategy. Other departments would keep their own isolated workspaces. A future link from the Learning area to his Learning Rooms project is an idea to introduce educational material without merging the applications; no reachable hosted URL or integration has been supplied or built.
+Other departments, if any use it later, would keep their own isolated workspaces. A link from the Learning area to separate educational material is an idea only; nothing is hosted or built.
 
 ### Earlier direction, retained for context
 
