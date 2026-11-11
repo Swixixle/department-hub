@@ -87,7 +87,7 @@ function checker({ roster, directory = {}, policy = POLICY, committed = [], toda
     memo.set(id, result);
     return result;
   }
-  return { judge, rows: new Map(roster.map(row => [row.key, row])) };
+  return { judge, week, rows: new Map(roster.map(row => [row.key, row])) };
 }
 
 function verdict(parts) {
@@ -124,26 +124,31 @@ export function describe(result, viewer = '') {
   return [...lines, ...result.notes, ...result.cautions, ...result.problems];
 }
 
-// Every way the person on `target` could come off it, under the rules entered:
-//   pickups: someone takes it and gives nothing back
-//   swaps:   two people exchange a shift each
-//   chains:  someone takes it only because a third person picks up one of theirs
-//   loops:   three people each hand a shift to the next
+// Every way the person on `target` could come off it, under the rules entered. Most people asking for a trade want to
+// keep their weekly hours, so the options that leave everyone's weeks as they were come first:
+//   keep:      two people swap shifts in the same pay week
+//   keepLoops: three people each hand a shift to the next, all in the same pay week
+//   swaps:     two people swap, and hours move between weeks
+//   pickups:   someone takes it and gives nothing back, so the person asking loses the hours
+//   chains:    someone takes it only because a third person picks up one of theirs
+//   loops:     every other three-person exchange (the slow search, done only when `loops` is asked for)
 // Each kind is sorted so the simplest come first, and only `limit` of each are returned. counts says how many passed.
-// Loops are the slow part, so they are searched only when `loops` is asked for.
 export function findOptions({ target, offers = [], limit = 5, loops = false, ...world }) {
   const check = checker(world), me = target.person, today = world.today || '';
   const others = world.roster.filter(row => key(row.person) !== key(me) && row.date >= today);
   const people = [...new Map(world.roster.filter(row => key(row.person) !== key(me)).map(row => [key(row.person), row.person])).values()];
   const offered = name => offers.some(offer => key(offer.person) === key(name) && offer.date === target.date && offer.shift === target.shift);
-  const at = Date.parse(target.date), found = { pickups: [], swaps: [], chains: [], loops: [] };
+  const at = Date.parse(target.date), found = { keep: [], keepLoops: [], swaps: [], pickups: [], chains: [], loops: [] };
   const add = (kind, moves, parts) => {
     const result = verdict(parts);
     if (result.status === 'blocked') return;
-    const taker = moves[0].to, said = offered(taker);
+    const said = offered(moves[0].to), neutral = parts.every(part => !part.weeks.length);
     const far = moves.slice(1).reduce((sum, move) => sum + Math.abs(Date.parse(check.rows.get(move.key).date) - at) / DAY, 0);
-    found[kind].push({ kind, moves, said, ...result, rank: (said ? -1000 : 0) + result.cautions.length * 100 + parts.reduce((sum, part) => sum + part.weeks.length, 0) * 10 + far });
+    found[neutral && kind === 'swaps' ? 'keep' : neutral && kind === 'loops' ? 'keepLoops' : kind].push({ kind, moves, said, neutral, ...result,
+      rank: (said ? -1000 : 0) + result.cautions.length * 100 + parts.reduce((sum, part) => sum + part.weeks.length, 0) * 10 + far });
   };
+  // Shifts that fall in the same pay week, hour for hour. Exchanging these leaves everyone's weekly hours alone.
+  const weeks = row => JSON.stringify(check.week(row)), sameWeeks = others.filter(row => weeks(row) === weeks(target));
   const off = check.judge(me, [target], []);
   const direct = new Map(people.map(name => [key(name), check.judge(name, [], [target])]));
   for (const name of people) add('pickups', [{ key: target.key, to: name }], [off, direct.get(key(name))]);
@@ -154,7 +159,7 @@ export function findOptions({ target, offers = [], limit = 5, loops = false, ...
     if (!iTake.problems.length) add('swaps', [{ key: target.key, to: b }, { key: theirs.key, to: me }], [iTake, takesMine]);
     // A chain is only worth showing when this person could not simply have picked the shift up.
     if (direct.get(key(b)).problems.length) for (const c of people) if (key(c) !== key(b)) add('chains', [{ key: target.key, to: b }, { key: theirs.key, to: c }], [off, takesMine, check.judge(c, [], [theirs])]);
-    if (loops) for (const third of others) {
+    for (const third of loops ? others : sameWeeks.includes(theirs) ? sameWeeks : []) {
       if (key(third.person) === key(b)) continue;
       const cTakes = check.judge(third.person, [third], [theirs]);
       if (cTakes.problems.length) continue;
@@ -165,7 +170,7 @@ export function findOptions({ target, offers = [], limit = 5, loops = false, ...
   const counts = {};
   for (const kind of Object.keys(found)) { counts[kind] = found[kind].length; found[kind] = found[kind].sort((a, b) => a.rank - b.rank).slice(0, limit); }
   if (!loops) delete counts.loops;
-  return { ...found, counts, blockedForMe: off.problems };
+  return { ...found, counts, blockedForMe: off.problems, sameWeekLeft: sameWeeks.length };
 }
 
 // Whose schedule an exchange changes.

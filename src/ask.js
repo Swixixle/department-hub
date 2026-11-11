@@ -5,8 +5,8 @@
 //
 // A hosted model can be added later by handing it the records this module finds. It should never be handed more than
 // the person asking is allowed to see, which is why the filtering happens here, before anything else.
-import { holidays, staffing, statSheet } from './fairness.js';
-import { addDays, normalizeName, shiftInterval, weekStart } from './model.js';
+import { holidays, isWeekendTurn, staffing, statSheet } from './fairness.js';
+import { addDays, minutesByWeek, normalizeName, payWeekStart, shiftInterval, weekStart } from './model.js';
 import { expand, keywords, nearest, qualifiers, stem, tidyQuestion } from './words.js';
 import { checkExchange, describe, findOptions, shiftName, weekChanges } from './trades.js';
 
@@ -21,26 +21,51 @@ const ROLES = { charge: 'charge', icu: 'ICU', extra: 'extra' };
 const tagged = row => row.person + (row.role ? ' (' + (ROLES[row.role] || row.role) + ')' : '') + (row.hours ? ' ' + row.hours : '');
 
 // The day or days a question is about, and day or night if it says. Returns null when it names no time.
+const MONTH_WORD = '(january|jan|february|feb|march|mar|april|apr|may|june|jun|july|jul|august|aug|september|sept|sep|october|oct|november|nov|december|dec)';
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const NTH = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4 };
+const COUNT = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, ten: 10, fourteen: 14, 'couple of': 2, few: 3 };
+
+// The day or days a question names. Returns { from, to, shift, label }, or null when it names none. A label reads
+// naturally after "shifts" or "off": "next week", "in December", "from Dec 1 to Dec 7".
 export function parseWhen(text, today, rules = {}) {
   const q = ' ' + text.toLowerCase().replace(/[’]/g, "'") + ' ';
-  const shift = /\b(tonight|nights?|overnight)\b/.test(q) ? 'N' : /\b(day shift|days(?! off)|mornings?|daytime)\b/.test(q) ? 'D' : null;
-  const year = Number(today.slice(0, 4));
+  // "What days do I work" asks which days. "Days" means the day shift only where it is used that way.
+  const shift = /\bdays (or|and|vs) nights\b|\bnights (or|and|vs) days\b/.test(q) ? null : /\b(tonight|nights?|overnight)\b/.test(q) ? 'N' :
+    /\b(day shift|dayshift|mornings?|daytime)\b|\b(on|work|works|working|worked|short|cover|covering) days\b|\b([a-z]+day|tomorrow|(next|this|last) week(end)?) days?\b/.test(q) ? 'D' : null;
+  const year = Number(today.slice(0, 4)), month = Number(today.slice(5, 7));
+  const dateIn = (y, m, d) => y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  const lastOf = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const short = date => pretty(date).split(', ')[1];
   const one = (date, label) => {
     const parsed = new Date(date + 'T12:00:00Z');
     if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return { invalid:true };
     return { from:date, to:date, shift, label:label || pretty(date) + (Number(date.slice(0, 4)) === year ? '' : ', ' + date.slice(0, 4)) };
   };
-  const near = (month, day) => {                      // a month and day with no year: the one coming, or just past
-    const date = y => y + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-    return date(year) < addDays(today, -60) ? date(year + 1) : date(year);
+  const span = (from, to, label) => ({ from, to, shift, label });
+  // "the week of Nov 15" is that whole week, not the one day
+  const wide = found => {
+    if (!found.from) return found;
+    if (/\bweekend of\b/.test(q)) { const friday = addDays(weekStart(found.from), weekday(found.from) === 0 ? -2 : 5); return span(friday, addDays(friday, 2), 'the weekend of ' + short(addDays(friday, 1))); }
+    return /\bweek (of|with)\b|\b(christmas|thanksgiving|holiday) week\b/.test(q) ? span(weekStart(found.from), addDays(weekStart(found.from), 6), 'in the week of ' + pretty(weekStart(found.from))) : found;
   };
-  const dateIn = (y, month, day) => y + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+  const near = (m, day) => dateIn(dateIn(year, m, day) < addDays(today, -60) ? year + 1 : year, m, day);   // a month and day with no year: the one coming, or just past
+  const monthNumber = word => MONTHS.indexOf(word.slice(0, 3)) + 1;
+  const yearOf = m => m < month - 2 ? year + 1 : year;                 // a month named with no year: this year's, unless it is well behind us
+  const wholeMonth = (y, m, label) => span(dateIn(y, m, 1), dateIn(y, m, lastOf(y, m)), label || 'in ' + MONTH_NAMES[m - 1] + (y === year ? '' : ' ' + y));
   const iso = q.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (iso) return one(iso[0]);
+  if (iso) return wide(one(iso[0]));
   const named = q.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? (\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/);
-  if (named) return one(named[3] ? dateIn(named[3], MONTHS.indexOf(named[1]) + 1, Number(named[2])) : near(MONTHS.indexOf(named[1]) + 1, Number(named[2])));
+  if (named) return wide(one(named[3] ? dateIn(named[3], monthNumber(named[1]), Number(named[2])) : near(monthNumber(named[1]), Number(named[2]))));
   const slashed = q.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/);
-  if (slashed) return one(slashed[3] ? dateIn(slashed[3], Number(slashed[1]), Number(slashed[2])) : near(Number(slashed[1]), Number(slashed[2])));
+  if (slashed) return wide(one(slashed[3] ? dateIn(slashed[3], Number(slashed[1]), Number(slashed[2])) : near(Number(slashed[1]), Number(slashed[2]))));
+  const nextMonth = month === 12 ? [year + 1, 1] : [year, month + 1];
+  const nth = q.match(new RegExp('\\b(first|1st|second|2nd|third|3rd|fourth|4th|last) week (?:of|in) (?:(next month|this month)|' + MONTH_WORD + ')\\b'));
+  if (nth) {
+    const [y, m] = nth[2] === 'next month' ? nextMonth : nth[2] ? [year, month] : [yearOf(monthNumber(nth[3])), monthNumber(nth[3])];
+    const from = nth[1] === 'last' ? lastOf(y, m) - 6 : (NTH[nth[1]] - 1) * 7 + 1, to = Math.min(from + 6, lastOf(y, m));
+    return span(dateIn(y, m, from), dateIn(y, m, to), 'from ' + short(dateIn(y, m, from)) + ' to ' + short(dateIn(y, m, to)));
+  }
   // Unticking a holiday changes fairness credit, not the calendar date named in a schedule question.
   const calendarRules = { ...rules, off:[] };
   const namedYear = q.match(/\b(\d{4})\b/), holidayYear = namedYear ? Number(namedYear[1]) : year;
@@ -49,23 +74,41 @@ export function parseWhen(text, today, rules = {}) {
     ['new year', "New Year's Day"], ['memorial day', 'Memorial Day'], ['labor day', 'Labor Day'], ['fourth of july', 'Independence Day'], ['4th of july', 'Independence Day'], ['independence day', 'Independence Day'],
     ...calendar.map(day => [day.name.toLowerCase(), day.name])].find(([words]) => q.includes(words));
   const holiday = wanted && calendar.find(day => day.name === wanted[1]);
-  if (holiday) return one(holiday.date, holiday.name + ', ' + pretty(holiday.date) + (Number(holiday.date.slice(0, 4)) === year ? '' : ', ' + holiday.date.slice(0, 4)));
+  if (holiday) return wide(one(holiday.date, holiday.name + ', ' + pretty(holiday.date) + (Number(holiday.date.slice(0, 4)) === year ? '' : ', ' + holiday.date.slice(0, 4))));
+  // A month on its own is the whole month. "May" counts only as "in May", because it is also an ordinary word.
+  const monthWord = [...q.matchAll(new RegExp('\\b(in |for |during |of )?' + MONTH_WORD + '\\b', 'g'))].find(found => found[2] !== 'may' || found[1]);
+  if (monthWord) { const m = monthNumber(monthWord[2]), y = namedYear ? Number(namedYear[1]) : yearOf(m); return wholeMonth(y, m); }
+  if (/\bnext month\b/.test(q)) return wholeMonth(...nextMonth, 'next month');
+  if (/\brest of (the|this) month\b/.test(q)) return span(today, dateIn(year, month, lastOf(year, month)), 'the rest of this month');
+  if (/\bthis month\b/.test(q)) return wholeMonth(year, month, 'this month');
+  // "the 19th" is the next 19th
+  const ordinal = q.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/);
+  if (ordinal && Number(ordinal[1]) >= 1 && Number(ordinal[1]) <= 31) {
+    let [y, m] = Number(ordinal[1]) >= Number(today.slice(8, 10)) ? [year, month] : nextMonth;
+    for (let tries = 0; tries < 3 && Number(ordinal[1]) > lastOf(y, m); tries++) [y, m] = m === 12 ? [y + 1, 1] : [y, m + 1];
+    return wide(one(dateIn(y, m, Number(ordinal[1]))));
+  }
   if (/\btonight\b/.test(q)) return { ...one(today, 'tonight'), shift: 'N' };
+  if (/\bday after tomorrow\b/.test(q)) return one(addDays(today, 2));
   if (/\btomorrow\b/.test(q)) return one(addDays(today, 1), 'tomorrow');
   if (/\byesterday\b/.test(q)) return one(addDays(today, -1), 'yesterday');
   if (/\btoday\b/.test(q)) return one(today, 'today');
   const start = weekStart(today);
+  const ahead = q.match(/\bnext (\d{1,2}|one|two|three|four|five|six|seven|ten|fourteen|couple of|few) (day|week)s?\b/);
+  if (ahead) { const count = Math.min(60, Number(ahead[1]) || COUNT[ahead[1]]) * (ahead[2] === 'week' ? 7 : 1); return span(today, addDays(today, count - 1), 'in the next ' + count + ' days'); }
+  if (/\brest of (the|this) week\b/.test(q)) return span(today, addDays(start, 6), 'the rest of this week');
   if (/\bweekend\b/.test(q)) {
     const friday = addDays(start, weekday(today) === 0 ? -2 : 5), shiftBy = /\bnext weekend\b/.test(q) ? 7 : 0;
     return { from: addDays(friday, shiftBy), to: addDays(friday, shiftBy + 2), shift, label: shiftBy ? 'next weekend' : 'this weekend' };
   }
-  if (/\bnext week\b/.test(q)) return { from: addDays(start, 7), to: addDays(start, 13), shift, label: 'next week' };
-  if (/\bthis week\b/.test(q)) return { from: start, to: addDays(start, 6), shift, label: 'this week' };
+  if (/\bnext week\b/.test(q)) return span(addDays(start, 7), addDays(start, 13), 'next week');
+  if (/\blast week\b/.test(q)) return span(addDays(start, -7), addDays(start, -1), 'last week');
+  if (/\bthis week\b/.test(q)) return span(start, addDays(start, 6), 'this week');
   const day = DAYS.findIndex(name => new RegExp('\\b' + name.slice(0, 3) + '(' + name.slice(3) + ')?s?\\b').test(q));
   if (day >= 0) {
-    let ahead = (day - weekday(today) + 7) % 7;
-    if (ahead === 0 && /\bnext\b/.test(q)) ahead = 7;
-    return one(addDays(today, ahead));
+    let offset = (day - weekday(today) + 7) % 7;
+    if (offset === 0 && /\bnext\b/.test(q)) offset = 7;
+    return { ...one(addDays(today, offset)), weekday: true };
   }
   return shift ? { from: today, to: today, shift, label: 'today', bare: true } : null;      // a shift was named and no day
 }
@@ -170,15 +213,21 @@ export function ask(question, world) {
   // Getting off one of your own shifts, or picking one up. Both are worked out with the trade rules, not looked up.
   const pickUp = Boolean(world.trade) && self && !/ my /.test(q) && / (pick up|pickup|picking up|cover for|take over) /.test(q) && Boolean(when || others.length);
   const wantsOff = Boolean(world.trade) && self && !pickUp && (has('trade', 'swap', 'switch', 'cover', 'coverage') || / (take|taking|pick up|give away|giving up) my /.test(q) || / (need|want|get|have) (\w+ ){0,3}off /.test(q)) && Boolean(when || has('next', 'shift'));
+  const hoursAsk = (has('hour', 'hours', 'overtime') || / (over|under|at) \d{2} /.test(q)) && (self || others.length > 0) && !pickUp && !wantsOff;
+  // "Which weekends am I on", "what weekends do I work in December": the weekend shifts only.
+  const weekends = / weekends /.test(q) && (self || others.length > 0);
+  // "Am I off Friday", "what days am I off next week". Not "how do I get time off", which is a question for the documents.
+  const offAsk = / off /.test(q) && (self || others.length > 0) && !wantsOff && !pickUp && !has('how', 'request', 'policy', 'pto', 'leave', 'vacation', 'census', 'time');
   // Which kind of question this is, from the words in it. Order matters: the more particular kinds come first.
   let kind = has('number', 'phone', 'call', 'text', 'reach', 'contact', 'cell') && others.length ? 'contact' :
+    hoursAsk ? 'hours' :
     has('fairness', 'unfair', 'share', 'carrying') || (has('fair') && !eventFair) || (has('many', 'much', 'count') && has('weekend', 'holiday', 'turn')) ? 'fair' :
     has('short', 'understaffed', 'overstaffed', 'census', 'four') || q.includes(' called off ') || (has('extra') && has('person', 'people')) ? 'staffing' :
     has('due', 'deadline', 'meeting', 'event', 'upcoming', 'calendar') || q.includes(' coming up ') ? 'dated' :
     / (miss|missed|news|latest|unread|announcements?|board) /.test(q) || / (is|anything) new /.test(q) || / new (post|message)/.test(q) ? 'news' :
-    pickUp ? 'pickup' : wantsOff ? 'trade' :
+    pickUp ? 'pickup' : wantsOff ? 'trade' : offAsk ? 'off' :
     rosterWho || (has('with') && (self || when)) ? 'who' :
-    (others.length && (when || has('work', 'shift', 'schedule', 'on', 'off', 'next'))) || has('shift', 'schedule') || (has('work') && (self || when)) || (has('on', 'off') && self && when) || (has('next') && self) || (when && self && tokens.size <= 5) ? 'when' : 'look';
+    weekends || (others.length && (when || has('work', 'shift', 'schedule', 'on', 'off', 'next'))) || (has('shift', 'schedule') && (self || others.length > 0 || Boolean(when))) || (has('work') && (self || when)) || (has('on', 'off') && self && when) || (has('next') && self) || (when && self && tokens.size <= 5) ? 'when' : 'look';
   // A follow-up such as "and Saturday?" or "what about Avery?" keeps the last kind of question and changes one part.
   const last = world.last;
   let followed = false;
@@ -274,19 +323,26 @@ export function ask(question, world) {
   // Ways off one of the person's own shifts.
   const tradeSource = 'Worked out from the schedule and the trade rules entered. It does not know who is willing or who is on leave.';
   if (kind === 'trade') {
-    const target = shiftsOf(actor).find(row => when && !when.bare ? inRange(row) && row.date >= today : upcoming(row) && (!when?.shift || row.shift === when.shift));
+    const ahead = shiftsOf(actor).filter(row => row.date >= today);
+    // "My Thursday" is the next Thursday the person works, not necessarily this week's.
+    const target = ahead.find(row => when && !when.bare ? inRange(row) : upcoming(row) && (!when?.shift || row.shift === when.shift)) ||
+      (when?.weekday ? ahead.find(row => new Date(row.date + 'T12:00:00Z').getUTCDay() === new Date(when.from + 'T12:00:00Z').getUTCDay() && (!when.shift || row.shift === when.shift)) : null);
     if (!target) return answer('You are not on the schedule ' + (when && !when.bare ? when.label : 'from today on') + '.', [], scheduleSource, { empty: false });
     const found = findOptions({ ...world.trade, target }), some = (n, one, many) => n ? n + ' ' + (n === 1 ? one : many) : '';
     if (found.blockedForMe.length) return answer(shiftName(target) + ' cannot be offered.', [{ text: found.blockedForMe.join(' '), sub: '', go: 'date|' + target.date }], tradeSource, { empty: false });
-    const counted = [some(found.counts.pickups, 'person could pick it up', 'people could pick it up'), some(found.counts.swaps, 'swap passes', 'swaps pass'), some(found.counts.chains, 'three-person chain passes', 'three-person chains pass')].filter(Boolean);
-    const items = ['pickups', 'swaps', 'chains'].flatMap(group => found[group].slice(0, group === 'pickups' ? 2 : 1)).map(option => {
+    // Unless cover is asked for, a trade means keeping your hours: swaps inside the pay week come first.
+    const cover = has('cover', 'coverage') || / (take|taking|pick up) my /.test(q), kept = found.counts.keep + found.counts.keepLoops;
+    const counted = [kept ? some(found.counts.keep, 'swap keeps', 'swaps keep') + (found.counts.keep && found.counts.keepLoops ? ' and ' : '') + some(found.counts.keepLoops, 'three-person exchange keeps', 'three-person exchanges keep') + ' everyone’s weekly hours' : 'nothing left in that pay week keeps everyone’s hours',
+      some(found.counts.swaps, 'swap moves hours between weeks', 'swaps move hours between weeks'), some(found.counts.pickups, 'person could cover it', 'people could cover it')].filter(Boolean);
+    const order = cover ? [['pickups', 2], ['chains', 1], ['keep', 1], ['keepLoops', 1]] : [['keep', 2], ['keepLoops', 1], ['swaps', 1], ['pickups', 1]];
+    const items = order.flatMap(([group, take]) => found[group].slice(0, take)).map(option => {
       const lines = describe(option, actor), split = lines.findIndex(line => /^(Hours|Nobody)/.test(line));
       return { text: lines.slice(0, split).join(' '), sub: [lines[split], ...option.cautions].join(' '), go: 'options|' + target.key };
     });
-    const first = found.pickups[0]?.moves[0].to || found.swaps[0]?.moves[0].to;
-    return answer(counted.length ? 'For ' + shiftName(target) + ': ' + counted.join(', ') + '.' : 'Nothing simple passes the rules for ' + shiftName(target) + '.',
-      items.length ? items : [{ text: 'Open the shift to look for three-person loops', sub: found.blockedForMe.join(' '), go: 'options|' + target.key }], tradeSource,
-      { empty: false, next: [first && 'How do I reach ' + first + '?', 'Who is on ' + pretty(target.date) + (target.shift === 'N' ? ' night' : ' day') + '?'].filter(Boolean) });
+    const first = (cover ? found.pickups[0] : found.keep[0] || found.swaps[0])?.moves[0].to;
+    return answer('For ' + shiftName(target) + ': ' + counted.join(', ') + '.',
+      items.length ? items : [{ text: 'Open the shift to look for other three-person exchanges', sub: '', go: 'options|' + target.key }], tradeSource,
+      { empty: false, next: [first && 'How do I reach ' + first + '?', 'How many hours do I have that week?'].filter(Boolean) });
   }
   // Picking up a shift: would the rules allow it, and what would it do to the week.
   if (kind === 'pickup') {
@@ -300,6 +356,42 @@ export function ask(question, world) {
     return answer('Picking up ' + shiftName(target) + (result.status === 'blocked' ? ' does not pass the rules entered.' : result.status === 'check' ? ' passes, with something to check.' : ' passes the rules entered.'),
       [{ text: ['Your hours: ' + (weekChanges(me) || 'no change') + '.', ...said].join(' '), sub: 'On that shift now: ' + list(on(target.date, target.shift).map(tagged)), go: 'date|' + target.date }], tradeSource,
       { empty: false, next: ['When do I work next?', 'How many weekends have I worked?'] });
+  }
+
+  // Scheduled hours by pay week.
+  if (kind === 'hours') {
+    const subject = others[0] || actor, mine = same(subject, actor), policy = world.trade?.policy || {}, startDay = policy.weekStartsOn || 0, limit = policy.overtimeLimitMinutes || 0;
+    const base = last?.kind === 'trade' && last.when && !when ? last.when : when;                       // "that week" after a trade question
+    const range = base && !base.bare ? base : { from: today, to: today }, totals = new Map(), listed = new Map(), tell = minutes => String(Math.round(minutes / 6) / 10);
+    for (const row of shiftsOf(subject)) for (const [week, minutes] of minutesByWeek(row, startDay)) { totals.set(week, (totals.get(week) || 0) + minutes); listed.set(week, [...(listed.get(week) || []), row]); }
+    const items = [];
+    for (let week = payWeekStart(range.from, startDay); week <= payWeekStart(range.to, startDay) && items.length < 8; week = addDays(week, 7)) {
+      const minutes = totals.get(week) || 0;
+      items.push({ text: 'Week of ' + pretty(week) + ': ' + tell(minutes) + ' hours' + (limit && minutes > limit ? ', ' + tell(minutes - limit) + ' over the limit entered' : ''),
+        sub: (listed.get(week) || []).map(row => pretty(row.date).split(', ')[1] + (row.shift === 'N' ? ' night' : ' day')).join(', ') || 'No shifts', go: 'date|' + week });
+    }
+    return answer(items.length === 1 ? (mine ? 'You are' : subject + ' is') + ' scheduled for ' + tell(totals.get(payWeekStart(range.from, startDay)) || 0) + ' hours in the week of ' + pretty(payWeekStart(range.from, startDay)) + '.' : (mine ? 'Your' : subject + '’s') + ' scheduled hours, week by week:',
+      items, scheduleSource + '. Hours are from this schedule only. The pay week starts on ' + DAYS[startDay][0].toUpperCase() + DAYS[startDay].slice(1) + (limit ? ' and the limit entered is ' + tell(limit) + ' hours.' : '.'),
+      { empty: false, next: mine && world.trade ? ['Who can I trade my next shift with?'] : [] });
+  }
+  // Days off.
+  if (kind === 'off') {
+    const subject = others[0] || actor, mine = same(subject, actor), worked = new Set(shiftsOf(subject).map(row => row.date));
+    const range = when && !when.bare ? when : { from: today, to: addDays(today, 13), label: 'in the next 14 days' };
+    const note = scheduleSource + '. A night shift is counted on the day it starts.';
+    if (range.from === range.to) {
+      const rows = shiftsOf(subject).filter(row => row.date === range.from);
+      return answer(rows.length ? 'No. ' + (mine ? 'You work ' : subject + ' works ') + range.label + ':' : 'Yes. ' + (mine ? 'You are' : subject + ' is') + ' off ' + range.label + '.', rows.map(shiftItem), note, { empty: false });
+    }
+    const runs = [];
+    for (let date = range.from > today ? range.from : today; date <= range.to && runs.length < 40; date = addDays(date, 1)) {
+      if (worked.has(date)) continue;
+      const open = runs.at(-1);
+      if (open && addDays(open.to, 1) === date) open.to = date; else runs.push({ from: date, to: date });
+    }
+    const days = runs.reduce((sum, run) => sum + Math.round((Date.parse(run.to) - Date.parse(run.from)) / 864e5) + 1, 0);
+    return answer((mine ? 'You are' : subject + ' is') + ' off ' + days + ' day' + (days === 1 ? '' : 's') + ' ' + range.label + (runs.length ? ':' : '.'),
+      runs.map(run => ({ text: run.from === run.to ? pretty(run.from) : pretty(run.from) + ' to ' + pretty(run.to), sub: run.from === run.to ? '' : Math.round((Date.parse(run.to) - Date.parse(run.from)) / 864e5) + 1 + ' days', go: 'date|' + run.from })), note, { empty: false });
   }
 
   // 6. Who is on, or who the person is working with.
@@ -322,13 +414,23 @@ export function ask(question, world) {
   // 7. When someone works.
   if (kind === 'when') {
     const subject = others[0] || actor, whose = same(subject, actor) ? 'You' : subject, be = same(subject, actor) ? 'are' : 'is';
+    const kindOf = when?.shift ? (when.shift === 'N' ? 'night ' : 'day ') : '', mine = same(subject, actor);
+    if (weekends) {
+      const range = when && !when.bare && when.from !== when.to ? when : { from: today, to: addDays(today, 55), label: 'in the next eight weeks' };
+      const rows = shiftsOf(subject).filter(row => row.date >= range.from && row.date <= range.to && isWeekendTurn(row));
+      return answer((mine ? 'You have ' : subject + ' has ') + (rows.length || 'no') + ' weekend shift' + (rows.length === 1 ? '' : 's') + ' ' + range.label + (rows.length ? ':' : '.'), rows.map(shiftItem),
+        scheduleSource + '. A weekend shift is Friday night through Sunday night.', { empty: false, next: mine ? ['How many weekends have I worked?'] : [] });
+    }
     if (when && !when.bare) {
       const rows = shiftsOf(subject).filter(inRange);
-      return answer(rows.length ? whose + ' ' + be + ' on ' + when.label + ':' : whose + ' ' + be + ' not on the schedule ' + when.label + '.', rows.map(shiftItem), scheduleSource, { empty: false });
+      if (when.from === when.to) return answer(rows.length ? whose + ' ' + be + ' on ' + when.label + ':' : whose + ' ' + be + ' not on the schedule ' + when.label + '.', rows.map(shiftItem), scheduleSource, { empty: false });
+      return answer((mine ? 'You have ' : subject + ' has ') + (rows.length || 'no') + ' ' + kindOf + 'shift' + (rows.length === 1 ? '' : 's') + ' ' + when.label + (rows.length ? ':' : '.'), rows.map(shiftItem), scheduleSource, { empty: false });
     }
-    const coming = shiftsOf(subject).filter(row => upcoming(row) && (!when?.shift || row.shift === when.shift)).slice(0, 4);
+    const every = shiftsOf(subject).filter(upcoming), coming = every.filter(row => !when?.shift || row.shift === when.shift).slice(0, 4);
+    // A question about day shifts put to someone who works nights still gets their schedule, with the reason.
+    if (!coming.length && every.length) return answer((mine ? 'You have' : subject + ' has') + ' no ' + kindOf + 'shifts from today on.', every.slice(0, 4).map(shiftItem), scheduleSource, { empty: false, lines: ['The next shifts on the schedule:'] });
     return answer(coming.length ? (same(subject, actor) ? 'Your' : subject + '’s') + ' next shift is ' + pretty(coming[0].date) + ', ' + shiftWord(coming[0].shift) + (coming[0].role ? ' (' + (ROLES[coming[0].role] || coming[0].role) + ')' : '') + '.' : whose + ' ' + be + ' not on the schedule from today on.',
-      coming.map(shiftItem), scheduleSource, { empty: false, next: !coming.length ? [] : same(subject, actor) ? ['Who am I working with on my next shift?', ...(world.trade ? ['Who can take my next shift?'] : [])] : ['How do I reach ' + subject + '?'] });
+      coming.map(shiftItem), scheduleSource, { empty: false, next: !coming.length ? [] : same(subject, actor) ? ['Who am I working with on my next shift?', ...(world.trade ? ['Who can I trade my next shift with?'] : [])] : ['How do I reach ' + subject + '?'] });
   }
 
   // Search taught answers, document passages and board posts.
@@ -356,4 +458,4 @@ export function ask(question, world) {
   }
 }
 
-export const SUGGESTIONS = ['When do I work next?', 'Who am I working with on my next shift?', 'Who is on tonight?', 'What did I miss on the board?', 'What is coming up?', 'How many weekends have I worked?', 'Who can take my next shift?'];
+export const SUGGESTIONS = ['When do I work next?', 'Who am I working with on my next shift?', 'Who is on tonight?', 'What did I miss on the board?', 'What is coming up?', 'How many weekends have I worked?', 'Who can I trade my next shift with?'];

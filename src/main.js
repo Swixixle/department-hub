@@ -15,7 +15,7 @@ import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, v
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
 const draftKey = storageKey + '-draft';
-const BUILD = 11;
+const BUILD = 12;
 const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
@@ -684,19 +684,23 @@ function dialogMarkup() {
       button('Trade this shift', 'matches', 'class="secondary" data-kind="trade" ' + valueAttr(row.key)) +
       button('Find coverage', 'matches', 'class="secondary" data-kind="coverage" ' + valueAttr(row.key)) + '</div>' : ''));
   if (type === 'options') {
-    const { found } = ui.dialog, kinds = ['pickups', 'swaps', 'chains', 'loops'];
+    const { found } = ui.dialog, kinds = ['keep', 'keepLoops', 'swaps', 'pickups', 'chains', 'loops'];
     const lines = item => describe(item, state.actor).map(line => '<p class="' + (item.cautions.includes(line) ? 'caution' : item.notes.includes(line) || /^(Hours|Nobody|Rest)/.test(line) ? 'subtle' : 'move') + '">' + h(line) + '</p>').join('');
     const group = (kind, title, blurb) => found[kind].length ? '<h3>' + title + '</h3><p class="subtle">' + blurb + (found.counts[kind] > found[kind].length ? ' ' + found.counts[kind] + ' pass the rules. These are the ' + found[kind].length + ' simplest.' : '') + '</p>' +
       found[kind].map((item, index) => '<div class="option">' + (item.said ? '<span class="badge learning">Said they could work this</span>' : '') + lines(item) +
         '<div class="actions inline">' + button('Propose this', 'propose', 'class="secondary" ' + valueAttr(kind + '|' + index)) + '</div></div>').join('') : '';
     return shell('Ways off ' + shiftCaption(row), '<p class="subtle">Checked against this schedule and the rules entered. It does not know who is willing or who is on leave.</p>' +
       (found.blockedForMe.length ? '<p class="caution">' + h(found.blockedForMe.join(' ')) + '</p>' : '') +
-      group('pickups', 'Someone picks it up', 'They take the shift and give nothing back.') + group('swaps', 'Swap with one person', 'You each take one of the other’s shifts.') +
-      group('chains', 'Three people, one pick-up', 'Someone can take yours only because a third person takes one of theirs.') +
-      (ui.dialog.loops ? group('loops', 'Three people, three shifts', 'Each of you hands a shift to the next.') || '<p class="subtle">No three-person loop passes the rules.</p>' : '') +
+      (found.keep.length || found.keepLoops.length ? '' : '<p><b>Nothing left in this pay week keeps everyone’s hours.</b> ' + (found.sameWeekLeft ? 'The ' + found.sameWeekLeft + ' other shifts still to come in it do not pass the rules.' : 'No other shift in it is still to come.') + ' The options below change someone’s weekly hours.</p>') +
+      group('keep', 'Swap and keep your hours', 'You each take one of the other’s shifts in the same pay week, so nobody’s weekly hours change.') +
+      group('keepLoops', 'Three people, everyone keeps their hours', 'Each of you hands a shift to the next, all in the same pay week.') +
+      group('swaps', 'Swap that moves hours between weeks', 'You each take one of the other’s shifts, in different pay weeks.') +
+      group('pickups', 'Someone covers it', 'They take the shift and give nothing back. You lose the hours.') +
+      group('chains', 'Cover through a third person', 'Someone can take yours only because a third person picks up one of theirs. You lose the hours.') +
+      (ui.dialog.loops ? group('loops', 'Other three-person exchanges', 'Each of you hands a shift to the next. These change someone’s weekly hours.') || '<p class="subtle">No other three-person exchange passes the rules.</p>' : '') +
       (kinds.some(kind => found[kind].length) ? '' : '<p><b>Nothing ' + (ui.dialog.loops ? '' : 'simpler ') + 'passes the rules entered.</b></p>') +
       '<p class="subtle">Rules in use: ' + h(rulesLine()) + '. Hours come from this schedule only, so a pick-up that is not on it is not counted.</p>' +
-      '<div class="actions">' + (ui.dialog.loops ? '' : button('Look for three-person loops', 'options-loops', 'class="secondary"')) + button('Back to the shift', 'shift', 'class="secondary" ' + valueAttr(row.key)) + '</div>');
+      '<div class="actions">' + (ui.dialog.loops ? '' : button('Look for more three-person exchanges', 'options-loops', 'class="secondary"')) + button('Back to the shift', 'shift', 'class="secondary" ' + valueAttr(row.key)) + '</div>');
   }
   if (type === 'exchange') {
     const exchange = state.exchanges.find(item => item.id === id);

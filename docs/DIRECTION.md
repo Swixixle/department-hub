@@ -247,6 +247,15 @@ The owner's direction on 2026-11-11: trades that need more than two people usual
 
 Limits: it works from the imported schedule, so handwritten changes, leave and pick-ups made elsewhere are not known. It does not check that a shift keeps enough people, only who holds charge and ICU. Qualifications are what is recorded, or else the kinds of shift the schedule lists a person on. Agreement is by whoever is selected under "Viewing as" until there are accounts, and nobody is notified. There is no list of shifts people want off, and nothing runs by itself when the schedule changes.
 
+## Added on branch `claude/v12`: trades keep hours by default, and Ask reads ordinary schedule questions
+
+The owner's correction on 2026-11-11, after using Version 11: a trade does not usually mean "who could cover". Most of the time the person wants to protect their weekly hours, and that gets harder as the week goes on. He also reported that Ask failed on his own schedule questions: "What days do I work the first week of December?" answered that he was not on the schedule.
+
+- **Hours first.** The options for a shift are now ordered by what they do to weekly hours. First come swaps inside the same pay week, which change nobody's hours, then three-person exchanges inside the same pay week, which are found without asking. After those come swaps that move hours between weeks, and last the options where someone covers the shift and the person asking loses the hours. When nothing left in the pay week keeps everyone's hours, the sheet says so. Ask leads with cover only when cover is asked for.
+- **Why Ask failed.** "Days" in "what days do I work" was read as the day shift, so a person who works nights was told they were not on the schedule. A month on its own, "the first week of December", "the 19th", "the week of Nov 15", "next month", "the next two weeks" and "the rest of this week" were not read as dates at all. All of these are read now, and the cases are in the tests.
+- **New answers.** Days off ("am I off Friday", "what days am I off next week"), scheduled hours by pay week against the limit entered ("how many hours do I have this week"), weekend shifts only ("which weekends am I on"), and the count of shifts in any range.
+- The lesson for testing: the questions that passed before were ones written by the person who wrote the code. The battery now used is closer to how people type, and it is still not a substitute for other people's questions.
+
 ## Still open from the review
 
 - Matches that are blocked are hidden with no reason given.

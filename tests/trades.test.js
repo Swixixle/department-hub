@@ -75,22 +75,29 @@ test('three people can each hand a shift to the next when none of them could sim
   assert.ok(loop.people.every(part => part.weeks.length === 0));
 });
 
-test('the finder lists pick-ups, swaps, chains and loops, simplest first, and says how many passed', () => {
+test('the finder puts what keeps everyone’s weekly hours first, then what moves hours, then cover', () => {
   const found = findOptions({ ...world, target: friday, limit: 3, loops: true });
-  assert.equal(findOptions({ ...world, target: friday }).counts.loops, undefined);            // loops are searched only on request
+  assert.equal(findOptions({ ...world, target: friday }).counts.loops, undefined);            // the wide loop search runs only on request
+  // Swaps inside the pay week leave every week as it was. Swaps across weeks are listed apart.
+  assert.ok(found.keep.length > 0 && found.keep.every(option => option.neutral && option.people.every(part => part.weeks.length === 0)));
+  assert.ok(found.swaps.every(option => !option.neutral));
+  assert.ok(found.keep.some(option => option.moves[1].key === at('2026-11-11', 'N', 'Blair').key));
+  // Three people in one pay week, each handing a shift to the next, are found without asking for the wide search.
+  const quick = findOptions({ ...world, target: friday });
+  assert.ok(quick.keepLoops.length > 0 && quick.keepLoops.every(option => option.moves.length === 3 && option.neutral));
   assert.deepEqual(found.pickups.map(option => option.moves[0].to), ['Casey']);
-  assert.ok(found.counts.swaps > 0 && found.counts.loops > 0 && found.counts.chains > 0);
-  assert.ok(found.swaps.length <= 3 && found.loops.length <= 3);
+  assert.ok(found.counts.chains > 0 && found.keep.length <= 3);
   // A chain exists because Blair could not simply pick the shift up, but can once someone takes one of Blair's.
   assert.ok(found.chains.every(option => option.moves.length === 2 && option.moves[0].key === friday.key));
   assert.ok(found.chains.some(option => option.moves[0].to === 'Blair'));
   // Every option returned passes the whole-exchange check on its own.
-  for (const option of [...found.pickups, ...found.swaps, ...found.chains, ...found.loops]) assert.notEqual(check(option.moves).status, 'blocked');
+  for (const option of ['keep', 'keepLoops', 'swaps', 'pickups', 'chains', 'loops'].flatMap(kind => found[kind])) assert.notEqual(check(option.moves).status, 'blocked');
   // Someone who said they could work that night comes first.
   const said = findOptions({ ...world, target: friday, offers: [{ person: 'Drew', date: '2026-11-20', shift: 'N' }, { person: 'Casey', date: '2026-11-13', shift: 'N' }] });
   assert.equal(said.pickups[0].said, true);
-  // Nothing is offered once the shift has passed.
-  assert.deepEqual(findOptions({ ...world, today: '2026-11-14', target: friday, loops: true }).counts, { pickups: 0, swaps: 0, chains: 0, loops: 0 });
+  // Late in the week there is less left to swap with, and once the shift has passed there is nothing.
+  assert.ok(findOptions({ ...world, today: '2026-11-13', target: friday }).counts.keep < quick.counts.keep);
+  assert.deepEqual(findOptions({ ...world, today: '2026-11-14', target: friday, loops: true }).counts, { keep: 0, keepLoops: 0, swaps: 0, pickups: 0, chains: 0, loops: 0 });
   // Two people on the same shift cannot "swap" it with each other.
   assert.match(check([{ key: friday.key, to: 'Drew' }, { key: at('2026-11-13', 'N', 'Drew').key, to: 'Avery' }]).problems.join(' '), /would give up and take the same shift/);
 });
