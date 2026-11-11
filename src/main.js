@@ -2,6 +2,7 @@ import './style.css';
 import { SHIFTS, POLICY, AGREED_STATUS, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, evaluateChange, committedKeys, projectRoster } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
+import { ledger, releaseOrder, statSheet } from './fairness.js';
 
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
@@ -28,6 +29,7 @@ const initial = {
   people: samplePeople,
   peopleSource: 'sample',
   manualLinks: {},
+  releases: [],
   assignments: staffSample,
   directory: sampleDirectory,
   hoursVerified: true,
@@ -43,6 +45,7 @@ const initial = {
 let state = loadState(storageKey, initial);
 // Workspaces saved before the directory existed.
 if (!state.people) state = { ...state, people: state.mode === 'sample' ? samplePeople : [], peopleSource: state.mode === 'sample' ? 'sample' : 'import', manualLinks: {} };
+if (!state.releases) state = { ...state, releases: [] };
 state = withContacts(state);
 // The starter rules live in code. A saved workspace picks up a new rule version on load.
 if (state.policy?.version !== POLICY.version) state = { ...state, policy: POLICY };
@@ -122,7 +125,7 @@ function top() {
     'class="nav-item ' + (ui.tab === id ? 'active' : '') + '" ' + valueAttr(id) + (ui.tab === id ? ' aria-current="page"' : ''));
   return '<aside><div class="brand"><img src="' + h(asset('mark.svg')) + '" alt=""><div><b>Department Hub</b><small>WORKSPACE</small></div></div>' +
     '<div class="space-label">YOUR DEPARTMENT</div><div class="space-name">Respiratory Care</div><nav aria-label="Workspace">' +
-    nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Department board') + nav('requests', '⇄', 'Requests') + nav('people', '☎', 'Directory') +
+    nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Department board') + nav('requests', '⇄', 'Requests') + nav('fairness', '⚖', 'Fairness') + nav('people', '☎', 'Directory') +
     '</nav><div class="aside-bottom"><span class="status-dot"></span>' + (publicDemo ? 'Public demo · fictional data' : 'Local workspace · this browser') + '</div></aside>';
 }
 
@@ -171,6 +174,37 @@ function board() {
       '</small></div></div><p>' + h(post.body) + '</p></article>').join('') + '</div>';
 }
 
+function fairness() {
+  const mine = state.assignments.filter(row => isSame(row.person, state.actor));
+  const pool = ui.pool || (mine.filter(row => row.shift === 'N').length > mine.length / 2 ? 'N' : 'D');
+  const table = ledger(state.assignments, pool, state.directory);
+  const signed = value => (value >= 0 ? '+' : '−') + Math.abs(value).toFixed(1);
+  const sheet = statSheet(state.actor, state);
+  const line = (label, value) => '<div><b>' + h(value) + '</b><span>' + h(label) + '</span></div>';
+  const card = sheet.row ? '<div class="panel stat-sheet"><div class="eyebrow">YOUR SHEET · ' + h(state.actor.toUpperCase()) + '</div><div class="stat-grid">' +
+    line('shifts', sheet.row.shifts) +
+    line(sheet.row.weekendOnly ? 'weekend turns' : 'weekend turns, fair share ' + sheet.row.weekendFair.toFixed(1), sheet.row.weekend) +
+    line('holidays' + (sheet.row.holidays.length ? ': ' + sheet.row.holidays.join(', ') : ''), sheet.row.holidays.length) +
+    line('charge', sheet.row.charge) + line('ICU', sheet.row.icu) +
+    line('trades accepted', sheet.tradesAccepted) + line('shifts covered', sheet.shiftsCovered) +
+    line('went home for someone', sheet.wentHomeForSomeone) + line('low-census hours', sheet.releasedHours) + '</div></div>' : '';
+  const rows = table.people.map(entry => '<tr class="' + (isSame(entry.person, state.actor) ? 'mine' : '') + (entry.regular ? '' : ' light') + '"><th scope="row">' + h(entry.person) +
+    (entry.weekendOnly ? ' <small>weekend only</small>' : entry.regular ? '' : ' <small>' + h(entry.status === 'PRN' ? 'PRN' : 'few shifts') + '</small>') + '</th><td>' + entry.shifts + '</td><td>' + entry.weekend + '</td><td>' +
+    (entry.weekendOnly ? '–' : entry.weekendFair.toFixed(1)) + '</td><td class="gap ' + (entry.weekendOnly || Math.abs(entry.weekendGap) < 1 ? 'even' : entry.weekendGap > 0 ? 'over' : 'under') + '">' +
+    (entry.weekendOnly ? '–' : signed(entry.weekendGap)) + '</td><td>' + (entry.holidays.length ? '<span title="' + h(entry.holidays.join(', ')) + '">' + entry.holidays.length + '</span>' : '0') +
+    '</td><td>' + entry.charge + '</td><td>' + entry.icu + '</td></tr>').join('');
+  return '<section class="intro"><div><div class="eyebrow">WHO CARRIED WHAT</div><h1>Fairness</h1><p>Counted from the schedule in this workspace. These are outcomes of how the schedule was built, not anyone’s doing.</p></div></section>' +
+    card + '<div class="calendar-toolbar"><div><div class="eyebrow">' + (table.from ? h(dayLabel(table.from, { month:'short', day:'numeric' }) + ' – ' + dayLabel(table.to, { month:'short', day:'numeric' })) : 'NO SHIFTS') +
+    '</div><h2>' + (pool === 'N' ? 'Night shift' : 'Day shift') + '</h2></div><div class="controls"><div class="segments">' +
+    button('Days', 'pool', 'class="' + (pool === 'D' ? 'selected' : '') + '" data-value="D"') + button('Nights', 'pool', 'class="' + (pool === 'N' ? 'selected' : '') + '" data-value="N"') + '</div></div></div>' +
+    (table.people.length ? '<div class="panel"><p class="fair-line"><b>' + table.withinOne + ' of ' + table.regulars + '</b> regulars are within one weekend turn of their fair share. The spread is <b>' +
+      table.spread.toFixed(1) + '</b> turns. The aim is under one.</p>' +
+      (table.next.length && table.spread >= 1 ? '<p class="subtle">Next weekend turns would go first to ' + h(table.next.join(', ')) + '.</p>' : '') +
+      '<div class="fair-scroll"><table class="fair"><thead><tr><th scope="col">Name</th><th scope="col">Shifts</th><th scope="col">Weekend</th><th scope="col">Fair share</th><th scope="col">Difference</th><th scope="col">Holidays</th><th scope="col">Charge</th><th scope="col">ICU</th></tr></thead><tbody>' +
+      rows + '</tbody></table></div><p class="subtle">A weekend turn is a Saturday or Sunday day shift, or a Friday, Saturday or Sunday night. Fair share follows how many shifts each person works. Students are left out. Call-offs and declined requests are never counted.</p></div>' :
+      '<div class="panel empty"><strong>No ' + (pool === 'N' ? 'night' : 'day') + ' shifts in this workspace.</strong></div>');
+}
+
 function people() {
   const linkedAs = person => Object.entries(state.links || {}).filter(([, id]) => id === person.id).map(([key]) => state.directory[key]?.person || key);
   const card = person => {
@@ -216,7 +250,7 @@ function render() {
     (actorNames().length ? actorNames() : [state.actor]).map(name => '<option ' + (isSame(name, state.actor) ? 'selected' : '') + '>' + h(name) + '</option>').join('') +
     '</select></label></header><div class="content">' +
     (ui.notice ? '<div role="status" class="notice">' + h(ui.notice) + '</div>' : '') +
-    (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : schedule()) +
+    (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : schedule()) +
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
     ' · No payroll or official schedule changes</span>' + button('Decision history', 'audit', 'class="text-button"') + '</footer></div></main>' + dialogMarkup();
   const dialog = app.querySelector('dialog');
@@ -261,6 +295,17 @@ function dialogMarkup() {
         h(issue.date + ' · ' + issue.message) + '</li>').join('') + '</ul>' : '<p class="good">No structural issues were flagged.</p>') +
       '<div class="actions">' + button('Start over', 'clear-draft', 'class="secondary"') +
       button('Publish to this workspace', 'publish', 'class="primary" ' + (!pending.assignments.length || unresolved ? 'disabled' : '')) + '</div>');
+  }
+  if (type === 'release') {
+    const working = state.assignments.filter(item => item.date === row.date && item.shift === row.shift && state.directory[normalizeName(item.person)]?.status !== 'Student').map(item => item.person);
+    const order = releaseOrder(working, state.releases);
+    return shell('Low census · ' + shiftCaption(row), '<p><b>' + h(row.person) + '</b> went home early.</p>' +
+      '<p class="subtle">Next in line for a cut on this shift: <b>' + h(order[0]?.person || '') + '</b> (' + (order[0]?.hours || 0) + ' hours so far). Hours count the same whether someone offered or was sent, so offering never moves a person to the front.</p>' +
+      '<form data-form="release"><input type="hidden" name="key" value="' + h(row.key) + '"><label>Hours not worked<input name="hours" type="number" min="0.5" max="12" step="0.5" required></label>' +
+      '<label>How it happened<select name="how"><option value="voluntary">Offered to go home</option><option value="directed">Was sent home</option></select></label>' +
+      '<label>If they offered, whose turn did they take?<select name="inPlaceOf"><option value="">Nobody else was up</option>' +
+      order.filter(item => !isSame(item.person, row.person)).map((item, index) => '<option' + (index === 0 && !isSame(order[0].person, row.person) ? ' selected' : '') + '>' + h(item.person) + '</option>').join('') +
+      '</select></label><div class="actions"><button class="primary">Save</button></div></form>');
   }
   if (type === 'people-review') {
     const list = ui.pending.people;
@@ -310,6 +355,9 @@ function dialogMarkup() {
     (contactFor(row.person)?.cell && !isMine(row) ? '<p class="person-lines"><span>' + h(formatPhone(contactFor(row.person).cell)) + '</span>' + contactButtons(contactFor(row.person)) + '</p>' : '') +
     (row.sources.length ? '<p>' + button('See photo source', 'source', 'class="text-button" ' + valueAttr(row.key)) +
       ' <small>' + h(row.sources.length + ' source page(s)') + '</small></p>' : '<p class="subtle">Fictional starting roster. Import sample photos to see image evidence.</p>') +
+    (state.releases.some(item => item.key === row.key) ? '<p class="subtle">Low census recorded: ' + h(state.releases.filter(item => item.key === row.key).map(item =>
+      item.hours + ' h, ' + (item.voluntary ? 'offered to go' + (item.inPlaceOf ? ' in place of ' + item.inPlaceOf : '') : 'sent home')).join('; ')) + '</p>' : '') +
+    '<p>' + button('Record low census (VA)', 'release', 'class="text-button" ' + valueAttr(row.key)) + '</p>' +
     (agreedRequestFor(row) ? '<p class="subtle">This shift is part of an agreed request that is queued for review. It cannot be offered again until that is settled.</p>' +
       '<div class="actions">' + button('Open the request', 'thread', 'class="secondary" ' + valueAttr(agreedRequestFor(row).id)) + '</div>' :
     isMine(row) ? '<div class="actions">' + button('Trade this shift', 'matches', 'class="primary" data-kind="trade" ' + valueAttr(row.key)) +
@@ -360,6 +408,7 @@ function dialogMarkup() {
       '>Staff</option>' + ['Contract', 'PRN', 'Student'].map(status => '<option' + (profile.status === status ? ' selected' : '') + '>' + status + '</option>').join('') + '</select></label>' +
       '<label><span><input type="checkbox" name="day"' + (profile.skills.includes('D') ? ' checked' : '') + '> Qualified for day shift</span></label>' +
       '<label><span><input type="checkbox" name="night"' + (profile.skills.includes('N') ? ' checked' : '') + '> Qualified for night shift</span></label>' +
+      '<label><span><input type="checkbox" name="weekendOnly"' + (profile.arrangement === 'weekend-only' ? ' checked' : '') + '> Weekend-only position (left out of the weekend rotation)</span></label>' +
       '<button class="primary">Save staff details</button></form>');
   }
   if (type === 'data') return shell('Local workspace data', '<p>Clear the imported roster, source photos, messages and receipts from this browser and restore the sample workspace.</p>' +
@@ -582,7 +631,8 @@ async function act({action, value, kind}) {
         actor: draft.assignments.some(item => isSame(item.person, previous.actor)) ? previous.actor : draft.assignments[0].person,
         people: draft.sample ? samplePeople : previous.peopleSource === 'import' ? previous.people : [],
         peopleSource: draft.sample ? 'sample' : 'import',
-        manualLinks: (previous.mode === 'sample') === draft.sample ? previous.manualLinks : {}
+        manualLinks: (previous.mode === 'sample') === draft.sample ? previous.manualLinks : {},
+        releases: (previous.mode === 'sample') === draft.sample ? previous.releases || [] : []
       }));
       state = withContacts(state);
       saveState(storageKey, state);
@@ -618,6 +668,8 @@ async function act({action, value, kind}) {
       break;
     }
     case 'audit': ui.dialog = { type:'audit' }; break;
+    case 'pool': ui.pool = value; break;
+    case 'release': if (row) ui.dialog = { type:'release', row }; break;
     case 'data': ui.dialog = { type:'data' }; break;
     case 'staff-setup': ui.dialog = { type:'staff-setup' }; break;
     case 'erase':
@@ -659,10 +711,20 @@ async function submit(form) {
       await commit('Board update', {}, previous => ({ ...previous, posts:[...previous.posts, { id:crypto.randomUUID(), ...message }] }));
       break;
     case 'profile': {
-      const profile = { person:data.person, status:data.status || null, skills:[data.day && 'D', data.night && 'N'].filter(Boolean) };
+      const profile = { person:data.person, status:data.status || null, skills:[data.day && 'D', data.night && 'N'].filter(Boolean), ...(data.weekendOnly ? { arrangement:'weekend-only' } : {}) };
       await commit('Staff details recorded', { ...profile }, previous => ({
         ...previous, directory:{ ...previous.directory, [normalizeName(profile.person)]:profile }
       }));
+      break;
+    }
+    case 'release': {
+      const row = state.assignments.find(item => item.key === data.key);
+      const hours = Number(data.hours);
+      if (!row || !(hours > 0)) return;
+      const entry = { id:crypto.randomUUID(), key:row.key, date:row.date, shift:row.shift, person:row.person, hours,
+        voluntary:data.how === 'voluntary', inPlaceOf:data.how === 'voluntary' ? data.inPlaceOf || null : null };
+      await commit('Low census recorded', entry, previous => ({ ...previous, releases:[...(previous.releases || []), entry] }));
+      ui.dialog = { type:'shift', row };
       break;
     }
     case 'people': {
