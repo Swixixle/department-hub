@@ -6,16 +6,16 @@ import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, ph
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
 import { localBoard } from './backend.js';
-import { SUGGESTIONS, ask, pretty as prettyDate } from './ask.js';
+import { SUGGESTIONS, ask, pretty as prettyDate, readingProblem, searchDocuments } from './ask.js';
 import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, parties, shiftName } from './trades.js';
 import { keywords, qualifiers } from './words.js';
-import { patientSigns } from './guard.js';
+import { LONG_NUMBER_HELP, patientShown, patientSigns } from './guard.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
 const draftKey = storageKey + '-draft';
-const BUILD = 12;
+const BUILD = 13;
 const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
@@ -48,6 +48,7 @@ const initial = {
   answers: [],
   unanswered: [],
   learned: [],
+  corrections: [],
   exchanges: [],
   offers: [],
   assignments: staffSample,
@@ -66,7 +67,7 @@ const initial = {
 function prepare(loaded) {
   let next = loaded;
   if (!next.people) next = { ...next, people: next.mode === 'sample' ? samplePeople : [], peopleSource: next.mode === 'sample' ? 'sample' : 'import', manualLinks: {} };
-  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}], ['history', []], ['documents', []], ['answers', []], ['exchanges', []], ['offers', []], ['unanswered', []], ['learned', []],
+  for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}], ['history', []], ['documents', []], ['answers', []], ['exchanges', []], ['offers', []], ['unanswered', []], ['learned', []], ['corrections', []],
     ['custodians', next.mode === 'sample' ? ['jordan'] : []], ['holidayRules', { off: [], extra: [] }]]) if (!next[field]) next = { ...next, [field]: empty };
   next = withContacts(next);
   // The starter rules live in code. A saved workspace picks up a new rule version on load.
@@ -139,7 +140,7 @@ function countPress(action, value) {
 }
 const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory',
   shift:'Opened a shift', options:'Looked for ways off a shift', 'options-loops':'Looked for three-person loops', propose:'Proposed an exchange', 'exchange-agree':'Agreed to an exchange', 'exchange-decline':'Declined an exchange',
-  'form:offer':'Said they could pick up a shift', 'form:trade-rules':'Changed the trade rules', 'ask-next':'Pressed a next-step question', 'ask-yes':'Said an answer helped', 'ask-no':'Said an answer did not help', 'ask-send':'Sent a question to the record keeper', verify:'Checked the receipts', 'notice-ok':'Acknowledged the notice', notice:'Opened the notice', 'mark-copy':'Copied the latest fingerprint', 'form:mark':'Looked for an earlier fingerprint', 'form:teach':'Taught an answer', 'ask-open':'Opened Ask', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
+  'form:offer':'Said they could pick up a shift', 'form:trade-rules':'Changed the trade rules', 'ask-next':'Pressed a next-step question', 'ask-yes':'Said an answer helped', 'ask-no':'Said an answer did not help', 'ask-send':'Sent a question to the record keeper', verify:'Checked the receipts', 'notice-ok':'Acknowledged the notice', notice:'Opened the notice', 'mark-copy':'Copied the latest fingerprint', 'form:mark':'Looked for an earlier fingerprint', 'form:teach':'Taught an answer', 'ask-open':'Opened Ask', 'ask-wrong':'Said what was wrong with an answer', 'form:reading-try':'Tried a rewording', 'reading-save':'Saved a reading correction', 'form:passage-find':'Looked for a passage', 'passage-pick':'Chose a passage for a question', 'correction-remove':'Removed a correction', 'teach-copy':'Copied the waiting questions', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
   import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
   over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog' };
@@ -154,10 +155,10 @@ function markBoardSeen(value = new Date().toISOString()) {
 }
 const askWorld = () => ({ today: localToday(), now:new Date().toISOString(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
   documents: state.documents, releases: state.releases, requests: creditRequests(), trade: { ...tradeWorld(), offers: state.offers }, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt,
-  answers: state.answers, learned: state.learned, last: ui.askContext, versions:sourceVersions });
+  answers: state.answers, learned: state.learned, corrections: state.corrections, last: ui.askContext, versions:sourceVersions });
 function currentAsk(dialog = ui.dialog) {
   const signs = patientSigns(dialog?.q || '');
-  if (signs.length) return { title:'Remove patient details before asking.', lines:['The text screen flagged ' + signs.join(', ') + '. No records were searched.'],
+  if (signs.length) return { title:'Remove patient details before asking.', lines:['The text screen saw ' + patientShown(dialog.q) + '. No records were searched.', ...(signs.some(sign => sign.startsWith('a long number')) ? [LONG_NUMBER_HELP] : [])],
     items:[], source:'Patient-information screen; it cannot detect every disclosure.', empty:true, kind:'blocked', context:null };
   return ask(dialog.q, { ...askWorld(), last:dialog.previousContext });
 }
@@ -168,7 +169,7 @@ async function askAndLog(q) {
   ui.lastAsk = ui.dialog = dialog;
   await commit(result.kind === 'blocked' ? 'Question blocked by text screen' : 'Question asked', {
     ...(result.kind === 'blocked' ? {} : { fingerprint:await sha256(q.trim().toLowerCase()) }),
-    engine:'ask-12-review-1', build:BUILD, kind:result.kind, answered:!result.empty,
+    engine:'ask-13', build:BUILD, kind:result.kind, answered:!result.empty, ...(result.corrected ? { correction:result.corrected.id } : {}),
     resolved:result.context?.when || null,
     sources:result.items.map(item => ({ reference:item.go || 'note',
       ...(item.go?.startsWith('doc|') ? { version:sourceVersions[item.go.split('|')[1]] } : {}) })),
@@ -181,7 +182,9 @@ function patientCheck(form, text) {
   if (!signs.length) return signs;
   let note = form.querySelector('.refusal');
   if (!note) { note = document.createElement('p'); note.className = 'refusal'; note.setAttribute('role', 'alert'); form.append(note); }
-  note.textContent = 'Remove possible patient details before saving: ' + signs.join(', ') + '. Repeated presses do not override this screen. It can miss other forms of patient information.';
+  // The words that set it off are shown to the person who wrote them, and kept nowhere.
+  note.textContent = 'Not saved. This looks like it points to a patient: ' + patientShown(text) + '. Take that out and save again. ' + (signs.some(sign => sign.startsWith('a long number')) ? LONG_NUMBER_HELP + ' ' : '') +
+    'Repeated presses do not override this screen, and it can miss other forms of patient information.';
   note.scrollIntoView({ block:'nearest' });
   void commit('Text screen blocked saving', { surface:form.dataset.form, signs }, previous => previous).catch(error => { note.textContent += ' The audit could not be saved: ' + error.message; });
   return null;
@@ -336,6 +339,11 @@ function schedule() {
     '<p class="calendar-foot">Night shifts appear on their start date. Payroll checks split hours at the workweek boundary.</p>';
 }
 
+// Why a question is waiting for the record keeper.
+const SCHEDULE_KINDS = ['when', 'who', 'off', 'offlist', 'run', 'hours', 'trade', 'pickup', 'staffing', 'fair'];
+const WRONG = { misread:'reported as misread', passage:'reported as quoting the wrong part', unanswered:'nothing answered it' };
+const sameAsk = (item, text) => item.asks.some(asked => asked.trim().toLowerCase() === text.trim().toLowerCase());
+const liveDocuments = () => state.documents.filter(doc => doc.status !== 'withdrawn' && (!doc.effective || doc.effective <= localToday()));
 const RULE = 'No patient information: no names, faces, monitors, charts or record numbers. Posts, uploads and questions are logged with a fingerprint and the name in use.';
 function postMarkup(post) {
   const link = videoLink(post.body);
@@ -831,16 +839,47 @@ function dialogMarkup() {
   if (type === 'teach') {
     if (!isKeeper()) return shell('Record keeper access', '<p>Switch to the record keeper’s profile to manage taught answers. Profile selection is a local courtesy until accounts exist.</p>');
     const picked = state.unanswered.find(item => item.id === ui.dialog.pick);
-    if (picked) return shell('Answer this once', '<p class="fair-line">' + h(picked.text) + '</p><form data-form="teach"><input type="hidden" name="id" value="' + h(picked.id) + '">' +
-      '<label>The answer<textarea name="answer" rows="4" required maxlength="1200" placeholder="Write it the way you would say it to a coworker"></textarea></label>' +
-      '<label>Who says so, or which document<input name="source" maxlength="120" autocomplete="off" placeholder="Lead, Nov 10. Or: Time off policy, section 3"></label>' +
-      '<label>Link an added source document<select name="documentId"><option value="">General department note; no document authority</option>' + state.documents.map(doc => '<option value="' + h(doc.id) + '">' + h(doc.title) + '</option>').join('') + '</select></label>' +
-      '<p class="subtle">This is a human-written custodian note, not official policy approval. A linked note stops matching when its source changes or is removed. Live roster answers and document passages take precedence. ' + RULE + '</p><p class="refusal" role="alert"></p>' +
-      '<div class="actions">' + button('Back', 'teach-list', 'class="secondary"') + '<button class="primary">Save the answer</button></div></form>');
-    return shell('What Ask has been taught', '<h3>Waiting for an answer</h3>' + (state.unanswered.length ? '<div class="line-list">' + state.unanswered.map(item => '<div><span><b>' + h(item.text) + '</b> <small>sent ' + h(prettyDate(item.at.slice(0, 10))) +
-        '</small></span><span class="pair">' + button('Answer it', 'teach-pick', 'class="secondary" ' + valueAttr(item.id)) + button('Dismiss', 'teach-drop', 'class="secondary" ' + valueAttr(item.id)) + '</span></div>').join('') + '</div>' : '<p class="subtle">Nothing is waiting.</p>') +
-      '<h3>Taught answers</h3>' + (state.answers.length ? '<div class="line-list">' + state.answers.map(item => '<div><span><b>' + h(item.asks[0]) + '</b> <small>' + h(item.answer.slice(0, 120)) + ' · ' + h(item.by) + ', ' + h(prettyDate(item.at.slice(0, 10))) +
-        '</small></span>' + button('Remove', 'teach-remove', 'class="secondary" ' + valueAttr(item.id)) + '</div>').join('') + '</div>' : '<p class="subtle">None yet.</p>') +
+    if (picked) {
+      // What Ask says for it now decides which corrections can do anything.
+      const now = currentAsk({ q:picked.text }), answered = now.kind !== 'blocked' && !now.empty && !now.taught;
+      const brief = result => (result.understood ? '<p class="subtle">Understood as: ' + h(result.understood) + '.</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') +
+        result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.slice(0, 3).map(entry => '<p><b>' + h(entry.text) + '</b>' + (entry.sub ? ' <small>' + h(entry.sub) + '</small>' : '') + '</p>').join('');
+      const reads = ui.dialog.reads || '', screened = reads && patientSigns(reads).length > 0;
+      const tried = reads && !screened ? ask(reads, { ...askWorld(), last:null, uncorrected:true }) : null;
+      const problem = !reads ? '' : screened ? 'Take the patient details out of the wording.' : readingProblem(picked.text, reads, askWorld());
+      const words = ui.dialog.words || '', passages = words ? searchDocuments(words, liveDocuments(), 5, [], sourceVersions) : [];
+      return shell('Correct this answer', '<p class="fair-line">' + h(picked.text) + '</p><p class="subtle">' + h([WRONG[picked.reason] || WRONG.unanswered, 'sent ' + prettyDate(picked.at.slice(0, 10))].join(' · ')) + '</p>' +
+        '<div class="ask-answer"><p class="subtle">What Ask says now</p>' + brief(now) + '</div>' +
+        '<h3>Read it another way</h3><p class="subtle">Type the same question in words Ask gets right. The answer is still worked out from the schedule and documents each time it is asked, so it cannot go out of date. The same question about another person or day is read the same way.</p>' +
+        '<form data-form="reading-try"><label>It should be read as<input name="reads" maxlength="200" autocomplete="off" value="' + h(reads) + '" placeholder="Who is not working tonight?"></label>' +
+        '<div class="actions inline"><button class="secondary">Try it</button></div></form>' +
+        (reads ? '<div class="ask-answer">' + (tried ? brief(tried) : '') + (problem ? '<p class="refusal" role="alert">' + h(problem) + '</p>' :
+          '<div class="actions">' + button('Save: read it this way', 'reading-save', 'class="primary" ' + valueAttr(picked.id)) + '</div>') + '</div>' : '') +
+        (liveDocuments().length ? '<h3>Quote a passage</h3><p class="subtle">Find the part of an added document that answers it. The choice holds until that document changes.</p>' +
+          '<form data-form="passage-find"><label>Words from the passage<input name="words" maxlength="120" autocomplete="off" value="' + h(words) + '" placeholder="four weeks before the schedule"></label>' +
+          '<div class="actions inline"><button class="secondary">Find it</button></div></form>' +
+          (words ? (passages.length ? passages.map(passage => '<div class="ask-item"><div><b>' + h(passage.text.replace(/\s+/g, ' ').slice(0, 220)) + (passage.text.length > 220 ? '…' : '') + '</b><small>' + h([passage.doc.title, passage.heading].filter(Boolean).join(' · ')) + '</small></div>' +
+            button('Use this passage', 'passage-pick', 'class="secondary" ' + valueAttr('doc|' + passage.doc.id + '|' + passage.offset)) + '</div>').join('') : '<p class="subtle">No passage has those words.</p>') : '') : '') +
+        '<h3>Write a note</h3>' + (answered ? '<p class="subtle">Not offered for this question. Ask already answers it from ' + (now.items.some(entry => entry.go?.startsWith('doc|')) ? 'a document' : now.kind === 'look' ? 'the board' : 'the schedule') +
+          ', and a note is shown only when nothing else answers. If the schedule or the document is wrong, correct it there.</p>' :
+        '<form data-form="teach"><input type="hidden" name="id" value="' + h(picked.id) + '">' +
+        '<label>The answer<textarea name="answer" rows="4" required maxlength="1200" placeholder="Write it the way you would say it to a coworker"></textarea></label>' +
+        '<label>Who says so, or which document<input name="source" maxlength="120" autocomplete="off" placeholder="Lead, Nov 10. Or: Time off policy, section 3"></label>' +
+        '<label>Link an added source document<select name="documentId"><option value="">General department note; no document authority</option>' + state.documents.map(doc => '<option value="' + h(doc.id) + '">' + h(doc.title) + '</option>').join('') + '</select></label>' +
+        '<p class="subtle">This is a human-written custodian note, not official policy approval. A linked note stops matching when its source changes or is removed. Live roster answers and document passages take precedence. ' + RULE + '</p><p class="refusal" role="alert"></p>' +
+        '<div class="actions"><button class="primary">Save the note</button></div></form>') +
+        '<div class="actions">' + button('Back', 'teach-list', 'class="secondary"') + '</div>');
+    }
+    const about = item => [item.at ? 'sent ' + prettyDate(item.at.slice(0, 10)) : '', WRONG[item.reason] || WRONG.unanswered, item.understood ? 'understood as: ' + item.understood : ''].filter(Boolean).join(' · ');
+    const fix = item => { const doc = item.go && state.documents.find(entry => entry.id === item.go.split('|')[1]), stale = item.go && (!doc || item.sourceHash !== sourceVersions[doc.id]);
+      return (item.reads ? 'Read as: “' + item.reads + '”' : 'Quotes a passage of ' + (doc ? doc.title : 'a removed document')) + (stale ? ' · not used now: the document changed or was removed' : '') + ' · ' + item.by + ', ' + prettyDate(item.at.slice(0, 10)); };
+    return shell('What Ask has been taught', '<h3>Waiting for the record keeper</h3>' + (state.unanswered.length ? '<div class="line-list">' + state.unanswered.map(item => '<div><span><b>' + h(item.text) + '</b> <small>' + h(about(item)) +
+        '</small></span><span class="pair">' + button('Correct it', 'teach-pick', 'class="secondary" ' + valueAttr(item.id)) + button('Dismiss', 'teach-drop', 'class="secondary" ' + valueAttr(item.id)) + '</span></div>').join('') + '</div>' +
+        '<p>' + button('Copy the waiting questions', 'teach-copy', 'class="text-button"') + ' <span class="subtle">to send to whoever maintains the app. A misread that keeps coming back is better fixed there.</span></p>' : '<p class="subtle">Nothing is waiting.</p>') +
+      '<h3>Corrections</h3>' + (state.corrections.length ? '<div class="line-list">' + state.corrections.map(item => '<div><span><b>' + h(item.asks[0]) + '</b> <small>' + h(fix(item)) +
+        '</small></span>' + button('Remove', 'correction-remove', 'class="secondary" ' + valueAttr(item.id)) + '</div>').join('') + '</div>' : '<p class="subtle">None yet. A correction changes how one exact question is read, or which passage it quotes.</p>') +
+      '<h3>Notes</h3>' + (state.answers.length ? '<div class="line-list">' + state.answers.map(item => '<div><span><b>' + h(item.asks[0]) + '</b> <small>' + h(item.answer.slice(0, 120)) + ' · ' + h(item.by) + ', ' + h(prettyDate(item.at.slice(0, 10))) +
+        '</small></span>' + button('Remove', 'teach-remove', 'class="secondary" ' + valueAttr(item.id)) + '</div>').join('') + '</div>' : '<p class="subtle">None yet. A note is shown only when nothing else answers.</p>') +
       '<div class="actions">' + button('Back to Ask', 'ask-back', 'class="secondary"') + '</div>');
   }
   if (type === 'note') {
@@ -849,7 +888,8 @@ function dialogMarkup() {
       (note.documentId ? '<p>' + button('Open linked document', 'doc-open', 'class="secondary" ' + valueAttr(note.documentId)) + '</p>' : '') +
       '<p>' + button('Back to Ask', 'ask-back', 'class="secondary"') + '</p>' : '<p>This note has been removed.</p>');
   }
-  if (type === 'send-question') return shell('Review the question to save', '<form data-form="send-question"><label>Question<textarea name="question" maxlength="200" required>' + h(ui.dialog.q || '') + '</textarea></label>' +
+  if (type === 'send-question') return shell('Review the question to save', (ui.dialog.reason ? '<p class="subtle">Sent to the record keeper as ' + h(WRONG[ui.dialog.reason]) + ', with how Ask understood it. The keeper can correct how it is read or which passage it quotes.</p>' : '') +
+    '<form data-form="send-question"><label>Question<textarea name="question" maxlength="200" required>' + h(ui.dialog.q || '') + '</textarea></label>' +
     '<p class="subtle">Sending saves these exact words for the record keeper in this browser and in backups. They remain in a taught answer if the keeper answers it. Remove personal or patient details first. Everyone with control of this browser can access its data.</p><p class="refusal" role="alert"></p><div class="actions">' +
     button('Cancel', 'ask-back', 'class="secondary"') + '<button class="primary">Save reviewed question</button></div><input type="hidden" name="teach" value="' + (ui.dialog.teach ? 'yes' : '') + '"></form>');
   if (type === 'ask') {
@@ -861,17 +901,23 @@ function dialogMarkup() {
       (entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
     return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
       '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
-      (result ? '<div class="ask-answer" role="status">' + (result.read ? '<p class="subtle">Read as: “' + h(result.read) + '”</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') + result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.map(item).join('') +
+      (result ? '<div class="ask-answer" role="status">' + (result.read || result.understood ? '<p class="subtle">' + h([result.read ? 'Read as: “' + result.read + '”' + (result.corrected?.kind === 'reading' ? ', a correction by ' + result.corrected.by + ' as record keeper' : '') : '',
+          result.understood ? 'Understood as: ' + result.understood : ''].filter(Boolean).join('. ')) + '.</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') + result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.map(item).join('') +
         '<p class="subtle">From: ' + h(result.source) + '</p>' +
         (result.next?.length ? '<div class="chip-list"><span class="subtle">Next</span><div>' + result.next.map((text, index) => button(h(text), 'ask-next', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' : '') +
-        (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' : ui.dialog.no || result.empty ? '<div class="actions wrap">' + button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
+        (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' : result.empty ? '<div class="actions wrap">' + button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
           (isKeeper() ? button('Teach the answer', 'ask-teach', 'class="secondary"') : '') + '</div>' :
+          // A wrong answer has one of three causes, and each is fixed in a different place.
+          ui.dialog.no ? '<p class="subtle">What was wrong? You can also ask it again in other words.</p><div class="actions wrap">' + button('It misread my question', 'ask-wrong', 'class="secondary" ' + valueAttr('misread')) +
+            (result.items.some(entry => entry.go?.startsWith('doc|')) ? button('It quoted the wrong part', 'ask-wrong', 'class="secondary" ' + valueAttr('passage')) : '') +
+            (SCHEDULE_KINDS.includes(result.kind) ? button('The schedule itself is wrong', 'ask-wrong', 'class="secondary" ' + valueAttr('schedule')) : '') +
+            button('Put this question on the board', 'ask-post', 'class="secondary"') + (isKeeper() ? button('Correct it now', 'ask-teach', 'class="secondary"') : '') + '</div>' :
           '<div class="actions wrap"><span class="subtle">Did that answer it?</span>' + button(canRemember ? 'Yes, remember this wording' : 'Yes', 'ask-yes', 'class="secondary"') + button('No', 'ask-no', 'class="secondary"') + '</div>' +
           (canRemember ? '<p class="subtle">Remembering saves wording or search words in this browser and backups. It records relevance feedback, not policy approval.</p>' : '')) + '</div>' :
         '<p class="subtle">It looks up supported questions and opens the records it finds. Nothing is sent to an AI service. Question text is not routinely saved; sending it or remembering wording saves a reviewed example. Receipts record fingerprints and source versions.</p>') +
       '<div class="chip-list"><span class="subtle">Try</span><div>' + SUGGESTIONS.map((text, index) => button(h(text), 'ask-try', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' +
       '<p>' + button('Documents it can search (' + state.documents.length + ')', 'docs', 'class="text-button"') + ' ' +
-        (isKeeper() ? button('Taught answers (' + state.answers.length + '), waiting (' + state.unanswered.length + ')', 'teach-list', 'class="text-button"') : '') + '</p>');
+        (isKeeper() ? button('Corrections and notes (' + (state.corrections.length + state.answers.length) + '), waiting (' + state.unanswered.length + ')', 'teach-list', 'class="text-button"') : '') + '</p>');
   }
   if (type === 'docs') {
     const about = doc => [doc.kind, doc.effective ? 'effective ' + doc.effective : 'no effective date given', 'added by ' + doc.by + ' on ' + prettyDate(doc.added.slice(0, 10)), fileSize(doc.text.length)].join(' · ');
@@ -1335,6 +1381,53 @@ async function act({action, value, kind}) {
       catch { ui.flash = 'Copying was not allowed here. Press and hold the fingerprint to copy it.'; }
       break;
     case 'ask-no': ui.lastAsk = ui.dialog = { ...ui.dialog, no:true }; break;
+    case 'ask-wrong': {
+      const q = (ui.dialog?.q || '').trim(), result = q ? currentAsk() : null;
+      if (!result || result.kind === 'blocked') return;
+      if (value === 'schedule') {          // Ask only repeats the schedule, so that is where it is put right
+        const dated = result.items.find(entry => entry.go?.startsWith('date|'))?.go.slice(5);
+        ui.dialog = null; ui.tab = 'schedule';
+        if (dated) { ui.view = 'week'; ui.date = dated; ui.scrollTo = '.day-card[data-date="' + dated + '"]'; }
+        ui.notice = 'Ask repeats what the schedule says. Use Edit names on the shift to correct it, and the answer follows.';
+        break;
+      }
+      if (!WRONG[value] || patientSigns(q).length) return;
+      ui.dialog = { type:'send-question', q, reason:value };
+      break;
+    }
+    case 'reading-save': {
+      if (!isKeeper() || ui.dialog?.type !== 'teach') return;
+      const waiting = state.unanswered.find(item => item.id === value), reads = (ui.dialog.reads || '').trim();
+      if (!waiting || !reads || patientSigns(waiting.text + '\n' + reads).length || readingProblem(waiting.text, reads, askWorld())) return;
+      const entry = { id:crypto.randomUUID(), asks:[waiting.text], reads, by:state.actor, at:new Date().toISOString() };
+      await commit('Reading correction saved', { id:entry.id, question:await sha256(waiting.text.trim().toLowerCase()), reads:await sha256(reads.toLowerCase()) }, previous => ({ ...previous,
+        corrections:[...previous.corrections.filter(item => !sameAsk(item, waiting.text)), entry].slice(-200), unanswered:previous.unanswered.filter(item => item.id !== waiting.id) }));
+      ui.dialog = { type:'teach' };
+      ui.flash = 'Saved. That question is now read as “' + reads + '”.';
+      break;
+    }
+    case 'passage-pick': {
+      if (!isKeeper() || ui.dialog?.type !== 'teach') return;
+      const waiting = state.unanswered.find(item => item.id === ui.dialog.pick), [, documentId] = String(value).split('|'), sourceHash = sourceVersions[documentId];
+      if (!waiting || !sourceHash || !liveDocuments().some(doc => doc.id === documentId)) return;
+      const entry = { id:crypto.randomUUID(), asks:[waiting.text], go:value, sourceHash, by:state.actor, at:new Date().toISOString() };
+      const read = currentAsk({ q:waiting.text }), wording = read.read || waiting.text, terms = keywords(wording);
+      await commit('Passage correction saved', { id:entry.id, question:await sha256(waiting.text.trim().toLowerCase()), reference:value, sourceHash }, previous => ({ ...previous,
+        corrections:[...previous.corrections.filter(item => !sameAsk(item, waiting.text)), entry].slice(-200), unanswered:previous.unanswered.filter(item => item.id !== waiting.id),
+        // a question worded nearly the same way gets the same passage lifted, as it does after a confirmed answer
+        learned: !terms.length ? previous.learned : [...previous.learned.filter(link => !(link.go === value && link.terms.join(' ') === terms.join(' '))), { terms, go:value, count:3, sourceHash, qualifiers:qualifiers(wording) }].slice(-400) }));
+      ui.dialog = { type:'teach' };
+      ui.flash = 'Saved. That question now quotes the passage you chose, until the document changes.';
+      break;
+    }
+    case 'correction-remove': if (isKeeper()) await commit('Correction removed', { id:value }, previous => ({ ...previous, corrections:previous.corrections.filter(item => item.id !== value) })); break;
+    case 'teach-copy': {
+      if (!isKeeper()) return;
+      const lines = state.unanswered.map(item => [item.text, WRONG[item.reason] || WRONG.unanswered, item.understood ? 'understood as: ' + item.understood : ''].filter(Boolean).join(' | '));
+      try { await navigator.clipboard.writeText(lines.join('\n')); ui.flash = 'Copied ' + lines.length + ' waiting question' + (lines.length === 1 ? '' : 's') + '.'; }
+      catch { ui.flash = 'Copying was not allowed here.'; }
+      break;
+    }
     case 'ask-yes': {
       const { q } = ui.dialog, result = currentAsk(), opened = ui.dialog.opened;
       const top = result.items.some(item => item.go === opened) ? opened : '';
@@ -1623,14 +1716,19 @@ async function submit(form) {
         ...(source ? { documentId:source.id, sourceHash:sourceVersions[source.id] } : {}) };
       await commit('Answer taught', { id:entry.id, question:await sha256(waiting.text.toLowerCase()), answer:await sha256(words), sourceHash:entry.sourceHash || null }, previous => ({ ...previous, answers:[...previous.answers, entry], unanswered:previous.unanswered.filter(item => item.id !== waiting.id) }));
       ui.dialog = { type:'teach' };
-      ui.flash = 'Saved. Ask will give this answer to questions like it.';
+      // Say what it will do, not what was hoped: a note never comes before the schedule or a document.
+      ui.flash = currentAsk({ q:waiting.text }).taught === entry.id ? 'Saved. Ask now gives this note for that question.' : 'Saved, but Ask will not show it for that question: the schedule or a document answers it first.';
       break;
     }
+    case 'reading-try': if (isKeeper() && ui.dialog?.type === 'teach') ui.dialog = { ...ui.dialog, reads:(data.reads || '').trim().slice(0, 200) }; break;
+    case 'passage-find': if (isKeeper() && ui.dialog?.type === 'teach') ui.dialog = { ...ui.dialog, words:(data.words || '').trim().slice(0, 120) }; break;
     case 'send-question': {
       const q = (data.question || '').trim().slice(0, 200);
       if (!q || !patientCheck(form, q)) return;
-      const entry = state.unanswered.find(item => item.text.toLowerCase() === q.toLowerCase()) || { id:crypto.randomUUID(), text:q, at:new Date().toISOString() };
-      if (!state.unanswered.includes(entry)) await commit('Reviewed question saved', { id:entry.id, fingerprint:await sha256(q.toLowerCase()), textSaved:true }, previous => ({ ...previous, unanswered:[...previous.unanswered, entry].slice(-200) }));
+      // Why it was sent, and how Ask took it, go with the words so the keeper can see what to correct.
+      const reason = WRONG[ui.dialog?.reason] ? ui.dialog.reason : 'unanswered', taken = currentAsk({ q });
+      const entry = state.unanswered.find(item => item.text.toLowerCase() === q.toLowerCase()) || { id:crypto.randomUUID(), text:q, at:new Date().toISOString(), reason, ...(taken.understood ? { understood:taken.understood } : {}) };
+      if (!state.unanswered.includes(entry)) await commit('Reviewed question saved', { id:entry.id, fingerprint:await sha256(q.toLowerCase()), textSaved:true, reason, kind:taken.kind }, previous => ({ ...previous, unanswered:[...previous.unanswered, entry].slice(-200) }));
       ui.dialog = data.teach && isKeeper() ? { type:'teach', pick:entry.id } : { type:'ask', q, previousContext:ui.lastAsk?.previousContext, yes:'Reviewed question saved for the record keeper in this browser and backups.' };
       break;
     }
