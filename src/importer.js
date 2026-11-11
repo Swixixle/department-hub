@@ -1,6 +1,7 @@
 import { createWorker } from 'tesseract.js';
 import { mergeAssignments, verifyRoster } from './model.js';
-import { inkMask, maskToRgba, backgroundColor, tintName, longStrokes, tightBox } from './pixels.js';
+import { inkMask, maskToRgba, backgroundColor, tintName, longStrokes, tightBox, withoutRules } from './pixels.js';
+import { parsePhoneList, mergePhoneReads } from './contacts.js';
 import { parseCalendar, reconcileNames } from './calendar.js';
 
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
@@ -142,6 +143,7 @@ export async function readBatch(files, onProgress, onSource) {
   const pages = [];
   const flags = [];
   const rows = [];
+  const people = [];
   try {
     await worker.setParameters({ tessedit_pageseg_mode: '6' });
     for (const [index, file] of files.entries()) {
@@ -184,6 +186,23 @@ export async function readBatch(files, onProgress, onSource) {
           },
           strokesIn: (region, minLength) => longStrokes(mask, image.width, region, minLength)
         });
+        // A page that is not a schedule may be a telephone list. Its table rules are erased and it is read twice,
+        // in two different ways, so that a number is trusted only when both readings agree.
+        if (parsed.layout === 'unrecognized') {
+          context.putImageData(new ImageData(maskToRgba(withoutRules(mask, canvas.width, canvas.height)), canvas.width, canvas.height), 0, 0);
+          const reads = [];
+          for (const mode of ['11', '6']) {
+            await worker.setParameters({ tessedit_pageseg_mode: mode });
+            const { data: again } = await worker.recognize(canvas, {}, { blocks: true, text: false });
+            reads.push(parsePhoneList(ocrWords(again), source));
+          }
+          const list = mergePhoneReads(reads[0], reads[1]);
+          if (list) {
+            people.push(...list.people);
+            pages.push({ name: file.name, page, status: 'phone list', dates: [], count: list.people.length });
+            continue;
+          }
+        }
         flags.push(...parsed.flags);
         rows.push(...parsed.assignments);
         pages.push({
@@ -213,5 +232,5 @@ export async function readBatch(files, onProgress, onSource) {
   for (const flag of flags) if (renamed.has(flag.draft.person)) flag.draft.person = renamed.get(flag.draft.person);
   const kept = cleaned.rows.filter((row, index) => !asked.has(index));
   const assignments = mergeAssignments(kept);
-  return { pages, assignments, flags, issues: verifyRoster(assignments) };
+  return { pages, assignments, flags, issues: verifyRoster(assignments), people };
 }

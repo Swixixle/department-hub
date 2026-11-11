@@ -4,7 +4,7 @@ export const SHIFTS = {
 };
 
 export const POLICY = {
-  version: 'pilot-2',
+  version: 'pilot-3',
   source: 'Illustrative department rules',
   zone: 'America/Indiana/Indianapolis',
   overtimeLimitMinutes: 40 * 60,
@@ -12,6 +12,7 @@ export const POLICY = {
   minimumByShift: { D: 4, N: 3 },
   allowPrnTrade: false,
   allowPrnCoverage: true,
+  allowStudents: false,
   allowOvertimeTrade: false,
   allowOvertimeCoverage: false
 };
@@ -150,6 +151,9 @@ export function evaluateChange({ roster, from, to, recipient, kind, directory, h
   const allowPrn = kind === 'trade' ? policy.allowPrnTrade : policy.allowPrnCoverage;
   if (!allowPrn && [owner?.status, candidate?.status].includes('PRN')) {
     return { status: 'blocked', reason: 'The current trade rules exclude PRN staff.' };
+  }
+  if (!policy.allowStudents && [owner?.status, candidate?.status].includes('Student')) {
+    return { status: 'blocked', reason: 'Students are not part of trades or coverage.' };
   }
   const candidates = [{ person: second, outgoing: to, incoming: from, profile: candidate }];
   if (kind === 'trade') candidates.push({ person: from.person, outgoing: from, incoming: to, profile: owner });
