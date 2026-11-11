@@ -67,16 +67,16 @@ test('a number is trusted only when two readings agree', () => {
 test('schedule names are matched to people, and guesses are kept apart', () => {
   const person = (last, first, group = 'Staff') => { const entry = { last, first, group }; return { ...entry, id: personId(entry) }; };
   const people = [person('Lane', 'Avery'), person('Moss', 'Jordan'), person('Kerr', 'Jordan', 'Student'), person('Vale', 'Francesca'), person('Shaw', 'Samantha'),
-    person('Park', 'Andrew'), person('Reyes', 'Julianne')];
-  const { links, guessed } = linkNames(['Avery', 'Jordan', 'Jordan K', 'Sam', 'Jules', 'Drew', 'Nobody'], people);
+    person('Park', 'Andrew'), person('Reyes', 'Nicolette')];
+  const { links, guessed } = linkNames(['Avery', 'Jordan', 'Jordan K', 'Sam', 'Nico', 'Drew', 'Nobody'], people);
   assert.equal(links.avery, 'lane,avery');
   assert.equal(links['jordan k'], 'kerr,jordan');
   assert.equal(links.jordan, 'moss,jordan');
   assert.equal(links.sam, 'shaw,samantha');
-  assert.equal(links.jules, 'reyes,julianne');
+  assert.equal(links.nico, 'reyes,nicolette');
   assert.equal(links.drew, undefined);
   assert.equal(links.nobody, undefined);
-  assert.deepEqual(guessed.sort(), ['jules', 'sam']);
+  assert.deepEqual(guessed.sort(), ['nico', 'sam']);
 });
 
 test('phone links and formatting', () => {

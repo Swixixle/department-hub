@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { AGREED_STATUS, assignmentKey, committedKeys, evaluateChange, mergeAssignments, minutesByWeek, projectRoster } from '../src/model.js';
+import { AGREED_STATUS, assignmentKey, committedKeys, evaluateChange, mergeAssignments, minutesByWeek, projectRoster, tidyNames, tidyNotes } from '../src/model.js';
 import { parseDate, parsePage } from '../src/importer.js';
 
 function shift(date, code, person, sources = []) {
@@ -120,4 +120,27 @@ test('a shift in an agreed request cannot be agreed again and its hours count', 
   assert.match(second.reason, /overtime/);
   const withoutProjection = evaluateChange({ roster, from:quinn[2], recipient:'Sam', kind:'coverage', directory, hoursVerified:true });
   assert.equal(withoutProjection.status, 'eligible');
+});
+
+test('names are tidied to one person per line, and a name entered twice is kept once', () => {
+  const known = ['Avery', 'Blair', 'Jordan', 'Jordan K', 'Mary Ann', 'Sam'];
+  const tidy = entries => tidyNames(entries.map(entry => typeof entry === 'string' ? { person: entry } : entry), known);
+  // A whole cell typed into one box, the way it happens when the cell is highlighted.
+  assert.deepEqual(tidy(['Avery Blair Jordan K']).rows.map(row => row.person), ['Avery', 'Blair', 'Jordan K']);
+  assert.deepEqual(tidy(['avery, BLAIR / sam and Jordan']).rows.map(row => row.person), ['Avery', 'Blair', 'Sam', 'Jordan']);
+  assert.deepEqual(tidy(['Avery Blair Jordan K']).split, ['Avery Blair Jordan K']);
+  // A known name with a space stays whole, and so does an unknown one.
+  assert.deepEqual(tidy(['Jordan K', 'Mary Ann', 'Dana Lee']).rows.map(row => row.person), ['Jordan K', 'Mary Ann', 'Dana Lee']);
+  assert.deepEqual(tidy(['Jordan K', 'Mary Ann', 'Dana Lee']).split, []);
+  assert.deepEqual(tidy(['Dana Lee']).fresh, ['Dana Lee']);
+  assert.deepEqual(tidy(['Avery Dana']).rows.map(row => row.person), ['Avery Dana']);   // not every word is a known name
+  // Twice in separate boxes, twice in one box, and twice with different capitals.
+  const twice = tidy([{ person: 'Avery' }, { person: 'Blair', role: 'charge' }, { person: ' avery ', role: 'icu', hours: '7-3' }, { person: 'Sam Sam' }, '']);
+  assert.deepEqual(twice.rows, [{ person: 'Avery', role: 'icu', hours: '7-3' }, { person: 'Blair', role: 'charge' }, { person: 'Sam' }]);
+  assert.deepEqual(twice.duplicates, ['Avery', 'Sam']);
+  // The role on a line that gets split stays with the first name only.
+  assert.deepEqual(tidy([{ person: 'Blair Sam', role: 'charge' }]).rows, [{ person: 'Blair', role: 'charge' }, { person: 'Sam' }]);
+  assert.deepEqual(tidyNotes(twice), ['Avery and Sam were entered twice and are listed once.', 'A line with several names was split so each person has a line: Sam Sam.']);
+  assert.deepEqual(tidyNotes(tidy(['Dana Lee'])), ['New name: Dana Lee. Check the spelling.']);
+  assert.deepEqual(tidyNotes(tidy(['Avery'])), []);
 });
