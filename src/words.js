@@ -22,7 +22,12 @@ export const SYNONYMS = [
 export const CORE_WORDS = ('when where who what how work works working worked shift shifts schedule scheduled next today tonight tomorrow yesterday weekend week night nights days morning ' +
   'sunday monday tuesday wednesday thursday friday saturday january february march april june july august september october november december christmas thanksgiving holiday holidays ' +
   'with number phone call text reach contact fair fairness share carrying weekends many short understaffed overstaffed extra census four people miss missed news announcement announcements latest unread board ' +
-  'due deadline meeting meetings event events upcoming coming calendar policy procedure protocol document request leave before after about').split(' ');
+  'due deadline meeting meetings event events upcoming coming calendar policy procedure protocol document request leave before after about ' +
+  // "show" was being read as "how" and "each" as "reach", which turned a follow-up into a new question. The other
+  // comparison words the planner reads — most, fewest, except, excluding and the rest — are already left alone, and
+  // adding them here would make each of them a new target for the corrector to pull other words towards: that is
+  // how "cover" became "over" on the first attempt at this.
+  'show each busiest quietest shortest proportion skip').split(' ');
 
 // Damerau-Levenshtein distance: insert, delete, substitute, or swap two neighbouring letters. Stops counting past `max`.
 export function editDistance(a, b, max = 2) {
@@ -115,3 +120,28 @@ export function expand(text, groups = SYNONYMS) {
   }
   return [...extra];
 }
+
+// Ordinary ways of saying things Ask already understands, rewritten into words it routes on. This is deliberately
+// narrow: each phrase is recognised in the context that makes it a work question, never substituted everywhere.
+// Returns { text, changes: [[typed, read]] }, so the answer can show what it did.
+const PHRASES = [
+  // "do i have to come in tomorrow" is a schedule question; "when does this come into effect" is not.
+  [/\b(come|comes|coming|came)\s+in(?:to)?\b(?!\s+(?:effect|force|play|view|question|contact|focus|being|use|place))(?:\s+to\s+work)?/g, 'work'],
+  // "are we thin tonight" is about staffing; "thin liquids" is a clinical phrase and must stay one.
+  [/\b(?:are|is|was|were|look|looks|looking|feel|feels|feeling|be|been|running|pretty|bit|too|very|so|real|really)\s+((?:\w+\s+){0,2}?)thin\b(?!\s+(?:liquid|liquids|film|films|layer|layers|client|clients|section|sections))/g, (whole, middle) => whole.replace(/thin$/, 'short')]
+];
+export function readWorkPhrases(text) {
+  let out = String(text || ''), changes = [];
+  for (const [shape, into] of PHRASES) {
+    out = out.replace(shape, (...args) => {
+      const whole = args[0], next = typeof into === 'function' ? into(...args) : into;
+      if (next !== whole) changes.push([whole.trim(), next.trim()]);
+      return next;
+    });
+  }
+  return { text: out.replace(/\s+/g, ' ').trim(), changes };
+}
+
+// A message that is only courtesy, with no question in it.
+const THANKS = /^\s*(?:ok(?:ay)?|alright|cool|great|perfect|awesome|nice|sweet|yes|yep|yeah)?[\s,.!]*(?:thanks?(?:\s+you)?|thank\s+you|thx|ty|tysm|appreciate\s+it|much\s+appreciated|got\s+it|gotcha)[\s,.!]*(?:a\s+lot|so\s+much|again|man|dude|buddy|friend)?[\s,.!]*$/i;
+export const isThanks = text => THANKS.test(String(text || ''));

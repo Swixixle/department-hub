@@ -6,9 +6,11 @@
 // A hosted model can be added later by handing it the records this module finds. It should never be handed more than
 // the person asking is allowed to see, which is why the filtering happens here, before anything else.
 import { holidays, isWeekendTurn, staffing, statSheet } from './fairness.js';
-import { addDays, minutesByWeek, normalizeName, payWeekStart, shiftInterval, weekStart } from './model.js';
-import { expand, keywords, nearest, qualifiers, stem, tidyQuestion } from './words.js';
+import { addDays, minutesByWeek, normalizeName, payWeekStart, shiftInterval, shiftTimes, weekStart } from './model.js';
+import { expand, isThanks, keywords, nearest, qualifiers, readWorkPhrases, stem, tidyQuestion } from './words.js';
 import { checkExchange, describe, findOptions, shiftName, weekChanges } from './trades.js';
+import { METRICS, describePlan, joined, readPlan, repairPlan } from './plan.js';
+import { runPlan, tellValue } from './measure.js';
 
 const DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -292,6 +294,9 @@ function lookup(question, world) {
   const names = [...new Set(assignments.map(row => row.person))];
   const familiar = new Set([...documents.map(doc => doc.title + ' ' + doc.text), ...posts.map(post => post.body || '')].flatMap(text => keywords(text)));
   const tidy = tidyQuestion(question, names, familiar);
+  // Ordinary ways of saying a work question, rewritten into the words the lookups route on.
+  const phrased = readWorkPhrases(tidy.text);
+  if (phrased.changes.length) { tidy.text = phrased.text; tidy.changes = [...tidy.changes, ...phrased.changes]; tidy.changed = true; }
   const q = ' ' + tidy.text.replace(/\s+/g, ' ').trim() + ' ';
   const tokens = new Set(q.trim().split(' ').map(stem)), has = (...words) => words.some(word => tokens.has(stem(word)));
   let others = findPeople(q, names).filter(name => !same(name, actor));
@@ -348,8 +353,52 @@ function lookup(question, world) {
     const from = addDays(payWeekStart(today, world.trade?.policy?.weekStartsOn || 0), offset);
     when = {...when,from,to:addDays(from,6)};
   }
+  // "Parker, not Morgan": the name after "not" is the one being rejected, whichever order they were found in.
+  // Without this the winner is whichever name sorted first, which is arbitrary when both are the same length.
+  const refused = findPeople((q.match(/\bnot\s+[^,.?!]*/) || [''])[0], names);
+  if (refused.length && others.length > refused.length) others = others.filter(name => !refused.some(bad => same(bad, name)));
+
+  // A correction of the previous answer: "no, I meant day shift", "no, the other Friday", "Morgan, not Jordan".
+  // It keeps the question that was asked and changes one part of it. A leading cue is required, so "who is not
+  // working Friday" stays a genuine negative question.
+  const repairCue = / (?:no|nope|nah|sorry|wrong)[, ]|^ (?:no|nope|nah)\b|\bi (?:mean|meant)\b|\bnot (?:that|those|then)\b/.test(' ' + q.trim() + ' ') && /^ ?(?:no|nope|nah|sorry|wrong|actually|i mean|i meant)\b/.test(q);
+  const repairing = Boolean(last?.kind) && last.kind !== 'ack' && repairCue;
+  let repaired = null, clarify = null;
+  if (repairing) {
+    const rest = q.replace(/^ ?(?:no|nope|nah|sorry|wrong|actually)[, ]+/, ' ').replace(/\bi (?:mean|meant)\b/g, ' ');
+    const said = parseWhen(rest, today, world.rules), people = findPeople(rest, names).filter(name => !same(name, actor));
+    const wantsOther = / other /.test(rest);
+    kind = last.kind;
+    if (!others.length && last.others?.length) others = last.others;
+    if (people.length) others = people;                                                   // "Morgan, not Jordan"
+    const base = last.when || null;
+    if (said?.bare && base) when = { ...base, shift:said.shift };                          // only a shift was named
+    else if (said && !said.bare) when = { ...said, shift:said.shift || base?.shift || null };
+    else when = base;
+    // "the other Friday": the same weekday again is not a correction, so ask which one rather than repeating it.
+    if (wantsOther && when && base && when.from === base.from) {
+      const span = Math.round((Date.parse(when.to) - Date.parse(when.from)) / 864e5);
+      const choices = [1, 2].map(weeks => addDays(when.from, 7 * weeks)).map(date => ({ date, to:addDays(date, span),
+        label:span > 0 ? pretty(date) + ' to ' + pretty(addDays(date, span)) : pretty(date) }));
+      clarify = { ask:'date', choices, base:{ kind, when:base, others, withActor:Boolean(last.withActor) } };
+    }
+    repaired = true;
+  }
+  // The answer to a clarification Ask asked last turn.
+  if (!repairing && last?.pending?.ask === 'date') {
+    const said = parseWhen(q, today, world.rules);
+    const picked = said && !said.bare ? last.pending.choices.find(choice => choice.date === said.from) : null;
+    const only = last.pending.choices.length === 1 && /^ (?:yes|yeah|yep|that one|the first|correct|right|ok|okay) /.test(q) ? last.pending.choices[0] : null;
+    if (picked || only) {
+      const chosen = picked || only;
+      kind = last.pending.base.kind;
+      others = last.pending.base.others || [];
+      when = { ...last.pending.base.when, from:chosen.date, to:chosen.to || chosen.date, label:chosen.label || pretty(chosen.date) };
+      repaired = true;
+    }
+  }
   let followed = false;
-  if (kind === 'look' && last?.kind && last.kind !== 'look' && (when || others.length) && tokens.size <= 6) {
+  if (!repaired && kind === 'look' && last?.kind && last.kind !== 'look' && (when || others.length) && tokens.size <= 6) {
     followed = true;
     kind = last.kind;
     if (!when) when = last.when || null;
@@ -358,6 +407,8 @@ function lookup(question, world) {
     if (!others.length && last.others?.length) others = last.others;
     if (others.length && kind === 'who') kind = 'when';
   }
+  // What a shift answer leaves in focus, so a follow-up like "what time should I be there" has something to refer to.
+  const spot = row => row && ({ date:row.date, shift:row.shift, person:row.person });
   const scheduleSource = world.published ? 'The schedule, published ' + pretty(world.published.slice(0, 10)) : 'The sample schedule';
   const inRange = row => !when || (row.date >= when.from && row.date <= when.to && (!when.shift || row.shift === when.shift));
   const byTime = (a, b) => a.date.localeCompare(b.date) || a.shift.localeCompare(b.shift);
@@ -373,17 +424,28 @@ function lookup(question, world) {
   const unknown = range => answer('No schedule entries are on record ' + (/^(in|from) /.test(range.label) ? '' : 'for ') + range.label.replace(/^left /, '') + '.', [], scheduleSource,
     { lines:[rosterFrom ? 'The schedule on record runs from ' + pretty(rosterFrom) + ' to ' + pretty(rosterTo) + '. A missing date cannot show whether anyone works.' : 'No schedule has been added.'], empty:true });
   // What the question was taken to be, in plain words, so a misreading shows at a glance.
+  // A comparison question is read into a plan (src/plan.js) and executed separately (src/measure.js), rather than
+  // dispatched on whichever keyword happens to match. A follow-up edits the plan already answered instead of
+  // starting again, which is what makes "same thing for nights" and "no, include Avery this time" work.
+  const repairedPlan = last?.plan ? repairPlan(last.plan, { text: tidy.text, said: question, names, when }) : null;
+  const plan = repairedPlan || readPlan({ text: tidy.text, names, people: others, when, actor, last });
+  if (plan) kind = plan.op;
+
   const understood = () => {
     const subject = others[0] || actor, you = same(subject, actor), span = when && !when.bare ? ', ' + when.label + (when.shift && !/night/.test(when.label) ? (when.shift === 'N' ? ', nights' : ', days') : '') : when?.bare ? ', ' + shiftWord(when.shift) + ' shift' : '';
     const what = { contact: 'how to reach ' + list(others), hours: (you ? 'your' : subject + '’s') + ' scheduled hours', fair: world.keeper && others[0] ? subject + '’s fairness record' : 'your fairness record',
       staffing: 'shifts with more or fewer people than usual', dated: 'dated posts on the board', news: 'what is new on the board', pickup: 'whether you could pick up a shift', trade: 'ways off one of your shifts',
       off: 'days ' + (you ? 'you are' : subject + ' is') + ' off', offlist: 'who has no shift listed', run: 'how many shifts in a row ' + (you ? 'you work' : subject + ' works'),
       who: has('with') || (followed && last?.withActor) ? 'who you are working with' : has('charge') ? 'who is marked charge' : has('icu') ? 'who is marked ICU' : 'who is on',
-      when: 'when ' + (you ? 'you work' : subject + ' works'), look: 'a search of the documents and the board' }[kind];
+      when: 'when ' + (you ? 'you work' : subject + ' works'), ack: 'a thank-you, with no question in it', time: 'the hours of the shift already shown', unknown: 'nothing I recognised',
+      rank: 'a comparison across people', compare: 'a comparison between named people', count: 'a count per person',
+      look: 'a search of the documents and the board' }[kind];
     return what + (kind === 'look' || kind === 'news' ? '' : span);
   };
   const answer = (title, items, source, extra = {}) => ({ title, items, source, lines: [], empty: !items.length && !extra.lines?.length, kind, understood: understood(), read: tidy.changed ? tidy.text : '', changes: tidy.changes,
-    context: { kind, when, others, withActor:kind === 'who' && (has('with') || (followed && Boolean(last?.withActor))) }, ...extra });
+    context: { kind, when, others, withActor:kind === 'who' && (has('with') || ((followed || repaired) && Boolean(last?.withActor))),
+      ...(extra.focus ? { focus:extra.focus } : last?.focus && repaired ? { focus:last.focus } : {}), ...(clarify ? { pending:clarify } : {}),
+      ...(plan ? { plan } : {}) }, ...extra });
   const tidyText = text => tidyQuestion(text, names, familiar).text;
   const docQuestion = /\b(polic(?:y|ies)|procedures?|protocols?|manuals?|guidelines?|handbook)\b/.test(q);
   const taughtAnswers = (world.answers || []).filter(note => note.documentId
@@ -394,9 +456,103 @@ function lookup(question, world) {
     'Human-written guidance. The selected profile is not a verified identity; check the original source.', { taught:taught.id });
 
   // Corrections cannot bypass clarification or a restricted record.
+  // Courtesy with no question in it. Searching the documents for "thanks" is not an answer.
+  if (isThanks(question)) { kind = 'ack'; return answer('Any time.', [], 'No lookup was made.',
+    { empty:false, understood:'a thank-you, with no question in it', next:SUGGESTIONS.slice(0, 2) }); }
+  if (clarify) {
+    const spanned = clarify.base.when && clarify.base.when.to > clarify.base.when.from;
+    const named = clarify.choices.map(choice => choice.label).join(' or ');
+    return answer('Which ' + (spanned ? 'week' : new Date(clarify.choices[0].date + 'T12:00:00Z').toLocaleDateString('en-US', { timeZone:'UTC', weekday:'long' })) + ' do you mean, ' + named + '?',
+      [], 'No lookup was made yet.',
+      { empty:false, understood:'a correction to the date, which could mean more than one day', next:clarify.choices.map(choice => choice.label),
+        lines:['Answer with the date and I will keep the rest of the question.'] });
+  }
+  // "What time should I be there" refers to the shift the last answer identified, not to a new lookup.
+  const timeAsk = / what time | start time | end time |\b(be there|show up|get there|clock in|clock out)\b/.test(q) ||
+    / when (?:do|does|should|would) (?:i|we|it) (?:need to |have to |)?(?:be|start|begin|finish|end) /.test(q);
+  if (timeAsk && last?.focus) {
+    kind = 'time';
+    const heldShift = last.focus, who = heldShift.person && !same(heldShift.person, actor) ? heldShift.person + '’s' : 'Your';
+    const row = assignments.find(entry => entry.date === heldShift.date && entry.shift === heldShift.shift && (!heldShift.person || same(entry.person, heldShift.person))) || { date:heldShift.date, shift:heldShift.shift };
+    const times = shiftTimes(row), recorded = Boolean(row.hours);
+    return answer(who + ' ' + pretty(heldShift.date) + ' ' + shiftWord(heldShift.shift) + ' shift ' + (recorded ? 'is listed as ' + row.hours + ', which this app reads as ' : 'has no hours written on the schedule. This app treats a ' + shiftWord(heldShift.shift) + ' shift as ') + times.start + ' to ' + times.end + '.',
+      [{ text:'Open ' + pretty(heldShift.date), sub:'', go:'date|' + heldShift.date }],
+      scheduleSource + (recorded ? '. The hours come from the schedule as imported.' : '. No start time is recorded for that shift; this is the standard the app uses for its own arithmetic, not a time the department wrote down.'),
+      { empty:false, understood:'the hours of the ' + pretty(heldShift.date) + ' ' + shiftWord(heldShift.shift) + ' shift already shown', focus:heldShift });
+  }
   if (tidy.ambiguous.length) return answer('Which staff name did you mean?', [], 'No person lookup was made.',
     {lines:tidy.ambiguous.map(item => item.typed + ': ' + item.choices.join(' or ')),empty:true});
   if (when?.invalid) return answer('That is not a valid date.', [], 'No schedule lookup was made.', {lines:['Use a date such as Nov 26, 2027.'],empty:true});
+
+  if (plan) {
+    const spoken = describePlan(plan);
+    const line = (...parts) => parts.filter(Boolean).join(' ');
+    // A recognised constraint that cannot be executed stops the question. Answering an easier one instead would
+    // look like an answer and be about something else.
+    // A name asked to be left out that matches nobody on the schedule. Dropping it and answering anyway would be
+    // answering a different question, so it asks instead.
+    if (plan.unresolved.length) return answer('I do not have anybody on the schedule called ' + joined(plan.unresolved.map(word => word[0].toUpperCase() + word.slice(1))) + '.', [],
+      'No count was made.', { empty:false, understood:spoken + ', leaving out ' + joined(plan.unresolved),
+        lines:['The people on this schedule are ' + joined(names) + '.', 'Say which of them to leave out and I will keep the rest of the question.'] });
+    if (plan.unsupported.length) return answer('I can read that question but I cannot work out ' + joined(plan.unsupported) + '.', [],
+      'No count was made.', { empty:false, understood:spoken,
+        lines:['What I can count: ' + Object.values(METRICS).map(item => item.label).join(', ') + ' — per person, ranked or compared, for a shift, a role, a date range, with people left out.',
+          'Ask it without that part and I will count what is on the schedule.'] });
+
+    // Other people's numbers are the record keeper's, as they are everywhere else in the app. Reading the question
+    // correctly is not permission to answer it.
+    const aboutOthers = plan.op !== 'compare' || plan.people.some(name => !same(name, actor));
+    if (aboutOthers && !world.keeper) return answer('That is kept by whoever keeps the record', [], 'Fairness',
+      { empty:false, understood:spoken,
+        lines:['I understood the question. You can see your own figures; other people’s are shown only to the person who keeps the record.'] });
+
+    const found = runPlan(plan, world);
+    const where = found.period.label ? found.period.label : found.period.from ? 'the schedule on record, ' + pretty(found.period.from) + ' to ' + pretty(found.period.to) : 'no dates on record';
+    const dates = found.period.from ? pretty(found.period.from) + ' to ' + pretty(found.period.to) : 'no dates';
+    const source = METRICS[plan.metric].label[0].toUpperCase() + METRICS[plan.metric].label.slice(1) +
+      (found.period.label ? ' ' + found.period.label : '') + ', ' + dates + '. ' + scheduleSource +
+      '. Counted from the schedule as imported; missing entries and unrecorded pickups are not counted.';
+    const item = row => ({ text: row.person + ': ' + tellValue(plan, row.value), sub: row.shifts + (row.shifts === 1 ? ' shift' : ' shifts') + ' counted' + (row.fair === undefined ? '' : ' · a fair share here is ' + row.fair.toFixed(1)), go: 'fairness' });
+    const counted = line(found.rows.length + (found.rows.length === 1 ? ' person' : ' people') + ' counted' + (plan.exclude.length ? ', with ' + joined(plan.exclude) + ' left out' : '') + '.',
+      plan.metric === 'weekend-shifts' ? 'Weekend shifts, not distinct weekends: a Saturday and a Sunday are two.' : '',
+      plan.metric === 'distinct-weekends' ? 'Distinct weekends, not weekend shifts: a Saturday and the Sunday after it are one.' : '');
+
+    if (found.status === 'clarify') return answer(found.question, [], 'No count was made yet.',
+      { empty:false, understood:spoken, next:found.choices, lines:['Answer with the shift and I will keep the rest of the question.'] });
+    if (found.status === 'empty') return answer(plan.exclude.length && !found.rows.length
+      ? 'Leaving out ' + joined(plan.exclude) + ' leaves nobody to compare.'
+      : 'Nothing on the schedule gives a figure for that.', [], source,
+      { empty:false, understood:spoken, lines:[line(found.missing.length ? joined(found.missing) + ' has no shifts on record for ' + where + '.' : '', counted)] });
+
+    if (plan.op === 'count') {
+      return answer(found.winners.slice(0, 8).map(row => row.person + ' ' + tellValue(plan, row.value)).join(', ') + '.',
+        found.winners.slice(0, 8).map(item), source, { empty:false, understood:spoken, lines:[counted] });
+    }
+
+    if (plan.op === 'compare') {
+      const [leader, ...rest] = found.winners;
+      const level = rest.length && rest[0].value === leader.value;
+      const title = level ? joined(found.winners.map(row => row.person)) + ' are level on ' + tellValue(plan, leader.value) + '.'
+        : leader.person + ' has ' + (plan.direction === 'lowest' ? 'fewer' : 'more') + ': ' + tellValue(plan, leader.value) + '.';
+      return answer(title, found.winners.map(item), source,
+        { empty:false, understood:spoken, ...(found.missing.length ? { partial:'You asked about ' + joined([...plan.people]) + '. This answer covers only: ' + joined(found.winners.map(row => row.person)) + '.' } : {}),
+          lines:[line(found.missing.length ? joined(found.missing) + ' has no shifts on record for ' + where + '.' : '', counted)] });
+    }
+
+    const top = found.winners, tied = top.length > 1 && top[0].value === top.at(-1).value && !plan.limit;
+    const superlative = plan.direction === 'lowest' ? 'fewest' : 'most';
+    const title = plan.limit
+      ? 'The ' + (plan.direction === 'lowest' ? 'lowest' : 'highest') + ' ' + plan.limit + ' by ' + METRICS[plan.metric].label + (plan.shift ? ' on ' + shiftWord(plan.shift) + ' shift' : '') + ':'
+      : tied
+        ? joined(top.map(row => row.person)) + ' are tied for the ' + superlative + ' ' + METRICS[plan.metric].label + (plan.shift ? ' on ' + shiftWord(plan.shift) + ' shift' : '') + ': ' + tellValue(plan, top[0].value) + ' each.'
+        : top[0].person + ' has the ' + superlative + ' ' + METRICS[plan.metric].label + (plan.shift ? ' on ' + shiftWord(plan.shift) + ' shift' : '') + ': ' + tellValue(plan, top[0].value) + '.';
+    // With a number asked for, the answer is that many and no more. Without one, a few runners-up help the reader
+    // see whether the top is a clear lead or a near-tie.
+    const rest = plan.limit ? [] : found.rows.filter(row => !top.some(best => same(best.person, row.person))).slice(0, 4);
+    return answer(title, [...top, ...rest].map(item), source,
+      { empty:false, understood:spoken, lines:[line(counted, rest.length ? 'Then: ' + rest.map(row => row.person + ' ' + tellValue(plan, row.value)).join(', ') + '.' : '')] });
+  }
+
   if (kind === 'fair' && others.length && !world.keeper) return answer('That is kept by whoever keeps the record', [], 'Fairness',
     {lines:['You can see your own sheet. Other people’s numbers are shown only to the person who keeps the record.'],empty:false});
   // A reviewed correction is labelled and revalidated against the current question before it runs.
@@ -408,7 +564,7 @@ function lookup(question, world) {
   const chosen = correction?.go ? chosenPassage(correction) : null;
   if (chosen) return documentAnswer(chosen, correction);
 
-  if (kind === 'who' && has('not', 'no', 'never', 'without')) return answer('Please clarify who you want listed.', [], scheduleSource,
+  if (kind === 'who' && !repaired && has('not', 'no', 'never', 'without')) return answer('Please clarify who you want listed.', [], scheduleSource,
     { lines:['Ask who is scheduled, or name a person and ask whether they work that date.'], empty:true });
   if (q.includes(' called off ') && !has('census', 'va')) return answer('Do you mean a low-census release?', [], 'Low census',
     { lines:['This app records low-census releases. It does not track staff calling in sick.'], empty:true });
@@ -630,7 +786,8 @@ function lookup(question, world) {
       items.push(role ? { text: pretty(date) + ' ' + shiftWord(shift) + ': ' + (marked.length ? list(marked.map(row => row.person)) : 'nobody is marked ' + ROLES[role]), sub: rows.length ? 'On that shift: ' + list(rows.map(tagged)) : recorded.has(date) ? 'Nobody is listed' : 'No schedule entries are on record for that date', go: 'date|' + date } :
         { text: pretty(date) + ' ' + shiftWord(shift) + ': ' + (rows.length ? list(rows.map(tagged)) : recorded.has(date) ? 'nobody is listed' : 'no schedule entries are on record'), sub: '', go: 'date|' + date });
     }
-    return answer(role ? 'Marked ' + ROLES[role] + ':' : '', items, scheduleSource);
+    return answer(role ? 'Marked ' + ROLES[role] + ':' : '', items, scheduleSource,
+      { focus: span.from === span.to && span.shift ? { date:span.from, shift:span.shift, person:null } : undefined });
   }
 
   // 7. When someone works.
@@ -677,18 +834,19 @@ function lookup(question, world) {
     }
     if (when && !when.bare) {
       const rows = shiftsOf(subject).filter(inRange);
-      if (when.from === when.to) return answer(rows.length ? whose + ' ' + be + ' on ' + when.label + ':' : whose + ' ' + be + ' not on the schedule ' + when.label + '.', rows.map(shiftItem), scheduleSource, { empty: false });
+      if (when.from === when.to) return answer(rows.length ? whose + ' ' + be + ' on ' + when.label + ':' : whose + ' ' + be + ' not on the schedule ' + when.label + '.', rows.map(shiftItem), scheduleSource, { empty: false, focus: spot(rows[0]) });
       // "My first shift in December", "my last shift before Christmas"
       const end = / (first|last) (shift|day|night|one) /.exec(q)?.[1], edge = end && rows.length ? (end === 'first' ? rows[0] : rows.at(-1)) : null;
       if (edge) return answer((mine ? 'Your ' : subject + '’s ') + end + ' ' + kindOf + 'shift ' + when.label + (past ? ' was ' : ' is ') + pretty(edge.date) + ', ' + shiftWord(edge.shift) + '.', [shiftItem(edge)], scheduleSource,
         { empty: false, lines: [rows.length + ' shift' + (rows.length === 1 ? '' : 's') + ' ' + when.label + '.', ...partly(when)], understood: (mine ? 'your ' : subject + '’s ') + end + ' shift ' + when.label });
-      return answer(have + (rows.length || 'no') + ' ' + kindOf + 'shift' + (rows.length === 1 ? '' : 's') + ' ' + when.label + (rows.length ? ':' : '.'), rows.map(shiftItem), scheduleSource, { empty: false, lines: partly(when) });
+      return answer(have + (rows.length || 'no') + ' ' + kindOf + 'shift' + (rows.length === 1 ? '' : 's') + ' ' + when.label + (rows.length ? ':' : '.'), rows.map(shiftItem), scheduleSource, { empty: false, lines: partly(when), focus: spot(rows[0]) });
     }
     const every = shiftsOf(subject).filter(upcoming), coming = every.filter(row => !when?.shift || row.shift === when.shift).slice(0, 4);
     // A question about day shifts put to someone who works nights still gets their schedule, with the reason.
-    if (!coming.length && every.length) return answer((mine ? 'You have' : subject + ' has') + ' no ' + kindOf + 'shifts from today on.', every.slice(0, 4).map(shiftItem), scheduleSource, { empty: false, lines: ['The next shifts on the schedule:'] });
+    if (!coming.length && every.length) return answer((mine ? 'You have' : subject + ' has') + ' no ' + kindOf + 'shifts from today on.', every.slice(0, 4).map(shiftItem), scheduleSource,
+      { empty: false, lines: ['These are not ' + kindOf.trim() + ' shifts. They are the next shifts of any kind on the schedule:'] });
     return answer(coming.length ? (same(subject, actor) ? 'Your' : subject + '’s') + ' next shift is ' + pretty(coming[0].date) + ', ' + shiftWord(coming[0].shift) + (coming[0].role ? ' (' + (ROLES[coming[0].role] || coming[0].role) + ')' : '') + '.' : whose + ' ' + be + ' not on the schedule from today on.',
-      coming.map(shiftItem), scheduleSource, { empty: false, next: !coming.length ? [] : same(subject, actor) ? ['Who am I working with on my next shift?', ...(world.trade ? ['Who can I trade my next shift with?'] : [])] : ['How do I reach ' + subject + '?'] });
+      coming.map(shiftItem), scheduleSource, { empty: false, focus: spot(coming[0]), next: !coming.length ? [] : same(subject, actor) ? ['Who am I working with on my next shift?', ...(world.trade ? ['Who can I trade my next shift with?'] : [])] : ['How do I reach ' + subject + '?'] });
   }
 
   // Search taught answers, document passages and board posts.
@@ -715,8 +873,22 @@ function lookup(question, world) {
       ], found.length ? 'Quoted from the document as added. Check its date, and ask the person responsible if it does not settle the question.' : 'The board. Posts are from coworkers and are not policy.',
         chosen ? { corrected: { id: fix.id, kind: 'passage', by: fix.by, at: fix.at } } : {});
     }
-    return answer('Nothing on record answers that.', [], documents.length ? 'Searched the board and ' + documents.length + ' added document' + (documents.length === 1 ? '' : 's') : 'Searched the board. No documents have been added yet.',
+    // A document search finding nothing does not establish that the question was understood. Say which it was.
+    const searched = documents.length ? 'Searched the board and ' + documents.length + ' added document' + (documents.length === 1 ? '' : 's') + '.' : 'Searched the board. No documents have been added yet.';
+    // A question naming a date, a person or a shift that did not reach a lookup was misread, not answered by absence.
+    const scheduleish = Boolean(when) || others.length > 0 || has('work', 'shift', 'schedule', 'hours', 'cover', 'trade', 'swap', 'weekend', 'night', 'day', 'off');
+    const questionShaped = /^ (?:who|what|when|where|why|how|which|can|could|do|does|did|is|are|am|will|would|should|any|anyone|anybody)\b/.test(q) ||
+      / (?:who|what|when|where|why|how|which) /.test(q) || String(question).trim().endsWith('?');
+    // A leave question is sent to the documents on purpose, so finding nothing there is an absent record, not a misread.
+    const aboutDocuments = docQuestion || leaveAsk || (!scheduleish && questionShaped);
+    if (aboutDocuments) return answer('Nothing on record answers that.', [], searched,
       { empty: true, lines: ['Ask the person responsible, or put the question on the board so the answer is on record for everyone.'] });
+    kind = 'unknown';
+    return answer('I did not understand that as a question I can look up.', [], searched + ' This is not a statement that the answer is not on record.',
+      { empty: true, understood: 'nothing I recognised',
+        lines: ['I can look up when someone works, who is on, days off, hours, ways off a shift, what is new on the board, what is coming up, how to reach someone, and passages of the documents that have been added.',
+          'Ask it another way, or put the question on the board so the answer is on record for everyone.'],
+        next: SUGGESTIONS.slice(0, 3) });
   }
 
   function shiftItem(row) { return { text: pretty(row.date) + ', ' + shiftWord(row.shift) + (row.role ? ' (' + (ROLES[row.role] || row.role) + ')' : '') + (row.hours ? ' ' + row.hours : ''), sub: 'With ' + (list(on(row.date, row.shift).filter(mate => !same(mate.person, row.person)).map(mate => mate.person)) || 'nobody else listed'), go: 'date|' + row.date }; }

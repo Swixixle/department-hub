@@ -67,10 +67,10 @@ const {JSDOM} = require('jsdom');
   await click('ask-open');
   assert.equal(document.querySelector('dialog').dataset.dialog,'notice');
   await click('notice-ok');
-  const expectedBuild = {version:15,fingerprint:release.fingerprint,mode:'production',source:release.source};
+  const expectedBuild = {version:16,fingerprint:release.fingerprint,mode:'production',source:release.source};
   assert.deepEqual(JSON.parse(localStorage.getItem(key)).events.at(-1).build,expectedBuild);
   assert.equal(document.querySelector('footer [data-build]').dataset.build,release.fingerprint);
-  assert.match(document.querySelector('footer').textContent,/Version 15 · /);
+  assert.match(document.querySelector('footer').textContent,/Version 16 · /);
   assert.ok(document.querySelector('footer').textContent.includes(release.source.commit?.slice(0,7) || 'source unknown'));
   assert.deepEqual(JSON.parse(localStorage.getItem(key)).events[0],stored.events[0]);
   await click('shift',document.querySelector('[data-action="shift"]').dataset.value);
@@ -130,6 +130,61 @@ const {JSDOM} = require('jsdom');
   assert.match(await ask('Who is working this Friday?'), /Understood as: who is on, Fri, Nov 13\./);
   assert.match(await ask('Who is working next Friday?'), /Understood as: who is on, Fri, Nov 20\./);
   assert.match(await ask('Am I working this Friday or next Friday?'), /Partial answer\. You asked about Fri, Nov 13 and Fri, Nov 20\./);
+  // The repaired exchanges through the same form, action handler and context path the phone uses, not direct ask() calls.
+  assert.match(await ask('Who is on Friday night?'), /Fri, Nov 13 night: /);
+  const fixedShift = await ask('No, I meant day shift.');
+  assert.match(fixedShift, /Understood as: who is on, Fri, Nov 13, days\./);
+  assert.match(fixedShift, /Casey/);
+  assert.doesNotMatch(fixedShift, /Quinn/);                                    // the night team of that same Friday
+  await ask('Who is on Friday day?');
+  assert.match(await ask('No, the other Friday.'), /Which Friday do you mean, Fri, Nov 20 or Fri, Nov 27\?/);
+  assert.deepEqual([...document.querySelectorAll('.ask-answer [data-action="ask-next"]')].map(el => el.textContent), ['Fri, Nov 20', 'Fri, Nov 27']);
+  const beforeChoice = JSON.parse(localStorage.getItem(key)).events;
+  await click('ask-next', '0');
+  await waitFor(() => /Nov 20/.test(document.querySelector('.ask-answer')?.textContent || ''), 'the chosen Friday answered');
+  const chosen = document.querySelector('.ask-answer').textContent;
+  assert.match(chosen, /Understood as: who is on, Fri, Nov 20, days\./);
+  assert.match(chosen, /Indigo/);
+  assert.doesNotMatch(chosen, /Casey/);                                        // the Friday that was corrected away from
+  assert.deepEqual(JSON.parse(localStorage.getItem(key)).events, beforeChoice, 'Choosing a clarification must not write a receipt');
+  await ask('When do I work next?');
+  const hours = await ask('What time should I be there?');
+  assert.match(hours, /Thu, Nov 12 night shift has no hours written on the schedule/);
+  assert.match(hours, /19:00 to 07:00/);
+  const thanked = await ask('thanks');
+  assert.match(thanked, /Any time\./);
+  assert.doesNotMatch(thanked, /Searched the board/);
+  // A comparison question and a follow-up that edits its plan, through the same form and action handler. The
+  // fixture's viewer is the record keeper, so the figures are theirs to see.
+  const ranked = await ask('Who has the most weekends on day shift, other than Avery?');
+  assert.match(ranked, /Understood as: Highest weekend shifts on day shift, excluding Avery\./);
+  // Avery appears in the understood line and in "with Avery left out", which is right. What must not appear is
+  // Avery as a result.
+  assert.doesNotMatch(ranked, /Avery: \d+ weekend shift/);
+  assert.match(ranked, /weekend shifts/);
+  assert.match(ranked, /Weekend shifts, not distinct weekends/);
+  const nights = await ask('Same thing for nights.');
+  assert.match(nights, /Understood as: Highest weekend shifts on night shift, excluding Avery\./);
+  assert.notEqual(nights, ranked, 'the shift filter changed the answer');
+  const included = await ask('No, include Avery this time.');
+  assert.match(included, /Understood as: Highest weekend shifts on night shift\./);
+  const refused = await ask('Who has the most weekends on day shift per month?');
+  assert.match(refused, /I can read that question but I cannot work out a rate per month/);
+  assert.doesNotMatch(refused, /weekend shifts each/);
+  // Not the record keeper: read correctly, declined, and the reading still shown.
+  await click('close'); await actor('Avery'); await click('ask-open');
+  const withheld = await ask('Who has the most weekends on day shift, other than Blair?');
+  assert.match(withheld, /kept by whoever keeps the record/);
+  assert.match(withheld, /Understood as: Highest weekend shifts on day shift, excluding Blair\./);
+  const countsWithheld = await ask('How many weekend shifts has each person worked?');
+  assert.match(countsWithheld, /kept by whoever keeps the record/);
+  assert.equal(document.querySelectorAll('.ask-answer .ask-item').length, 0);
+  await click('close'); await actor('Jordan'); await click('ask-open');
+
+  const notAQuestion = await ask('zxqw blorp');
+  assert.match(notAQuestion, /I did not understand that as a question I can look up\./);
+  assert.doesNotMatch(notAQuestion, /Nothing on record answers that/);
+  assert.equal(localStorage.getItem(key).includes('zxqw blorp'), false);
   await click('docs');
   await submitForm('doc',{title:'Leave policy',text:'Leave requests are submitted through the request screen. The custodian confirms the current official process.'});
   const added=read().documents.at(-1);
@@ -161,7 +216,7 @@ const {JSDOM} = require('jsdom');
   assert.equal(read().answers.at(-1).asks.length,2);
   assert.equal((await audit.verifyReceipts(read().events)).ok,true);
   await click('close'); await click('audit');
-  assert.match(document.querySelector('dialog').textContent,new RegExp('v15 · '+release.fingerprint.slice(0,12)));
+  assert.match(document.querySelector('dialog').textContent,new RegExp('v16 · '+release.fingerprint.slice(0,12)));
   await click('verify');
   assert.match(document.querySelector('.flash').textContent,/receipt links and hashes check out/);
   const mark=read().events.at(-1).hash;

@@ -1,6 +1,8 @@
 # Shared permission launch gate
 
-Status: contract tests written; shared backend, fixture seeder, sign-in and synchronization are not implemented. No access-control claim is established by this document. Version 15 on the Mac is unchanged.
+Status: the contract passes against a real server and a fresh seeder, run end to end by `npm run gate:shared`. Passkey sign-in and the app's own connection to the server are not implemented, so no shared rollout claim is established: the sessions the gate uses are minted by the seeder directly in the database, which tests the server's treatment of an authenticated identity and says nothing about whether sign-in is correct. Version 15 on the Mac is unchanged and the public demo is unchanged.
+
+**Decided clarification:** sign-in uses a passkey with no email typed at sign-in; members enter their own phone/email information. **Open:** email as optional contact information, an administrator-only recovery-confirmation channel, or separate fields for both. Nothing here selects one, and this contract covers phone only.
 
 ## Run against the actual backend
 
@@ -14,7 +16,7 @@ Without that environment variable the command exits 2 and says the gate has **no
 
 The tests make real HTTP requests using fresh authenticated sessions. The manifest may supply an Authorization header or Cookie header for each session. It cannot supply trusted person/department/role headers. This deliberately leaves the sign-in mechanism open while testing the server's treatment of authenticated identity. When account enrollment and the chosen authentication integration exist, rerun using credentials from that same implementation; a test-only identity adapter is not evidence that real sign-in is correct. Fixture setup must not become a public production endpoint or bypass normal request authorization.
 
-The owner has ruled out email/password sign-in. The proposed invite/passkey flow is in `docs/SIGN-IN.md`; no email address, password or biometric data is required in this test fixture. Sessions produced by the eventual passwordless flow must satisfy the same contract.
+Sign-in uses a passkey without typing email or a Department Hub password. That does not prohibit email information for another purpose. The proposed enrollment flow is in `docs/SIGN-IN.md`; fixture sessions authenticate with existing test tokens, not contact addresses or biometric data. Sessions produced by the eventual passkey flow must satisfy the same contract.
 
 ## Seed and response contract
 
@@ -51,8 +53,28 @@ Source kinds are `post`, `document`, `file`, `conversation`, `fairness`, `schedu
 
 Phone controls prove an explicitly shared number is returned through directory list/detail, name search, the named-number Ask question and directory export. Private-number checks then exercise those same routes across coworkers, administrators and custodians. The phone assertion checks raw, formatted and encoded numbers in content and headers. Sharing-withdrawal checks first warm every route with a real shared result, then require the same existing session to stop receiving it on the next request. Search sources may still identify the coworker; their name is not treated as a private phone number. Consent applies to the structured contact record, not a promise to erase screenshots, previously downloaded copies or independently authored text.
 
+## Four faults this contract used to miss, now covered
+
+Found by running the contract against deliberately broken copies of the server, one fault at a time. Each was
+originally caught only by the server's own tests, so the gate alone would have passed a backend with it:
+
+1. A create refused with 400 or 403 was never read back, so a server that saves the row and then returns the refusal
+   passed.
+2. No non-administrator ever attempted `PATCH` or `DELETE` on `/memberships/:id`, so a server that let any member
+   revoke anyone passed.
+3. A legitimate participant naming the other participant in an accept body was never sent, so a server that records
+   one person's acceptance as the other's passed. Only the outsider's attempt was tested, and that is refused
+   earlier for not being a participant at all.
+4. Authorship forged in a request *header* was never sent, only in the body, so a server that trusts `X-Actor` for
+   authorship passed.
+
+All four are now explicit checks here: the first and fourth in "client role, actor and department hints do not grant
+authority", the second in "membership administration requires the administrator role", the third in "a participant
+acceptance is attributed to the authenticated participant only". Each was re-verified by breaking the server in that
+one way and confirming this contract alone fails. `tests/server/backend.test.mjs` keeps its own versions as well.
+
 ## What still remains
 
 There is no shared server or seeder to run this against yet, so the real permission gate remains blocked. This finite contract is the initial minimum, not exhaustive proof of authorization correctness. The backend must add coverage as routes, caches, uploads, invitations and recovery are implemented. Atomic trade conflicts and stale-proposal rejection require their own real-database tests. A later two-phone test must exercise the chosen sign-in integration, permissions and synchronization together. Revocation rejects future server requests; it cannot recall bytes already downloaded. Existing public or independently usable storage URLs need explicit handling before claiming that those access paths are revoked too.
 
-Before enabling shared mode, the backend implementation must wire its server startup, fresh seeding and this command into a required CI job. That job does not exist yet. The current local-app CI is not a substitute for that launch gate.
+`npm run gate:shared` starts the server, seeds a fresh synthetic fixture and runs this contract in one command, exiting with the contract's status. It is the command a required CI job should run; the CI job itself is not wired up yet. The current local-app CI is not a substitute for it.
