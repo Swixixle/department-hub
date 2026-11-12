@@ -45,7 +45,7 @@ const INCLUDE_LEAD = /\b(?:include|including|count|counting|add|put|with)\b/g;
 // more or fewer people than usual" and "any week over the limit" are other questions with good answers already, and
 // a planner that grabbed them would be the same mistake in the other direction.
 const HIGH = /\b(?:most|highest|greatest|largest|biggest|busiest|top|furthest\s+(?:above|over)|over)\b/;
-const LOW = /\b(?:least|fewest|lowest|smallest|quietest|bottom|shortest|furthest\s+(?:under|below)|under|below|short of|behind on)\b/;
+const LOW = /\b(?:least|fewest|lowest|less|fewer|lower|smallest|quietest|bottom|shortest|furthest\s+(?:under|below)|under|below|short of|behind on)\b/;
 // A superlative, or an instruction to put people in order. A grammar library would hand this over as one tag class
 // (see docs/ASK-PLANNER.md on the Compromise spike); until then the list is explicit, which is a cost in words a
 // person might use that it has never met.
@@ -134,6 +134,9 @@ function readMetric(q) {
 function readShift(q) {
   // "on day shift", "day staff", "the days", "weekend days", "nights". A night shift question and a question about
   // Monday are not the same thing, so a weekday name never selects a shift.
+  if (/\b(?:both|either|any)\s+shifts?\b/.test(q) ||
+      /\bdays?(?:\s+shifts?)?\s+(?:and|or)\s+nights?(?:\s+shifts?)?\b/.test(q) ||
+      /\bnights?(?:\s+shifts?)?\s+(?:and|or)\s+days?(?:\s+shifts?)?\b/.test(q)) return null;
   if (/\b(?:night|nights|nocs|noc|overnight)\b/.test(q) && !/\bnight(?:ingale)\b/.test(q)) return 'N';
   if (/\bday\s*(?:shift|shifts|staff|crew|side)\b/.test(q) || /\b(?:on|the)\s+days?\b(?!\s+(?:off|before|after|of))/.test(q)
     || /\bdayshift\b/.test(q) || /\bweekend\s+days?\b/.test(q)) return 'D';
@@ -159,7 +162,7 @@ export function readPlan({ text, names = [], people = [], when = null, actor = '
   const q = ' ' + String(text || '').toLowerCase().replace(/\s+/g, ' ').trim() + ' ';
   const excluded = namesAfter(q, EXCLUDE_LEAD, names), exclude = excluded.taken;
   const mentioned = positionsOf(q, names).map(entry => entry.name);
-  const subjects = (people.length ? people : mentioned).filter(name => !exclude.some(out => same(out, name)));
+  const subjects = mentioned.filter(name => !exclude.some(out => same(out, name)));
   const metric = readMetric(q);
   // "who is over their weekend share" asks the same thing a ranking asks: it wants the people at one end of the
   // fair-share figure. The Understood line says it was read as a ranking, so the reading is visible.
@@ -186,15 +189,19 @@ export function readPlan({ text, names = [], people = [], when = null, actor = '
   // quietly narrow a question about the whole schedule to two days, so a weekend metric keeps a period only when
   // the question points at one: "this weekend", "in December", a date.
   const weekendMetric = metric === 'weekend-shifts' || metric === 'distinct-weekends' || metric === 'weekend-fair-gap';
-  const pointsAtAPeriod = !weekendMetric || /\b(?:this|next|last|that|the)\s+weekend\b/.test(q)
-    || /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/.test(q) || /\b(?:week|month|year)\b/.test(q) || /\d/.test(q);
+  // Strip metric words and rank limits before looking for a date. A weekday is a real date constraint;
+  // "weekend shifts" alone is not, and the 3 in "top 3" must not select this weekend.
+  const periodText = q.replace(/\b(?:top|bottom|first|last|highest|lowest)\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/g, ' ')
+    .replace(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:most|least|highest|lowest|fewest|busiest)\b/g, ' ')
+    .replace(/\bweekends?\b/g, ' ');
+  const pointsAtAPeriod = !weekendMetric || /\b(?:this|next|last|that|the)\s+weekend\b/.test(q) || NAMES_A_DATE.test(periodText);
 
   return {
     op, metric, direction,
     limit: readLimit(q),
     shift: readShift(q),
     role: metric === 'charge-turns' || metric === 'icu-turns' ? null : readRole(q),
-    people: op === 'compare' ? withActor : [],
+    people: op === 'compare' ? [...new Set(withActor)] : subjects,
     exclude,
     when: when && !when.bare && pointsAtAPeriod ? when : null,
     ties: true,
@@ -262,11 +269,12 @@ export function describePlan(plan, { periodLabel = '' } = {}) {
   const role = plan.role ? ' marked ' + (plan.role === 'icu' ? 'ICU' : plan.role) : '';
   const period = plan.when?.label ? ' ' + plan.when.label : periodLabel ? ' on ' + periodLabel : '';
   const without = plan.exclude.length ? ', excluding ' + joined(plan.exclude) : '';
+  const among = plan.op !== 'compare' && plan.people.length ? ', among ' + joined(plan.people) : '';
   const head = plan.op === 'compare' ? joined(plan.people) + ' compared by ' + metric
     : plan.op === 'count' ? metric + ' for each person'
     : (plan.direction === 'lowest' ? 'Lowest ' : 'Highest ') + metric;
   const top = plan.op === 'compare' || !plan.limit ? '' : ', the ' + (plan.direction === 'lowest' ? 'lowest ' : 'highest ') + plan.limit;
-  return head + shift + role + period + top + without;
+  return head + shift + role + period + top + among + without;
 }
 
 const joined = names => names.length < 3 ? names.join(' and ') : names.slice(0, -1).join(', ') + ' and ' + names.at(-1);

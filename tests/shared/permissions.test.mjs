@@ -131,9 +131,16 @@ describe('shared permission launch gate: real backend, synthetic records', {conc
   });
 
   test('named fairness and exports require the custodian role, while your own sheet remains available',async()=>{
+    // A computed table in Ask is the same named comparison boundary as a stored fairness sheet.
+    const question={question:'How many weekend shifts has each person worked?'};
+    const control=await request(s.keeper,route(a,'ask'),{method:'POST',body:question}); allowed(control);
+    assert.ok(json(control).items.length>1,'The custodian must actually retrieve per-person counts');
     for(const member of [s.member,s.outsider,s.admin]) {
       denied(await request(member,route(a,'fairness',s.partner.personId)));
       denied(await request(member,route(a,'exports/fairness')));
+      const counts=await request(member,route(a,'ask'),{method:'POST',body:question}); allowed(counts);
+      assert.deepEqual(json(counts).items,[],'Ask must not bypass the named comparison restriction');
+      noPrivateSources(counts,[{kind:'fairness',id:s.partner.personId}]);
     }
     allowed(await request(s.partner,route(a,'fairness',s.partner.personId)));
     allowed(await request(s.keeper,route(a,'fairness',s.partner.personId)));

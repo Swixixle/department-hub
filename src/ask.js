@@ -445,7 +445,7 @@ function lookup(question, world) {
   const answer = (title, items, source, extra = {}) => ({ title, items, source, lines: [], empty: !items.length && !extra.lines?.length, kind, understood: understood(), read: tidy.changed ? tidy.text : '', changes: tidy.changes,
     context: { kind, when, others, withActor:kind === 'who' && (has('with') || ((followed || repaired) && Boolean(last?.withActor))),
       ...(extra.focus ? { focus:extra.focus } : last?.focus && repaired ? { focus:last.focus } : {}), ...(clarify ? { pending:clarify } : {}),
-      ...(plan ? { plan } : last?.plan && !extra.dropPlan ? { plan:last.plan } : {}) }, ...extra });
+      ...(plan ? { plan } : {}) }, ...extra });
   const tidyText = text => tidyQuestion(text, names, familiar).text;
   const docQuestion = /\b(polic(?:y|ies)|procedures?|protocols?|manuals?|guidelines?|handbook)\b/.test(q);
   const taughtAnswers = (world.answers || []).filter(note => note.documentId
@@ -501,7 +501,7 @@ function lookup(question, world) {
 
     // Other people's numbers are the record keeper's, as they are everywhere else in the app. Reading the question
     // correctly is not permission to answer it.
-    const aboutOthers = plan.op === 'rank' ? true : plan.people.some(name => !same(name, actor));
+    const aboutOthers = plan.op !== 'compare' || plan.people.some(name => !same(name, actor));
     if (aboutOthers && !world.keeper) return answer('That is kept by whoever keeps the record', [], 'Fairness',
       { empty:false, understood:spoken,
         lines:['I understood the question. You can see your own figures; other people’s are shown only to the person who keeps the record.'] });

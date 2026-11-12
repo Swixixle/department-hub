@@ -21,6 +21,7 @@ jobs:
           python-version: '3.12'
       - run: npm ci
       - run: npm test
+      - run: npm run eval:ask
       - run: python -m unittest discover -s tests -p 'test_*.py'
       - run: npm run build
       - run: npm run build:demo

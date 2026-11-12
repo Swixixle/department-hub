@@ -104,7 +104,8 @@ export function runPlan(plan, world) {
 
   const rows = measure(plan, world);
   const excluded = new Set(plan.exclude.map(key));
-  const eligible = rows.filter(row => !excluded.has(key(row.person)));
+  const included = new Set(plan.people.map(key));
+  const eligible = rows.filter(row => !excluded.has(key(row.person)) && (!included.size || included.has(key(row.person))));
 
   if (plan.op === 'count') {
     // Every person's figure, in order, with nobody singled out as a winner.
