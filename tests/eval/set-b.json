@@ -1,0 +1,401 @@
+[
+ [
+  "who ends up with the most weekend nights",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "whos got the fewest weekends",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "lowest"
+  }
+ ],
+ [
+  "who's got the most weekends on days",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "which of us has the most weekend shifts",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest"
+  }
+ ],
+ [
+  "who racks up the most hours",
+  {
+   "op": "rank",
+   "metric": "hours",
+   "direction": "highest"
+  }
+ ],
+ [
+  "who is working the fewest shifts on nights",
+  {
+   "op": "rank",
+   "metric": "shifts",
+   "direction": "lowest",
+   "shift": "N"
+  }
+ ],
+ [
+  "give me the three highest weekend counts on day shift",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D",
+   "limit": 3
+  }
+ ],
+ [
+  "list the bottom 4 by hours",
+  {
+   "op": "rank",
+   "metric": "hours",
+   "direction": "lowest",
+   "limit": 4
+  }
+ ],
+ [
+  "who is lowest on weekend nights other than Parker",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "lowest",
+   "shift": "N",
+   "exclude": [
+    "Parker"
+   ]
+  }
+ ],
+ [
+  "most charge turns on nights, not counting Parker",
+  {
+   "op": "rank",
+   "metric": "charge-turns",
+   "direction": "highest",
+   "shift": "N",
+   "exclude": [
+    "Parker"
+   ]
+  }
+ ],
+ [
+  "without Morgan who does the most weekend nights",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N",
+   "exclude": [
+    "Morgan"
+   ]
+  }
+ ],
+ [
+  "skip Avery, who has the most weekend day shifts",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D",
+   "exclude": [
+    "Avery"
+   ]
+  }
+ ],
+ [
+  "who has the most icu turns besides Morgan",
+  {
+   "op": "rank",
+   "metric": "icu-turns",
+   "direction": "highest",
+   "exclude": [
+    "Morgan"
+   ]
+  }
+ ],
+ [
+  "does Morgan do more weekend nights than Jordan",
+  {
+   "op": "compare",
+   "metric": "weekend-shifts",
+   "shift": "N",
+   "people": [
+    "Morgan",
+    "Jordan"
+   ]
+  }
+ ],
+ [
+  "is Blair or Jamie doing more weekends",
+  {
+   "op": "compare",
+   "metric": "weekend-shifts",
+   "people": [
+    "Blair",
+    "Jamie"
+   ]
+  }
+ ],
+ [
+  "Casey or Emery, who has fewer shifts",
+  {
+   "op": "compare",
+   "metric": "shifts",
+   "people": [
+    "Casey",
+    "Emery"
+   ]
+  }
+ ],
+ [
+  "how do Blair and Casey compare on weekend day shifts",
+  {
+   "op": "compare",
+   "metric": "weekend-shifts",
+   "shift": "D",
+   "people": [
+    "Blair",
+    "Casey"
+   ]
+  }
+ ],
+ [
+  "who has the most weekends between december 1 and december 31",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "period": true
+  }
+ ],
+ [
+  "most weekend day shifts this month",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D",
+   "period": true
+  }
+ ],
+ [
+  "who worked the most weekends in nov",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "period": true
+  }
+ ],
+ [
+  "whos above their share of weekends on nights",
+  {
+   "op": "rank",
+   "metric": "weekend-fair-gap",
+   "shift": "N"
+  }
+ ],
+ [
+  "who is getting more than their fair share of weekend days",
+  {
+   "op": "rank",
+   "metric": "weekend-fair-gap",
+   "shift": "D"
+  }
+ ],
+ [
+  "who is shortest of their weekend share on day shift",
+  {
+   "op": "rank",
+   "metric": "weekend-fair-gap",
+   "shift": "D"
+  }
+ ],
+ [
+  "how many separate weekends does each of us have on days",
+  {
+   "op": "count",
+   "metric": "distinct-weekends",
+   "shift": "D"
+  }
+ ],
+ [
+  "who has worked the most individual weekends",
+  {
+   "op": "rank",
+   "metric": "distinct-weekends",
+   "direction": "highest"
+  }
+ ],
+ [
+  "most holidays worked on nights",
+  {
+   "op": "rank",
+   "metric": "holidays",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "who has the most weekneds on nigths",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "whos the busyest on day shift",
+  {
+   "op": "rank",
+   "metric": "shifts",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "i wanna know who has the most weekends on nights",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "most weekends day shift who",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "ok so on nights whos got the most weekends",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "who has the most weekends per shift worked",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "what proportion of Blairs shifts are weekends",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "who is trending up on weekends",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "who has the most weekends compared to last month",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "who most likely wants a weekend off",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "who has the most weekends other than Tamsin",
+  {
+   "unresolved": true
+  }
+ ],
+ [
+  "most weekends excluding Kowalczyk",
+  {
+   "unresolved": true
+  }
+ ],
+ [
+  "what are my hours next week",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "am i working this weekend",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "who is off on friday",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "what did i miss on the board",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "how do i ask for time off",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "who is in charge tonight",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "how many shifts in a row am i working",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "can Morgan take my saturday",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "how many weekends do i have left",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "whats the thin liquids protocol",
+  {
+   "notAPlan": true
+  }
+ ]
+]

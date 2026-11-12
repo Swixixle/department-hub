@@ -154,6 +154,30 @@ const {JSDOM} = require('jsdom');
   const thanked = await ask('thanks');
   assert.match(thanked, /Any time\./);
   assert.doesNotMatch(thanked, /Searched the board/);
+  // A comparison question and a follow-up that edits its plan, through the same form and action handler. The
+  // fixture's viewer is the record keeper, so the figures are theirs to see.
+  const ranked = await ask('Who has the most weekends on day shift, other than Avery?');
+  assert.match(ranked, /Understood as: Highest weekend shifts on day shift, excluding Avery\./);
+  // Avery appears in the understood line and in "with Avery left out", which is right. What must not appear is
+  // Avery as a result.
+  assert.doesNotMatch(ranked, /Avery: \d+ weekend shift/);
+  assert.match(ranked, /weekend shifts/);
+  assert.match(ranked, /Weekend shifts, not distinct weekends/);
+  const nights = await ask('Same thing for nights.');
+  assert.match(nights, /Understood as: Highest weekend shifts on night shift, excluding Avery\./);
+  assert.notEqual(nights, ranked, 'the shift filter changed the answer');
+  const included = await ask('No, include Avery this time.');
+  assert.match(included, /Understood as: Highest weekend shifts on night shift\./);
+  const refused = await ask('Who has the most weekends on day shift per month?');
+  assert.match(refused, /I can read that question but I cannot work out a rate per month/);
+  assert.doesNotMatch(refused, /weekend shifts each/);
+  // Not the record keeper: read correctly, declined, and the reading still shown.
+  await click('close'); await actor('Avery'); await click('ask-open');
+  const withheld = await ask('Who has the most weekends on day shift, other than Blair?');
+  assert.match(withheld, /kept by whoever keeps the record/);
+  assert.match(withheld, /Understood as: Highest weekend shifts on day shift, excluding Blair\./);
+  await click('close'); await actor('Jordan'); await click('ask-open');
+
   const notAQuestion = await ask('zxqw blorp');
   assert.match(notAQuestion, /I did not understand that as a question I can look up\./);
   assert.doesNotMatch(notAQuestion, /Nothing on record answers that/);

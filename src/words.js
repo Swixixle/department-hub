@@ -22,7 +22,12 @@ export const SYNONYMS = [
 export const CORE_WORDS = ('when where who what how work works working worked shift shifts schedule scheduled next today tonight tomorrow yesterday weekend week night nights days morning ' +
   'sunday monday tuesday wednesday thursday friday saturday january february march april june july august september october november december christmas thanksgiving holiday holidays ' +
   'with number phone call text reach contact fair fairness share carrying weekends many short understaffed overstaffed extra census four people miss missed news announcement announcements latest unread board ' +
-  'due deadline meeting meetings event events upcoming coming calendar policy procedure protocol document request leave before after about').split(' ');
+  'due deadline meeting meetings event events upcoming coming calendar policy procedure protocol document request leave before after about ' +
+  // "show" was being read as "how" and "each" as "reach", which turned a follow-up into a new question. The other
+  // comparison words the planner reads — most, fewest, except, excluding and the rest — are already left alone, and
+  // adding them here would make each of them a new target for the corrector to pull other words towards: that is
+  // how "cover" became "over" on the first attempt at this.
+  'show each busiest quietest shortest proportion skip').split(' ');
 
 // Damerau-Levenshtein distance: insert, delete, substitute, or swap two neighbouring letters. Stops counting past `max`.
 export function editDistance(a, b, max = 2) {

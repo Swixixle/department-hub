@@ -17,7 +17,8 @@
     "seed:shared": "node server/seed.mjs",
     "gate:shared": "node scripts/shared-gate.mjs",
     "test:server": "node --test --test-concurrency=1 tests/server/*.test.mjs",
-    "bootstrap:admin": "node server/bootstrap.mjs"
+    "bootstrap:admin": "node server/bootstrap.mjs",
+    "eval:ask": "node scripts/eval-ask.mjs"
   },
   "dependencies": {
     "@simplewebauthn/server": "^14.1.0",
