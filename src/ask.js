@@ -7,6 +7,7 @@
 // the person asking is allowed to see, which is why the filtering happens here, before anything else.
 import { holidays, isWeekendTurn, staffing, statSheet } from './fairness.js';
 import { protocolAnswer } from './pathways.js';
+import { namesAReference, referenceAnswer } from './references.js';
 import { addDays, minutesByWeek, normalizeName, payWeekStart, shiftInterval, shiftTimes, weekStart } from './model.js';
 import { expand, isThanks, keywords, nearest, qualifiers, readWorkPhrases, stem, tidyQuestion } from './words.js';
 import { checkExchange, describe, findOptions, shiftName, weekChanges } from './trades.js';
@@ -277,6 +278,16 @@ export function ask(question, world) {
   // A question about a held protocol is answered from a reviewed mapping or not at all. It never reaches the word search.
   const fromProtocol = world.protocols ? protocolAnswer(question, world) : null;
   if (fromProtocol) return fromProtocol;
+  // A question that names AARC, NBRC or a practice guideline is pointed at the published original when the reference
+  // list has a title for it. Nothing is answered from a reference: the list holds titles and links, not text.
+  const listed = world.references?.length > 0;
+  if (listed && namesAReference(question)) { const pointed = referenceAnswer(question, world); if (pointed?.reference.ids.length || pointed?.reference.retired) return pointed; }
+  const result = fromRecords(question, world);
+  // Only when the department's own records had nothing is a reference offered, and then only as a pointer.
+  return listed && result.empty && ['look', 'unknown'].includes(result.kind) ? referenceAnswer(question, world, { fallback: true }) || result : result;
+}
+
+function fromRecords(question, world) {
   const result = lookup(question, world);
   // This is a disclosure for explicitly joined, recognized dates, not an uncertainty score or a new date parser.
   // Keep the existing lookup and expose its actual scope beside the answer when the question names several scopes.

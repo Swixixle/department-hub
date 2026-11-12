@@ -213,6 +213,39 @@ const step = async (name, work) => { try { await work(); results.push([true, nam
     assert.equal(events.filter(event => event.type === 'Answer relevance feedback').length, 0);
   });
 
+  await step('professional references are a shelf of links out: searchable, retired hidden, nothing of their text held, usable on a phone', async () => {
+    await press('tab', 'protocols'); if (await page.locator('[data-action="protocol-home"]').count()) await press('protocol-home');
+    await page.waitForSelector('[data-action="reference-shelf"]');
+    await press('reference-shelf'); await page.waitForSelector('article.reference');
+    assert.equal(await page.locator('article.reference').count(), 79);
+    assert.match(await text('.reference-terms'), /These are not your hospital’s protocols\./);
+    assert.deepEqual(await page.locator('article.reference a.link-button').first().evaluate(link => [link.target, link.rel, /^https:\/\/www\.aarc\.org\//.test(link.href)]), ['_blank', 'noopener noreferrer', true]);
+    await page.fill('form[data-form="reference-search"] input[name="q"]', 'oxygen adults'); await page.click('form[data-form="reference-search"] button'); await settle();
+    assert.deepEqual((await page.locator('article.reference:not(.grouped) h3').allInnerTexts()).slice(0, 2), ['AARC Clinical Practice Guideline: Management of Adult Patients With Oxygen in the Acute Care Setting (2022)', 'Oxygen Therapy for Adults in the Acute Care Facility (2002)']);
+    assert.match(await page.locator('article.reference').nth(1).innerText(), /Dated 2002, 24 years ago\. Check with whoever issued it for something newer\.[\s\S]*AARC also lists a later document on this subject/);
+    await page.selectOption('#reference-section', 'AARC-Retired Guidelines'); await settle();
+    assert.equal(await page.locator('article.reference').count(), 0, 'the retired collection shows nothing until retired documents are asked for');
+    await page.check('#reference-retired'); await settle();
+    await page.fill('form[data-form="reference-search"] input[name="q"]', ''); await page.click('form[data-form="reference-search"] button'); await settle();
+    assert.equal(await page.locator('article.reference.retired').count(), 26);
+    await shot('10-reference-shelf');
+    const reply = await askFor('Is there an AARC guideline on suctioning?');
+    assert.match(reply, /Professional references on this\. They are not your hospital’s protocol\./);
+    assert.equal(await page.locator('.ask-answer a.link-button').count(), 3);
+    await shot('11-ask-points-to-reference');
+    await closeDialog();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await press('tab', 'protocols');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'the reference shelf scrolls sideways on a phone');
+    const small = await page.evaluate(() => [...document.querySelectorAll('.content a.link-button, .content form button, .content select, .content input[type=search], .content input[name=q]')].filter(node => node.offsetParent).map(node => Math.round(node.getBoundingClientRect().height)).filter(height => height < 44));
+    assert.deepEqual(small, [], 'a control on the reference shelf is under 44 px tall on a phone');
+    await shot('12-phone-reference-shelf');
+    await page.setViewportSize({ width: 1360, height: 900 });
+    const kept = await stored();
+    for (const typed of ['oxygen adults', 'guideline on suctioning']) assert.ok(!kept.includes(typed), 'storage holds "' + typed + '"');
+    await press('protocol-home');
+  });
+
   await step('someone who is not a record keeper can read, search, bookmark and ask, and cannot add, review or withdraw', async () => {
     const names = await page.locator('#actor option').allInnerTexts(), keepers = (await state()).custodians;
     const other = names.find(name => !keepers.includes(name.toLowerCase().replace(/[^a-z]+/g, ' ').trim()) && !keepers.some(id => name.toLowerCase().startsWith(id)));

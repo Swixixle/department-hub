@@ -47,7 +47,7 @@ const { JSDOM } = require('jsdom');
   const settle = () => new Promise(resolve => setTimeout(resolve, 70));
   const waitFor = async (ready, label) => { for (let i = 0; i < 150; i++) { if (ready()) { await settle(); return; } await new Promise(resolve => setTimeout(resolve, 20)); } assert.fail('Timed out: ' + label); };
   const find = (action, value) => [...document.querySelectorAll('[data-action]')].find(el => el.dataset.action === action && (value === undefined || el.dataset.value === value));
-  const READING = new Set(['tab', 'protocol-home', 'protocol-open', 'protocol-revision', 'protocol-pane', 'protocol-cite', 'protocol-mark', 'protocol-ask', 'ask-go', 'ask-open', 'ask-back', 'ask-next', 'close', 'protocol-withdraw', 'protocol-withdraw-cancel']);
+  const READING = new Set(['tab', 'protocol-home', 'protocol-open', 'protocol-revision', 'protocol-pane', 'protocol-cite', 'protocol-mark', 'protocol-ask', 'reference-shelf', 'ask-go', 'ask-open', 'ask-back', 'ask-next', 'close', 'protocol-withdraw', 'protocol-withdraw-cancel']);
   const click = async (action, value) => { const before = read().events, el = find(action, value); assert.ok(el, 'Missing action ' + action + (value ? ' ' + value : '')); el.click(); await settle();
     if (READING.has(action)) assert.deepEqual(read().events, before, 'Reading must not add a receipt: ' + action); };
   const submit = async (selector, values) => { const form = document.querySelector(selector); assert.ok(form, 'Missing form ' + selector); for (const [name, value] of Object.entries(values)) form.querySelector('[name=' + name + ']').value = value;
@@ -183,6 +183,36 @@ const { JSDOM } = require('jsdom');
   await click('close');
   await actor('Jordan');
 
+  // Professional references: a shelf of links out. Nothing of any guideline is held, shown or answered from.
+  await click('tab', 'protocols'); await click('protocol-home');
+  await waitFor(() => find('reference-shelf'), 'the reference list loaded');
+  assert.match(content(), /Professional references[\s\S]*They are not your hospital’s protocols\./);
+  await click('reference-shelf');
+  assert.equal(document.querySelectorAll('article.reference').length, 79, 'retired documents are left out to begin with');
+  assert.match(document.querySelector('.reference-terms').textContent, /^These are not your hospital’s protocols\. Each entry is a title, a year and a link to the publisher’s own copy\. Department Hub holds none of the text, does not summarise it and answers nothing from it\./);
+  const out = [...document.querySelectorAll('article.reference a.link-button')];
+  assert.ok(out.length === 79 && out.every(link => link.target === '_blank' && link.rel === 'noopener noreferrer' && /^https?:\/\/[^/]+\//.test(link.href)), 'every entry leaves the app by an ordinary safe link');
+  await submit('form[data-form="reference-search"]', { q: 'suction' });
+  assert.deepEqual([...document.querySelectorAll('article.reference:not(.grouped) h3')].map(node => node.textContent), ['AARC Clinical Practice Guidelines: Artificial Airway Suctioning (2022)',
+    'Endotracheal Suctioning of Mechanically Ventilated Patients With Artificial Airways (2010)', 'Nasotracheal Suctioning (2004)']);
+  assert.match(document.querySelector('.group-divider').textContent, /^Not matched by title\. Filed under a related subject:$/);
+  assert.ok(document.querySelector('.group-divider').compareDocumentPosition(document.querySelector('article.reference.grouped')) & 4, 'entries matched only by subject group come after the divider');
+  const retiredBox = document.querySelector('#reference-retired'); retiredBox.checked = true; retiredBox.dispatchEvent(new w.Event('change', { bubbles: true })); await settle();
+  assert.deepEqual([...document.querySelectorAll('article.reference.retired:not(.grouped) h3')].map(node => node.textContent), ['Suctioning of the patient in the home (1999)']);
+  assert.match(document.querySelector('article.reference.retired:not(.grouped)').textContent, /^RETIRED · AARC-Retired Guidelines[\s\S]*Retired by AARC\. Kept as history, not as a reference for practice\./);
+  reply = await ask('Is there an AARC guideline on suctioning?');
+  assert.match(reply, /Understood as: a search of the professional reference list\.[\s\S]*Professional references on this\. They are not your hospital’s protocol\.[\s\S]*Department Hub holds none of their text and does not summarise them\./);
+  const pointers = [...document.querySelectorAll('.ask-answer .ask-item a.link-button')];
+  assert.deepEqual(pointers.map(link => [link.textContent, link.target, link.rel, link.href.startsWith('https://www.aarc.org/wp-content/uploads/')]), Array(3).fill(['Open official source ↗', '_blank', 'noopener noreferrer', true]));
+  assert.ok(!/\b\d+\s?(?:mm ?hg|cm ?h2o|l\/min)\b/i.test(reply), 'a setting appeared in a reference answer');
+  await click('ask-go', 'refs|suctioning');
+  assert.equal(document.querySelector('form[data-form="reference-search"] [name=q]').value, 'suctioning');
+  assert.equal(document.querySelectorAll('article.reference:not(.grouped)').length, 3);
+  reply = await ask('When do I work next?');
+  assert.ok(!/Professional references/.test(reply), 'a schedule question is still a schedule question');
+  await click('close');
+  await click('protocol-home');
+
   // Withdrawal needs a reason and leaves a receipt; the protocol then has no answer and says why.
   await click('tab', 'protocols'); if (find('protocol-open')) await click('protocol-open');
   await click('protocol-withdraw');
@@ -196,12 +226,12 @@ const { JSDOM } = require('jsdom');
 
   // What was kept, and what was not.
   const kept = JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(name => [name, localStorage.getItem(name)])));
-  for (const typed of ['Blue Trainer drill at', 'amber seal lamp serviced', 'swallow screen before']) assert.ok(!kept.includes(typed), 'storage holds what was typed: ' + typed);
+  for (const typed of ['Blue Trainer drill at', 'amber seal lamp serviced', 'swallow screen before', 'suction']) assert.ok(!kept.includes(typed), 'storage holds what was typed: ' + typed);
   assert.deepEqual(types().slice(receiptsAtStart), ['Protocol reading confirmed', 'Protocol answers mapped', ...Array(6).fill('Protocol answer reviewed'), 'Protocol answers reviewed', 'Protocol revision made active', 'Protocol revision withdrawn']);
   assert.deepEqual(read().events[0], stored.events[0], 'the receipt from before protocols is untouched');
   assert.equal((await audit.verifyReceipts(read().events)).ok, true);
   assert.equal(read().documents[0].text, stored.documents[0].text);
   assert.ok(fetches.length === 1 && /rt-train-014-rev1\.mapping\.json$/.test(fetches[0]), 'the only request was for the mapping that ships with the app');
-  console.log('PASS: Protocols is on every screen; reading confirmed, answers mapped, each reviewed, revision made active and withdrawn, each with a receipt; Ask shows the whole rule and Open lands on the cited passage; reading, searching, asking and branch choices store nothing; a non-keeper cannot change the library; the earlier receipt and pasted document are unchanged.');
+  console.log('PASS: Protocols is on every screen; reading confirmed, answers mapped, each reviewed, revision made active and withdrawn, each with a receipt; Ask shows the whole rule and Open lands on the cited passage; reading, searching, asking and branch choices store nothing; a non-keeper cannot change the library; professional references are links out with nothing of their text held; the earlier receipt and pasted document are unchanged.');
   dom.window.close();
 })().catch(error => { console.error(error.stack); process.exitCode = 1; });

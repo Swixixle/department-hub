@@ -6,6 +6,7 @@
 import { applicable, historyOf, standing, STANDING, shortDigest, familyOf, revisionOf, bundlesOf } from './protocols.js';
 import { passageAt } from './pdftext.js';
 import { reviewHolds, validateBundle, wholeRule } from './bundles.js';
+import { cautionsFor, searchReferences } from './references.js';
 
 export const NOT_AUTHORITY = 'Recorded for the profile selected on this device. This prototype does not verify who that is, and a recorded review is not clinical sign-off.';
 export const HELD_HERE = 'This is the copy held on this device. Department Hub cannot tell whether whoever issued a protocol has published a newer one.';
@@ -17,7 +18,7 @@ export const chipFor = (library, revision, today) => { const where = standing(li
 // The revision a protocol's page opens on: the one in force, or failing that the newest held.
 export const landingRevision = (library, familyId, today) => applicable(library, familyId, today).revision || historyOf(library, familyId)[0] || null;
 
-export function libraryView({ library, today, documents, query, results, keeper, demo, sampleNext }, { h, button, valueAttr }) {
+export function libraryView({ library, today, documents, query, results, keeper, demo, sampleNext, references }, { h, button, valueAttr }) {
   const families = [...library.families].sort((a, b) => Number(library.marks.includes(b.id)) - Number(library.marks.includes(a.id)) || a.identifier.localeCompare(b.identifier));
   const card = family => {
     const now = applicable(library, family.id, today), shown = now.revision || historyOf(library, family.id)[0], marked = library.marks.includes(family.id);
@@ -38,6 +39,8 @@ export function libraryView({ library, today, documents, query, results, keeper,
       ? 'Adds revision 1 of a made-up training drill (' + h(SYNTHETIC) + ') exactly as a real file would be added: unchecked, unreviewed and answering nothing until you take each step.'
       : 'Adds revision 2 of the invented drill, effective 1 November 2026. From that date revision 1 is history, and nothing answers until revision 2 has been checked and reviewed.') + '</p>' +
       button(sampleNext === '1' ? 'Add the invented protocol' : 'Add revision 2 of the invented protocol', 'protocol-sample', 'class="secondary"') + '</div>' : '') +
+    '<h2 class="group-head">Professional references</h2><p class="subtle">Published guidelines from AARC and others, and NBRC’s credentialing pages: titles and links to the official originals. Department Hub holds none of their text and answers nothing from them. They are not your hospital’s protocols.</p>' +
+    (references ? '<p>' + button('Browse ' + references.records.length + ' professional references', 'reference-shelf', 'class="secondary"') + '</p>' : '<p class="subtle">The reference list is loading.</p>') +
     '<h2 class="group-head">Pasted documents</h2><p class="subtle">Added before protocols were kept as files, or pasted as plain text. Ask searches their words and quotes what it finds. They are not reviewed protocols and do not become one by being here.</p>' +
     (documents.length ? '<div class="line-list">' + documents.map(doc => '<div><span><b>' + h(doc.title) + '</b> <small>' + h(['Legacy document', doc.kind, doc.effective ? 'effective ' + doc.effective : 'no effective date given'].join(' · ')) + '</small></span><span class="pair">' +
       button('Open', 'doc-open', 'class="secondary" ' + valueAttr(doc.id)) + '</span></div>').join('') + '</div>' : '<p class="subtle">None.</p>') +
@@ -140,4 +143,29 @@ export function addDialog({ busy }, { h }) {
     '<label>Where this file came from<input name="location" maxlength="200" autocomplete="off" placeholder="For example: the policy library, downloaded today"></label>' +
     '<p class="subtle">These are the document’s own details, typed from what it says. They are recorded separately from when it was added here. A PDF that is a scan (a picture of pages) will read as empty; you can type its text in afterwards. ' + h(NOT_AUTHORITY) + '</p>' +
     '<div class="actions inline"><button class="primary">Read and add</button></div></form>';
+}
+
+// The reference shelf. Every entry leaves the app to the publisher's own copy; nothing of the document is shown here.
+export function referencesView({ list, query, section, retired, today }, { h, button, valueAttr }) {
+  const found = searchReferences(list.records, query, { retired, section, groups: true }), hidden = list.records.filter(record => record.retired && (!section || record.section === section)).length;
+  return '<p class="pair start">' + button('‹ All protocols', 'protocol-home', 'class="text-button"') + '</p><div class="intro"><div><div class="eyebrow">PROFESSIONAL REFERENCES</div><h1>Published references</h1><p>Where a guideline is, not what it says.</p></div></div>' +
+    '<div class="notice reference-terms" role="note"><b>These are not your hospital’s protocols.</b> Each entry is a title, a year and a link to the publisher’s own copy. Department Hub holds none of the text, does not summarise it and answers nothing from it. ' +
+      'A listing does not show that a document is current, or that your hospital has adopted it.</div>' +
+    '<form data-form="reference-search" class="reference-search"><label>Search titles and topics<input name="q" maxlength="120" autocomplete="off" enterkeyhint="search" value="' + h(query || '') + '" placeholder="Try suction, oxygen, ventilator or asthma"></label>' +
+      '<label>Collection<select name="section" id="reference-section"><option value="">All collections</option>' + list.sections.map(name => '<option' + (name === section ? ' selected' : '') + '>' + h(name) + '</option>').join('') + '</select></label>' +
+      '<label class="check"><span><input type="checkbox" name="retired" id="reference-retired"' + (retired ? ' checked' : '') + '> Include retired documents (' + hidden + ')</span></label><button class="secondary">Search</button></form>' +
+    '<p class="subtle" role="status">' + (query ? found.filter(hit => hit.hits >= 1).length + ' matched by title' + (found.some(hit => hit.hits < 1) ? ', ' + found.filter(hit => hit.hits < 1).length + ' more filed under a related subject' : '') + ', of ' + list.records.length
+      : found.length + ' of ' + list.records.length + ' shown') + (retired ? '' : ' · retired documents are left out') + (query ? ' · this search is not saved' : '') + '</p>' +
+    (found.length ? '<div class="reference-list">' + found.map(({ record, hits }, index) => { const cautions = cautionsFor(record, list.records, today), grouped = Boolean(query) && hits < 1;
+      // A match on the broad subject group alone is set apart: the title does not say it covers what was typed.
+      return (grouped && (index === 0 || found[index - 1].hits >= 1) ? '<p class="subtle group-divider">' + (index ? 'Not matched by title. Filed under a related subject:' : 'No title matches. Filed under a related subject:') + '</p>' : '') +
+        '<article class="panel reference' + (record.retired ? ' retired' : '') + (grouped ? ' grouped' : '') + '" data-reference="' + h(record.id) + '"><div><span class="badge standing ' + (record.retired ? 'withdrawn' : 'superseded') + '">' + (record.retired ? 'RETIRED · ' : '') + h(record.section) + '</span>' +
+        '<h3>' + h(record.title) + '</h3><p class="subtle">' + h([record.kind === 'external_guideline_or_standard' ? 'Another organization’s document, listed by AARC' : record.issuer, record.topic, record.year ? 'listed year ' + record.year : 'no year listed'].filter(Boolean).join(' · ')) + '</p>' +
+        cautions.map(caution => '<p class="caution">' + h(caution) + '</p>').join('') +
+        '<details><summary>What this listing does and does not establish</summary><p class="subtle">Found on ' + h(record.foundAt) + ' on ' + h(list.collectedOn) + '. Whether it is still current was not checked. ' + h(record.rights) +
+          ' Nothing of the document is copied into Department Hub.</p></details></div>' +
+        '<div class="actions"><a class="secondary link-button" href="' + h(record.url) + '" target="_blank" rel="noopener noreferrer">Open official source ↗</a></div></article>'; }).join('') + '</div>' :
+      '<div class="panel empty"><h3>No title matches</h3><p>The list is searched by title and topic only, because none of the documents themselves are held here.</p></div>') +
+    '<p class="subtle">Collected ' + h(list.collectedOn) + ' from AARC’s guideline index and guidance page and from NBRC’s site. ' + h(list.checked.aarcGuidelineIndex) + ' ' + h(list.checked.aarcHostedLinks) + ' ' + h(list.checked.otherLinks) + ' ' + h(list.checked.nbrc) +
+      ' Opening a source needs an internet connection and takes you to its publisher.</p>';
 }

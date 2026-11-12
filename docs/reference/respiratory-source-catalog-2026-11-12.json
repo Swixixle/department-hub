@@ -1,0 +1,3919 @@
+{
+ "schema": "department-hub.source-catalog.v1",
+ "prepared_on": "2026-11-12",
+ "purpose": "Source discovery and navigation; not an installed protocol answer database.",
+ "scope": "All 94 entries in the observed AARC clinical-practice-guideline index, all five visible AARC guidance documents, and seven selected NBRC references. Not every publication on either website.",
+ "counts": {
+  "Evidence-Based Clinical Practice Guidelines": 14,
+  "Expert Panel Reference-Based Guidelines": 23,
+  "AARC-Retired Guidelines": 26,
+  "Guidelines From Other Organizations": 31,
+  "Current Guidance Documents": 4,
+  "Retired Guidance Documents": 1,
+  "NBRC references": 7
+ },
+ "full_text_copies": 0,
+ "clinical_answer_bundles": 0,
+ "records": [
+  {
+   "id": "source-b027531b63d9",
+   "title": "AARC and PALISI Clinical Practice Guideline: Pediatric Critical Asthma (2025)",
+   "display_title": "Pediatric Critical Asthma (2025)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2025/05/white-et-al-2025-aarc-and-palisi-clinical-practice-guideline-pediatric-critical-asthma.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC / PALISI",
+   "listed_year": 2025,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "personal_use_notice_present",
+    "basis": "Copyright holder and a personal-use restriction are printed in the linked PDF; no shared-app reuse licence was established.",
+    "source_url": "https://www.aarc.org/wp-content/uploads/2025/05/white-et-al-2025-aarc-and-palisi-clinical-practice-guideline-pediatric-critical-asthma.pdf",
+    "pdf_pages": [
+     1,
+     2
+    ]
+   },
+   "review": {
+    "level": "abstract_and_rights_notice_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": true,
+    "pdf_pages": [
+     1,
+     2
+    ]
+   },
+   "description": "A joint AARC/PALISI guideline for children with critical asthma. It evaluates medication strategies, respiratory support and use of a care pathway. Recommendations vary in certainty, and several questions have no recommendation for or against an intervention. This description is a navigation aid; the complete recommendation and its qualifiers remain in the original.",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-2991fb3fd943",
+   "title": "AARC Clinical Practice Guideline: Patient-Ventilator Assessment (2024)",
+   "display_title": "Patient-Ventilator Assessment (2024)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2024/10/patient-ventilator-assessment-aarc-cpg.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2024,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "copyright_notice_present_no_reuse_licence_established",
+    "basis": "The first page identifies a 2024 Daedalus copyright. No app-redistribution licence established.",
+    "pdf_pages": [
+     1
+    ]
+   },
+   "review": {
+    "level": "abstract_and_introduction_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": true,
+    "pdf_pages": [
+     1,
+     2
+    ]
+   },
+   "description": "A guideline on assessing the person receiving mechanical ventilation together with their airway, interface, humidification and ventilator data. Its recommendations have different evidence grades. It distinguishes direct bedside assessment from supplemental remote monitoring. This is a topic description, not a substitute for the recommendation details or a complete bedside checklist.",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-566209619234",
+   "title": "AARC Clinical Practice Guideline: Spontaneous Breathing Trials for Liberation From Adult Mechanical Ventilation (2024)",
+   "display_title": "Spontaneous Breathing Trials for Liberation From Adult Mechanical Ventilation (2024)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2023/11/CPG2024SpontaneousBreathingTrial.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2024,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "copyright_notice_present_no_reuse_licence_established",
+    "basis": "The linked advance-publication PDF identifies a 2024 Daedalus copyright. No app-redistribution licence established.",
+    "pdf_pages": [
+     1
+    ]
+   },
+   "review": {
+    "level": "abstract_introduction_and_version_notice_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": true,
+    "pdf_pages": [
+     1,
+     2
+    ]
+   },
+   "description": "An adult ventilator-liberation guideline addressing readiness assessment, breathing-trial technique, timing and oxygen settings. Its recommendations are conditional and carry different evidence-certainty levels. Passing a breathing trial and being ready for extubation are separate judgments. The file linked from the AARC catalog is an advance-publication version, so compare it with the final published article before adopting answer mappings.",
+   "notes": [],
+   "related_source_ids": [
+    "source-8a421fcef036"
+   ],
+   "version_note": "Linked file is marked paper in press, published March 5, 2024; its notice says the final version may differ."
+  },
+  {
+   "id": "source-4f472648a79d",
+   "title": "AARC Clinical Practice Guidelines: Capillary Blood Gas Sampling for Neonatal and Pediatric Patients (2022)",
+   "display_title": "Capillary Blood Gas Sampling for Neonatal and Pediatric Patients (2022)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2022/10/cpg-capillary-blood-gas-sampling.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2022,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": [
+    "source-728c0edd1227"
+   ]
+  },
+  {
+   "id": "source-607d3dad5fe7",
+   "title": "AARC Clinical Practice Guidelines: Artificial Airway Suctioning (2022)",
+   "display_title": "Artificial Airway Suctioning (2022)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2022/10/cpg-artificial-airway-suctioning.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2022,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "copyright_notice_present_no_reuse_licence_established",
+    "basis": "The article identifies a 2022 Daedalus copyright. No app-redistribution licence established.",
+    "pdf_pages": [
+     2
+    ]
+   },
+   "review": {
+    "level": "abstract_and_introduction_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": true,
+    "pdf_pages": [
+     1,
+     2
+    ]
+   },
+   "description": "A guideline covering suction through artificial airways in neonatal, pediatric and adult populations. It addresses when to suction, preparation, technique, equipment limits and complications. Age-specific recommendations and units must remain attached to each rule. This source description intentionally supplies no detached settings or procedure instructions.",
+   "notes": [],
+   "related_source_ids": [
+    "source-efb9968f2335"
+   ]
+  },
+  {
+   "id": "source-3a5676d6f874",
+   "title": "AARC Clinical Practice Guideline: Management of Adult Patients With Oxygen in the Acute Care Setting (2022)",
+   "display_title": "Management of Adult Patients With Oxygen in the Acute Care Setting (2022)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2022/10/cpg-clinical-mangement-adult-o2-acute-settings.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2022,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": [
+    "source-2712863addea"
+   ]
+  },
+  {
+   "id": "source-2129fc58ce34",
+   "title": "AARC Clinical Practice Guideline: Management of Pediatric Patients with Oxygen in the Acute Care Setting (2021)",
+   "display_title": "Management of Pediatric Patients with Oxygen in the Acute Care Setting (2021)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2021/08/management-of-pediatric-patients-with-oxygen-in-the-acute-setting.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2021,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-5ce020a34344",
+   "title": "AARC Clinical Practice Guideline: Management of Adult Patients with Tracheostomy in the Acute Care Setting (2021)",
+   "display_title": "Management of Adult Patients with Tracheostomy in the Acute Care Setting (2021)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2025/03/mussa-et-al-2020-aarc-clinical-practice-guideline-management-of-adult-patients-with-tracheostomy-in-the-acute-care.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2021,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-d6e268d6c2cd",
+   "title": "AARC Clinical Practice Guideline: Management of Pediatric Patients with Tracheostomy in the Acute Care Setting (2021)",
+   "display_title": "Management of Pediatric Patients with Tracheostomy in the Acute Care Setting (2021)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2025/03/volsko-et-al-2021-aarc-clinical-practice-guideline-management-of-pediatric-patients-with-tracheostomy-in-the-acute-care.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2021,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-1ea66343471d",
+   "title": "AARC Clinical Practice Guideline: Effectiveness of Pharmacologic Airway Clearance Therapies in Hospitalized Patients (2015)",
+   "display_title": "Effectiveness of Pharmacologic Airway Clearance Therapies in Hospitalized Patients (2015)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/pharm_cpg.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2015,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-2e5b31193e90",
+   "title": "AARC Clinical Practice Guideline: Effectiveness of Nonpharmacologic Airway Clearance Therapies in Hospitalized Patients (2013)",
+   "display_title": "Effectiveness of Nonpharmacologic Airway Clearance Therapies in Hospitalized Patients (2013)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/nonpharmacologic_2013.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2013,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-9eb29c605d52",
+   "title": "Evidence-Based Clinical Practice Guideline: Inhaled Nitric Oxide for Neonates With Acute Hypoxic Respiratory Failure (2010)",
+   "display_title": "Inhaled Nitric Oxide for Neonates With Acute Hypoxic Respiratory Failure (2010)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2025/03/diblasi-et-al-2010-evidence-based-clinical-practice-guideline-inhaled-nitric-oxide-for-neonates-with-acute-hypoxic.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2010,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-0cbb5c986309",
+   "title": "Care of the Ventilator Circuit and Its Relation to Ventilator-Associated Pneumonia (2003)",
+   "display_title": "Care of the Ventilator Circuit and Its Relation to Ventilator-Associated Pneumonia (2003)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/09.03.0869.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2003,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-8a421fcef036",
+   "title": "Weaning and Discontinuing Ventilatory Support (2002)",
+   "display_title": "Weaning and Discontinuing Ventilatory Support (2002)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/ebgwdvscpg.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Evidence-Based Clinical Practice Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2002,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "A later related AARC document is listed. Review the overlap; this catalog does not assert complete formal replacement."
+   ],
+   "related_source_ids": [
+    "source-566209619234"
+   ]
+  },
+  {
+   "id": "source-9f97f3aa3b1a",
+   "title": "Aerosol Delivery Device Selection for Spontaneously Breathing Patients (2012)",
+   "display_title": "Aerosol Delivery Device Selection for Spontaneously Breathing Patients (2012)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/aerosol_delivery_2012.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2012,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-8dcaf4c67890",
+   "title": "Application of Continuous Positive Airway Pressure to Neonates via Nasal Prongs, Nasopharyngeal Tube, or Nasal Mask (2004)",
+   "display_title": "Application of Continuous Positive Airway Pressure to Neonates via Nasal Prongs, Nasopharyngeal Tube, or Nasal Mask (2004)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/09.04.1100.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2004,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction",
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-9f2c035e5a10",
+   "title": "AARC Clinical Practice Guideline: Blood Gas Analysis and Hemoximetry (2013)",
+   "display_title": "Blood Gas Analysis and Hemoximetry (2013)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2025/03/davis-et-al-2013-aarc-clinical-practice-guideline-blood-gas-analysis-and-hemoximetry-2013.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2013,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-69ec3812df5b",
+   "title": "Bronchoscopy Assisting (2007)",
+   "display_title": "Bronchoscopy Assisting (2007)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/bronchoscopy_assisting.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2007,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-728c0edd1227",
+   "title": "Capillary Blood Gas Sampling for Neonatal and Pediatric Patients (2001)",
+   "display_title": "Capillary Blood Gas Sampling for Neonatal and Pediatric Patients (2001)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.01.506.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2001,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "A later related AARC document is listed. Review the overlap; this catalog does not assert complete formal replacement."
+   ],
+   "related_source_ids": [
+    "source-4f472648a79d"
+   ]
+  },
+  {
+   "id": "source-777525a0a8a7",
+   "title": "Capnography/Capnometry During Mechanical Ventilation (2011)",
+   "display_title": "Capnography/Capnometry During Mechanical Ventilation (2011)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/04.11.0503.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2011,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases",
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-256bbdec9bb6",
+   "title": "Effect of Race and Ethnicity on Pulmonary Function Testing Interpretation (2023)",
+   "display_title": "Effect of Race and Ethnicity on Pulmonary Function Testing Interpretation (2023)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2023/08/effect-race-ethnicity-pulmonary-function-testing-interpretation.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2023,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-efb9968f2335",
+   "title": "Endotracheal Suctioning of Mechanically Ventilated Patients With Artificial Airways (2010)",
+   "display_title": "Endotracheal Suctioning of Mechanically Ventilated Patients With Artificial Airways (2010)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/06.10.0758.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2010,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction",
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "A later related AARC document is listed. Review the overlap; this catalog does not assert complete formal replacement."
+   ],
+   "related_source_ids": [
+    "source-607d3dad5fe7"
+   ]
+  },
+  {
+   "id": "source-eaa22a39e7dc",
+   "title": "Humidification During Invasive and Noninvasive Mechanical Ventilation (2012)",
+   "display_title": "Humidification During Invasive and Noninvasive Mechanical Ventilation (2012)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/12.05.0782.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2012,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "reuse_term_search_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "No photocopy clause was found by a text search of this linked file. That negative search is not a complete licence audit."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-00bf1e95facd",
+   "title": "In-Hospital Transport of the Mechanically Ventilated Patient (2002)",
+   "display_title": "In-Hospital Transport of the Mechanically Ventilated Patient (2002)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/06.02.721.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2002,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-234eb14f515c",
+   "title": "Incentive Spirometry (2011)",
+   "display_title": "Incentive Spirometry (2011)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/10.11.1600.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2011,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-9232afb29de1",
+   "title": "Infant/Toddler Pulmonary Function Tests (2008)",
+   "display_title": "Infant/Toddler Pulmonary Function Tests (2008)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/07.08.0929.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2008,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-353afc915f6a",
+   "title": "Intermittent Positive Pressure Breathing (2003)",
+   "display_title": "Intermittent Positive Pressure Breathing (2003)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.03.0540.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2003,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-f3429403ad3a",
+   "title": "Long-Term Invasive Mechanical Ventilation in the Home (2007)",
+   "display_title": "Long-Term Invasive Mechanical Ventilation in the Home (2007)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/08.07.1056.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2007,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-5f112f19ec90",
+   "title": "Metabolic Measurement Using Indirect Calorimetry During Mechanical Ventilation (2004)",
+   "display_title": "Metabolic Measurement Using Indirect Calorimetry During Mechanical Ventilation (2004)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/09.04.1073.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2004,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-7578024e5e1b",
+   "title": "Nasotracheal Suctioning (2004)",
+   "display_title": "Nasotracheal Suctioning (2004)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/09.04.1080.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2004,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-2712863addea",
+   "title": "Oxygen Therapy for Adults in the Acute Care Facility (2002)",
+   "display_title": "Oxygen Therapy for Adults in the Acute Care Facility (2002)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/06.02.717.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2002,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "A later related AARC document is listed. Review the overlap; this catalog does not assert complete formal replacement."
+   ],
+   "related_source_ids": [
+    "source-3a5676d6f874"
+   ]
+  },
+  {
+   "id": "source-1599ba62690a",
+   "title": "Oxygen Therapy in the Home or Alternate Site Health Care Facility (2007)",
+   "display_title": "Oxygen Therapy in the Home or Alternate Site Health Care Facility (2007)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/08.07.1063.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2007,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-0211de5974aa",
+   "title": "Polysomnography (1995)",
+   "display_title": "Polysomnography (1995)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/12.05.1336.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1995,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Sleep"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-c14c3393ac21",
+   "title": "Providing Patient and Caregiver Training (2010)",
+   "display_title": "Providing Patient and Caregiver Training (2010)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/06.10.0765.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2010,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Education and professional practice"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "limited_educational_photocopy_permission",
+    "basis": "Section 15.5 permits noncommercial scientific or educational photocopies with credit to AARC and Respiratory Care. It does not establish a general electronic-app republication licence.",
+    "pdf_pages": [
+     4
+    ]
+   },
+   "review": {
+    "level": "availability_clause_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": true,
+    "pdf_pages": [
+     4
+    ]
+   },
+   "description": "Guidance concerning education of patients, families and caregivers. The availability section contains a specific noncommercial educational photocopy permission; broader electronic reuse is not established by this catalog.",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-e8a9778df979",
+   "title": "Removal of the Endotracheal Tube (2007)",
+   "display_title": "Removal of the Endotracheal Tube (2007)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/removal_of_endotracheal_tube.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2007,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-a98970f015e5",
+   "title": "Surfactant Replacement Therapy (2013)",
+   "display_title": "Surfactant Replacement Therapy (2013)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2025/03/walsh-et-al-2013-aarc-clinical-practice-guideline-surfactant-replacement-therapy-2013.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2013,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-b0dc4fab76b9",
+   "title": "Transcutaneous Blood Gas Monitoring for Neonatal & Pediatric Patients (2004)",
+   "display_title": "Transcutaneous Blood Gas Monitoring for Neonatal & Pediatric Patients (2004)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2025/03/2004-transcutaneous-blood-gas-monitoring-for-neonatal-pediatric-patients-2004-revision-update.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Expert Panel Reference-Based Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2004,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-b22a99999f23",
+   "title": "Assessing response to bronchodilator therapy at point of care (1995)",
+   "display_title": "Assessing response to bronchodilator therapy at point of care (1995)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/12.95.1300.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1995,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-282959c5a4fe",
+   "title": "Bland aerosol administration (2003)",
+   "display_title": "Bland aerosol administration (2003)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.03.529.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2003,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-ff2ae3216e1a",
+   "title": "Body plethysmography (2001)",
+   "display_title": "Body plethysmography (2001)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.01.507.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2001,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-10b57d1a5a17",
+   "title": "Defibrillation during resuscitation (1995)",
+   "display_title": "Defibrillation during resuscitation (1995)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/07.95.744.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1995,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-04f97804ebcb",
+   "title": "Directed cough (1993)",
+   "display_title": "Directed cough (1993)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.93.495.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1993,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-14b844f50f73",
+   "title": "Discharge planning for the respiratory care patient (1995)",
+   "display_title": "Discharge planning for the respiratory care patient (1995)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/12.95.1308.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1995,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-00c881160ed2",
+   "title": "Exercise testing for evaluation of hypoxemia and/or desaturation (2001)",
+   "display_title": "Exercise testing for evaluation of hypoxemia and/or desaturation (2001)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.01.514.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2001,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-4619b76af608",
+   "title": "Management of airway emergencies (1995)",
+   "display_title": "Management of airway emergencies (1995)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/07.95.749.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1995,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-c3d81a62af74",
+   "title": "Methacholine challenge testing (2001)",
+   "display_title": "Methacholine challenge testing (2001)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.01.523.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2001,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-a896a11e5ae1",
+   "title": "Neonatal time-triggered, pressure-limited, time-cycle mechanical ventilation (1994)",
+   "display_title": "Neonatal time-triggered, pressure-limited, time-cycle mechanical ventilation (1994)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/08.94.808.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1994,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-8c05ce4261b5",
+   "title": "Patient-ventilator system checks (1992)",
+   "display_title": "Patient-ventilator system checks (1992)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/08.92.882.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1992,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-542d307d0bbd",
+   "title": "Postural drainage therapy (1991)",
+   "display_title": "Postural drainage therapy (1991)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/12.91.1418.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1991,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-029f32b0644d",
+   "title": "Pulmonary rehabilitation (2002)",
+   "display_title": "Pulmonary rehabilitation (2002)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.02.617.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2002,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-52866d5d224f",
+   "title": "Pulse oximetry (1992)",
+   "display_title": "Pulse oximetry (1992)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/08.92.897.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1992,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-99441ae37037",
+   "title": "Resuscitation and defibrillation in the health care setting (2004)",
+   "display_title": "Resuscitation and defibrillation in the health care setting (2004)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/08.04.1085.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2004,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-5a5cfdf8e19c",
+   "title": "Sampling for arterial blood gas analysis (1992)",
+   "display_title": "Sampling for arterial blood gas analysis (1992)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/08.92.891.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1992,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-eaae609b8c20",
+   "title": "Selection of a device for delivery of aerosol to the lung parenchyma (1996)",
+   "display_title": "Selection of a device for delivery of aerosol to the lung parenchyma (1996)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/07.96.647.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1996,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-0208a80e5182",
+   "title": "Selection of an aerosol device for neonatal and pediatric patients (1995)",
+   "display_title": "Selection of an aerosol device for neonatal and pediatric patients (1995)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/12.95.1325.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1995,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-08c05b3f828c",
+   "title": "Selection of an oxygen delivery device for neonatal and pediatric patients (2002)",
+   "display_title": "Selection of an oxygen delivery device for neonatal and pediatric patients (2002)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/06.02.707.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2002,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Oxygen and blood gases"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-b27bbc4b6032",
+   "title": "Selection of device, administration of bronchodilator, and evaluation of response to therapy in mechanically ventilated patients (1999)",
+   "display_title": "Selection of device, administration of bronchodilator, and evaluation of response to therapy in mechanically ventilated patients (1999)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/01.99.105.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1999,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols",
+    "Ventilation and liberation"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-a7773781d052",
+   "title": "Single-breath carbon monoxide diffusing capacity (1999)",
+   "display_title": "Single-breath carbon monoxide diffusing capacity (1999)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.99.539.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1999,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-0d7faab99b7a",
+   "title": "Spirometry (1996)",
+   "display_title": "Spirometry (1996)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/07.96.629.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1996,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-7dcbd4f087b2",
+   "title": "Static lung volumes (2001)",
+   "display_title": "Static lung volumes (2001)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.01.537.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 2001,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-69b0ec1db359",
+   "title": "Suctioning of the patient in the home (1999)",
+   "display_title": "Suctioning of the patient in the home (1999)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/01.99.99.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1999,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-a83bfdb2c576",
+   "title": "Training the health care professional for the role of patient and caregiver education (1996)",
+   "display_title": "Training the health care professional for the role of patient and caregiver education (1996)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/07.96.654.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1996,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Education and professional practice"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-db4761a47dda",
+   "title": "Use of positive airway pressure adjuncts to bronchial hygiene therapy (1993)",
+   "display_title": "Use of positive airway pressure adjuncts to bronchial hygiene therapy (1993)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/05.93.516.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "AARC-Retired Guidelines",
+   "index_topic": null,
+   "source_kind": "clinical_practice_guideline",
+   "issuer": "AARC",
+   "listed_year": 1993,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-e8a49a4fa1fe",
+   "title": "ACCP Device Selection and Outcomes of Aerosol Therapy: Evidence-Based Guidelines (2005)",
+   "display_title": "ACCP Device Selection and Outcomes of Aerosol Therapy: Evidence-Based Guidelines (2005)",
+   "source_url": "http://journal.chestnet.org/article/S0012-3692(15)32410-7/fulltext",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Aerosol Therapy",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2005,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-0b3695471a67",
+   "title": "ASA Practice Guidelines for the Management of the Difficult Airway (2013)",
+   "display_title": "ASA Practice Guidelines for the Management of the Difficult Airway (2013)",
+   "source_url": "http://anesthesiology.pubs.asahq.org/article.aspx?articleid=1918684",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Airway Management",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2013,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-01e7f10c9cfb",
+   "title": "ATS/ESICM/SCCM Clinical Practice Guideline: Mechanical Ventilation in Adult Patients with Acute Respiratory Distress Syndrome",
+   "display_title": "ATS/ESICM/SCCM Clinical Practice Guideline: Mechanical Ventilation in Adult Patients with Acute Respiratory Distress Syndrome",
+   "source_url": "http://atsjournals.org/doi/full/10.1164/rccm.201703-0548ST",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "ARDS",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": null,
+   "year_basis": "not stated in catalog title",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-d6bfe0d97915",
+   "title": "NAEPP EPR-3 2007 Asthma Guidelines",
+   "display_title": "NAEPP EPR-3 2007 Asthma Guidelines",
+   "source_url": "http://nhlbi.nih.gov/guidelines/asthma/asthgdln.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Asthma",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2007,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-6aaf52d10abb",
+   "title": "AAP Clinical Practice Guideline: The Diagnosis, Management, and Prevention of Bronchiolitis (2014)",
+   "display_title": "AAP Clinical Practice Guideline: The Diagnosis, Management, and Prevention of Bronchiolitis (2014)",
+   "source_url": "http://pediatrics.aappublications.org/content/early/2014/10/21/peds.2014-2742",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Bronchiolitis",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2014,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-5964a812e9ae",
+   "title": "ATS CPG: Classification, Evaluation, and Management of Childhood Interstitial Lung Disease (chILD) in Infancy (2013)",
+   "display_title": "ATS CPG: Classification, Evaluation, and Management of Childhood Interstitial Lung Disease (chILD) in Infancy (2013)",
+   "source_url": "https://thoracic.org/statements/resources/pldd/cp-guideline-080113.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Childhood Interstitial Lung Disease in Infancy",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2013,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-eabe3516fa14",
+   "title": "CFF: Cystic Fibrosis Pulmonary Guidelines: Airway Clearance Therapies (2009)",
+   "display_title": "CFF: Cystic Fibrosis Pulmonary Guidelines: Airway Clearance Therapies (2009)",
+   "source_url": "http://rc.rcjournal.com/content/54/4/522.short",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Cystic Fibrosis",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2009,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Airways and suction"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-d090ee4cfd1d",
+   "title": "AHA ECC 2015 Guidelines for Cardiopulmonary Resuscitation and Emergency Cardiovascular Care",
+   "display_title": "AHA ECC 2015 Guidelines for Cardiopulmonary Resuscitation and Emergency Cardiovascular Care",
+   "source_url": "https://professional.heart.org/en/science-news/2015-aha-guidelines-update-for-cpr-and-ecc-science",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Emergency Cardiovascular Care",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2015,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-063ec04c25f6",
+   "title": "Recommendations for end-of-life care in the intensive care unit: A consensus statement by the American College of Critical Care Medicine (2008)",
+   "display_title": "Recommendations for end-of-life care in the intensive care unit: A consensus statement by the American College of Critical Care Medicine (2008)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2014/08/recommendations-for-eol-in-icu-accm.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "End-of-Life Care",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2008,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-253e289cb6f1",
+   "title": "ATS: An Official American Thoracic Society Clinical Practice Guideline: Pediatric Chronic Home Invasive Ventilation (2016)",
+   "display_title": "ATS: An Official American Thoracic Society Clinical Practice Guideline: Pediatric Chronic Home Invasive Ventilation (2016)",
+   "source_url": "https://thoracic.org/statements/resources/pldd/pediatric-chronic-home-invasive-ventilation.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Home Mechanical Ventilation",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2016,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-f8795571236d",
+   "title": "ATS Guideline: The Diagnosis of Intensive Care Unit-acquired Weakness in Adults (2014)",
+   "display_title": "ATS Guideline: The Diagnosis of Intensive Care Unit-acquired Weakness in Adults (2014)",
+   "source_url": "https://thoracic.org/statements/resources/cc/ICUAW_cpg.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "ICU-Aqcuired Weakness in Adults",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2014,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-e72883ab678e",
+   "title": "AHRQ Comparative Effectiveness Report Number 68: Noninvasive Positive-Pressure Ventilation (NPPV) for Acute Respiratory Failure (2012)",
+   "display_title": "AHRQ Comparative Effectiveness Report Number 68: Noninvasive Positive-Pressure Ventilation (NPPV) for Acute Respiratory Failure (2012)",
+   "source_url": "http://ncbi.nlm.nih.gov/books/NBK99179/pdf/TOC.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Non-Invasive Positive Pressure Ventilation",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2012,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-4a187df098a4",
+   "title": "AASM Clinical Guideline for the Evaluation, Management, and Long-Term Care of Obstructive Sleep Apnea in Adults (2009)",
+   "display_title": "AASM Clinical Guideline for the Evaluation, Management, and Long-Term Care of Obstructive Sleep Apnea in Adults (2009)",
+   "source_url": "http://aasmnet.org/Resources/clinicalguidelines/OSA_Adults.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Obstructive Sleep Apnea",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2009,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Sleep"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-813fe487add3",
+   "title": "NCP Clinical Practice Guidelines for Quality Palliative Care, 4th edition (2018)",
+   "display_title": "NCP Clinical Practice Guidelines for Quality Palliative Care, 4th edition (2018)",
+   "source_url": "https://nationalcoalitionhpc.org/ncp/",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Palliative Care",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2018,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-eb2c805fa06b",
+   "title": "ATS Guideline: Diagnosis, Risk Stratification, and Management of Pulmonary Hypertension of Sickle Cell Disease (2014)",
+   "display_title": "ATS Guideline: Diagnosis, Risk Stratification, and Management of Pulmonary Hypertension of Sickle Cell Disease (2014)",
+   "source_url": "https://thoracic.org/statements/resources/pvd/sickle-cell-disease.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Arterial Hypertension",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2014,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-4f5e16ca60c6",
+   "title": "AHA/ATS Guideline: Pediatric Pulmonary Hypertension",
+   "display_title": "AHA/ATS Guideline: Pediatric Pulmonary Hypertension",
+   "source_url": "https://thoracic.org/statements/resources/pldd/pediatric-pulmonary-hypertension.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Arterial Hypertension",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": null,
+   "year_basis": "not stated in catalog title",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-6299e9621b4e",
+   "title": "ACCP Evidence-Based Clinical Practice Guidelines for Medical Therapy for Pulmonary Arterial Hypertension (2007)",
+   "display_title": "ACCP Evidence-Based Clinical Practice Guidelines for Medical Therapy for Pulmonary Arterial Hypertension (2007)",
+   "source_url": "http://journal.chestnet.org/article/S0012-3692(15)37531-0/fulltext",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Arterial Hypertension",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2007,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-14165f55934f",
+   "title": "ATS/ERS Standardization of Spirometry (2019)",
+   "display_title": "ATS/ERS Standardization of Spirometry (2019)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2026/06/ers-ats-standardization-of-spirometry.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Function Testing",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2019,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-19d0cdec34c2",
+   "title": "ATS/ERS Standardisation of the Measurement of Lung Volumes (2023)",
+   "display_title": "ATS/ERS Standardisation of the Measurement of Lung Volumes (2023)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2026/06/ers-ats-technical-standard-for-lung-volumes.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Function Testing",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2023,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-0017677348e2",
+   "title": "ERS/ATS Standards for Single-Breath Carbon Monoxide Uptake in the Lung (2017)",
+   "display_title": "ERS/ATS Standards for Single-Breath Carbon Monoxide Uptake in the Lung (2017)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2026/06/ers-ats-standards-for-dlco.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Function Testing",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2017,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-66a0f9b3643d",
+   "title": "ERS/ATS Technical Standard on Interpretive Strategies for Routine Lung Function Tests (2022)",
+   "display_title": "ERS/ATS Technical Standard on Interpretive Strategies for Routine Lung Function Tests (2022)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2026/06/ers-ats-pft-interpretation-statement.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Function Testing",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2022,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-fbfe70f829ef",
+   "title": "ATS/ACCP Statement on Cardiopulmonary Exercise Testing (2003)",
+   "display_title": "ATS/ACCP Statement on Cardiopulmonary Exercise Testing (2003)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2026/06/ats-accp-statement-on-cpet.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Function Testing",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2003,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-9da71ec9b803",
+   "title": "ERS Statement on Standardisation of Cardiopulmonary Exercise Testing in Chronic Lung Diseases (2019)",
+   "display_title": "ERS Statement on Standardisation of Cardiopulmonary Exercise Testing in Chronic Lung Diseases (2019)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2026/06/ers-statement-on-standardisation-of-cpet-in-chronic-lung-diseases.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Function Testing",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2019,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-14920c8878d9",
+   "title": "ATS Field Walking Tests in Chronic Respiratory Disease (2014)",
+   "display_title": "ATS Field Walking Tests in Chronic Respiratory Disease (2014)",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2026/06/ers-ats-technical-standard-for-field-walking-tests.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Function Testing",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2014,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-72cd3997e502",
+   "title": "American College of Chest Physicians/American Association of Cardiovascular and Pulmonary Rehabilitation Evidence-Based Clinical Practice Guidelines (2007)",
+   "display_title": "American College of Chest Physicians/American Association of Cardiovascular and Pulmonary Rehabilitation Evidence-Based Clinical Practice Guidelines (2007)",
+   "source_url": "http://journal.chestnet.org/article/S0012-3692(16)30214-8/fulltext",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Pulmonary Rehabilitation",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2007,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Lung function and rehabilitation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-7bb565dc5a2f",
+   "title": "Diagnosis and treatment of respiratory illness in children and adults (2013)",
+   "display_title": "Diagnosis and treatment of respiratory illness in children and adults (2013)",
+   "source_url": "https://icsi.org/guidelines__more/catalog_guidelines_and_more/catalog_guidelines/catalog_respiratory_guidelines/respiratory_illness",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Respiratory Illness: Diagnosis and Treatment",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2013,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-e97d8ad41e9e",
+   "title": "Smoking Cessation Guidelines from the Surgeon General",
+   "display_title": "Smoking Cessation Guidelines from the Surgeon General",
+   "source_url": "https://hhs.gov/surgeongeneral/reports-and-publications/tobacco/2020-cessation-sgr-factsheet-key-findings/index.html",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Smoking Cessation",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": null,
+   "year_basis": "not stated in catalog title",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-5e3a69d39f1b",
+   "title": "SCCM Guidelines for the Inter- and Intrahospital Transport of Critically Ill Patients (2004)",
+   "display_title": "SCCM Guidelines for the Inter- and Intrahospital Transport of Critically Ill Patients (2004)",
+   "source_url": "https://journals.lww.com/ccmjournal/Fulltext/2004/01000/Guidelines_for_the_inter__and_intrahospital.38.aspx",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Transport of Critically Ill Patients",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2004,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Other respiratory care"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-ff67c775dc0c",
+   "title": "Centers for Disease Control Device-Associated module: Ventilator Associated Event Protocol (2013)",
+   "display_title": "Centers for Disease Control Device-Associated module: Ventilator Associated Event Protocol (2013)",
+   "source_url": "https://cdc.gov/nhsn/PDFs/pscManual/10-VAE_FINAL.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Ventilator Associated Pneumonia/Ventilator Associated Events",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2013,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-d97309df8471",
+   "title": "Institute for Clinical Systems Improvement: Prevention of Ventilator Associated Pneumonia (2011)",
+   "display_title": "Institute for Clinical Systems Improvement: Prevention of Ventilator Associated Pneumonia (2011)",
+   "source_url": "https://icsi.org/_asset/y24ruh/VAP-Interactive1111.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Ventilator Associated Pneumonia/Ventilator Associated Events",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": 2011,
+   "year_basis": "year printed in catalog title; not inferred from URL upload date",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-444ac4b2a0ff",
+   "title": "ATS CPG: Diagnostic Evaluation of Infants with Recurrent or Persistent Wheezing",
+   "display_title": "ATS CPG: Diagnostic Evaluation of Infants with Recurrent or Persistent Wheezing",
+   "source_url": "http://atsjournals.org/doi/pdf/10.1164/rccm.201604-0694ST",
+   "discovered_at_url": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+   "index_category": "Guidelines From Other Organizations",
+   "index_topic": "Wheezing in Infants",
+   "source_kind": "external_guideline_or_standard",
+   "issuer": "See linked issuing organization",
+   "listed_year": null,
+   "year_basis": "not stated in catalog title",
+   "topics": [
+    "Asthma and aerosols"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Listed by AARC; publisher version, continued validity and individual reuse terms still need checking."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-0838d72b1a3f",
+   "title": "A Process Manual for Clinical Practice Guidelines Development",
+   "display_title": "A Process Manual for Clinical Practice Guidelines Development",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2023/01/aarc-clinical-practice-guidelines-development.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/aarc-issue-papers-position-statements-and-guidance-documents/",
+   "index_category": "Current Guidance Documents",
+   "index_topic": null,
+   "source_kind": "professional_guidance",
+   "issuer": "AARC",
+   "listed_year": null,
+   "year_basis": "not stated in catalog title",
+   "topics": [
+    "Education and professional practice"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-fc276ef4b0d7",
+   "title": "Guidance Document Additional Ventilators May Pose a Risk to Hospital Gas Systems",
+   "display_title": "Additional Ventilators May Pose a Risk to Hospital Gas Systems",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2020/04/guidance-document-additional-ventilators-may-pose-a-risk-to-hospital-gas-systems.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/aarc-issue-papers-position-statements-and-guidance-documents/",
+   "index_category": "Current Guidance Documents",
+   "index_topic": null,
+   "source_kind": "professional_guidance",
+   "issuer": "AARC",
+   "listed_year": null,
+   "year_basis": "not stated in catalog title",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-d97eb1fa64ee",
+   "title": "Guidance Document Regarding RRT Entry to Licensure",
+   "display_title": "Regarding RRT Entry to Licensure",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2017/03/rrt-entry-to-licensure.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/aarc-issue-papers-position-statements-and-guidance-documents/",
+   "index_category": "Current Guidance Documents",
+   "index_topic": null,
+   "source_kind": "professional_guidance",
+   "issuer": "AARC",
+   "listed_year": null,
+   "year_basis": "not stated in catalog title",
+   "topics": [
+    "Education and professional practice"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-82aa5cbca52c",
+   "title": "Guidance Documents Best Practices in Respiratory Care Productivity and Staffing",
+   "display_title": "Best Practices in Respiratory Care Productivity and Staffing",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2018/07/guidance_Best_Practices_Productivity_Staffing.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/aarc-issue-papers-position-statements-and-guidance-documents/",
+   "index_category": "Current Guidance Documents",
+   "index_topic": null,
+   "source_kind": "professional_guidance",
+   "issuer": "AARC",
+   "listed_year": null,
+   "year_basis": "not stated in catalog title",
+   "topics": [
+    "Education and professional practice"
+   ],
+   "retired": false,
+   "listed_status": "listed_in_non_retired_section",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-f68e6ac7788e",
+   "title": "Guidance Document on Scope of Practice",
+   "display_title": "on Scope of Practice",
+   "source_url": "https://www.aarc.org/wp-content/uploads/2017/03/guidance_scope_of_practice.pdf",
+   "discovered_at_url": "https://www.aarc.org/resource/aarc-issue-papers-position-statements-and-guidance-documents/",
+   "index_category": "Retired Guidance Documents",
+   "index_topic": null,
+   "source_kind": "professional_guidance",
+   "issuer": "AARC",
+   "listed_year": null,
+   "year_basis": "not stated in catalog title",
+   "topics": [
+    "Education and professional practice"
+   ],
+   "retired": true,
+   "listed_status": "retired_by_index",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "No app-redistribution licence established in this review. Public access is not a reuse licence."
+   },
+   "review": {
+    "level": "catalog_metadata_only",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "",
+   "notes": [
+    "Historical reference. Excluded from normal browsing and clinical answer selection."
+   ],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-73817c2a7044",
+   "title": "NBRC public resource library",
+   "display_title": "NBRC public resource library",
+   "source_url": "https://www.nbrc.org/resources-2/document-library/",
+   "discovered_at_url": "https://www.nbrc.org/resources-2/document-library/",
+   "index_category": "NBRC references",
+   "index_topic": null,
+   "source_kind": "credential_resource",
+   "issuer": "NBRC",
+   "listed_year": null,
+   "year_basis": "not asserted",
+   "topics": [
+    "Exams and credential maintenance"
+   ],
+   "retired": false,
+   "listed_status": "official_source_link",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "NBRC general terms restrict copying and distribution unless separately permitted.",
+    "source_url": "https://www.nbrc.org/terms-of-use/"
+   },
+   "review": {
+    "level": "resource_or_article_landing_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "Public index of credentialing documents, examination information and technical articles. Its contents should not be labelled a hospital protocol collection.",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-2c0dda3544c8",
+   "title": "NBRC credential maintenance and practitioner services",
+   "display_title": "NBRC credential maintenance and practitioner services",
+   "source_url": "https://www.nbrc.org/credentialed-practitioners/",
+   "discovered_at_url": "https://www.nbrc.org/resources-2/document-library/",
+   "index_category": "NBRC references",
+   "index_topic": null,
+   "source_kind": "credential_resource",
+   "issuer": "NBRC",
+   "listed_year": null,
+   "year_basis": "not asserted",
+   "topics": [
+    "Exams and credential maintenance"
+   ],
+   "retired": false,
+   "listed_status": "official_source_link",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "NBRC general terms restrict copying and distribution unless separately permitted.",
+    "source_url": "https://www.nbrc.org/terms-of-use/"
+   },
+   "review": {
+    "level": "resource_or_article_landing_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "Official information about maintaining credentials and accessing practitioner services.",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-c2c8c27638ea",
+   "title": "NBRC candidate handbook",
+   "display_title": "NBRC candidate handbook",
+   "source_url": "https://www.nbrc.org/candidate-handbook",
+   "discovered_at_url": "https://www.nbrc.org/resources-2/document-library/",
+   "index_category": "NBRC references",
+   "index_topic": null,
+   "source_kind": "credential_resource",
+   "issuer": "NBRC",
+   "listed_year": null,
+   "year_basis": "not asserted",
+   "topics": [
+    "Exams and credential maintenance"
+   ],
+   "retired": false,
+   "listed_status": "official_source_link",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "NBRC general terms restrict copying and distribution unless separately permitted.",
+    "source_url": "https://www.nbrc.org/terms-of-use/"
+   },
+   "review": {
+    "level": "resource_or_article_landing_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "Examination and candidate information. This is not a bedside clinical protocol.",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-3d63f58612c8",
+   "title": "NBRC credential-maintenance brochure",
+   "display_title": "NBRC credential-maintenance brochure",
+   "source_url": "https://www.nbrc.org/CMP-brochure",
+   "discovered_at_url": "https://www.nbrc.org/resources-2/document-library/",
+   "index_category": "NBRC references",
+   "index_topic": null,
+   "source_kind": "credential_resource",
+   "issuer": "NBRC",
+   "listed_year": null,
+   "year_basis": "not asserted",
+   "topics": [
+    "Exams and credential maintenance"
+   ],
+   "retired": false,
+   "listed_status": "official_source_link",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "NBRC general terms restrict copying and distribution unless separately permitted.",
+    "source_url": "https://www.nbrc.org/terms-of-use/"
+   },
+   "review": {
+    "level": "resource_or_article_landing_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "Credential-maintenance information. Use the current official copy when checking an individual requirement.",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-12793699c242",
+   "title": "NBRC announcements",
+   "display_title": "NBRC announcements",
+   "source_url": "https://www.nbrc.org/news/",
+   "discovered_at_url": "https://www.nbrc.org/resources-2/document-library/",
+   "index_category": "NBRC references",
+   "index_topic": null,
+   "source_kind": "professional_news",
+   "issuer": "NBRC",
+   "listed_year": null,
+   "year_basis": "not asserted",
+   "topics": [
+    "Exams and credential maintenance"
+   ],
+   "retired": false,
+   "listed_status": "official_source_link",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "NBRC general terms restrict copying and distribution unless separately permitted.",
+    "source_url": "https://www.nbrc.org/terms-of-use/"
+   },
+   "review": {
+    "level": "resource_or_article_landing_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "Official announcements, including examination and credentialing updates. News is not automatically clinical policy.",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-0788166e62f1",
+   "title": "NBRC examination transition for 2027",
+   "display_title": "NBRC examination transition for 2027",
+   "source_url": "https://www.nbrc.org/examination-changes-coming-in-2027-new-details-added/",
+   "discovered_at_url": "https://www.nbrc.org/resources-2/document-library/",
+   "index_category": "NBRC references",
+   "index_topic": null,
+   "source_kind": "credential_resource",
+   "issuer": "NBRC",
+   "listed_year": null,
+   "year_basis": "not asserted",
+   "topics": [
+    "Exams and credential maintenance"
+   ],
+   "retired": false,
+   "listed_status": "official_source_link",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "NBRC general terms restrict copying and distribution unless separately permitted.",
+    "source_url": "https://www.nbrc.org/terms-of-use/"
+   },
+   "review": {
+    "level": "resource_or_article_landing_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": false
+   },
+   "description": "Official explanation of the examination transition and related candidate questions. It does not grant patient-care authority.",
+   "notes": [],
+   "related_source_ids": []
+  },
+  {
+   "id": "source-6fa792a65136",
+   "title": "Setting tidal volume: NBRC-hosted technical article",
+   "display_title": "Setting tidal volume: NBRC-hosted technical article",
+   "source_url": "https://www.nbrc.org/wp-content/uploads/2017/07/Setting-the-Tidal-Volume.pdf",
+   "discovered_at_url": "https://www.nbrc.org/resources-2/document-library/",
+   "index_category": "NBRC references",
+   "index_topic": null,
+   "source_kind": "educational_technical_article",
+   "issuer": "NBRC (technical article authors identified in original)",
+   "listed_year": null,
+   "year_basis": "not asserted",
+   "topics": [
+    "Ventilation and liberation"
+   ],
+   "retired": false,
+   "listed_status": "official_source_link",
+   "currency_verified": false,
+   "local_adoption": null,
+   "access_mode": "official_link",
+   "full_text_included": false,
+   "clinical_answer_ready": false,
+   "rights": {
+    "status": "not_cleared_for_full_text_redistribution",
+    "basis": "NBRC general terms restrict copying and distribution unless separately permitted.",
+    "source_url": "https://www.nbrc.org/terms-of-use/"
+   },
+   "review": {
+    "level": "resource_or_article_landing_read",
+    "reviewed_at": "2026-11-12",
+    "source_text_reviewed": true
+   },
+   "description": "An educational article explaining how examination committees approached lung-protective ventilation evidence. Its hosting location does not turn it into a current institutional order set.",
+   "notes": [],
+   "related_source_ids": []
+  }
+ ]
+}

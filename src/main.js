@@ -15,7 +15,7 @@ import { readPdf } from './pdftext.js';
 import { emptyLibrary, prepareLibrary, addRevision, checkExtraction, supplyText, markFigure, activate, withdraw, toggleMark, revisionOf, searchLibrary } from './protocols.js';
 import { addMapping, reviewBundle, markMappingsReviewed } from './bundles.js';
 import { protocolTopics } from './pathways.js';
-import { libraryView, familyView, addDialog, landingRevision } from './protocol-view.js';
+import { libraryView, familyView, addDialog, landingRevision, referencesView } from './protocol-view.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
 const publicDemo = __PUBLIC_DEMO__;
@@ -133,7 +133,7 @@ const checkChange = (details, exceptId = null) => {
 const noticeKey = 'department-hub-notice-v3';
 let noticeSeen = loadState(noticeKey, null);
 let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: noticeSeen ? null : { type:'notice' }, pending: loadDraft(), busy: null, notice: '', flash: '',
-  protocols: { family:null, revision:null, pane:'both', cite:null, query:'', withdrawing:false, fromAsk:false } };
+  protocols: { family:null, revision:null, pane:'both', cite:null, query:'', withdrawing:false, fromAsk:false, shelf:null, refQuery:'', refSection:'', refRetired:false } };
 // Text size is a setting of this device, not of the workspace. It scales every rem in sizes.css.
 const TEXT_SIZES = [1, 1.15, 1.3], TEXT_NAMES = ['normal', 'large', 'larger'], textKey = 'department-hub-text-size';
 let textSize = Math.max(0, TEXT_SIZES.indexOf(Number(loadState(textKey, 1))));
@@ -152,7 +152,7 @@ function countPress(action, value) {
     localStorage.setItem(usageKey, JSON.stringify(usage));
   } catch { /* counting must never get in the way */ }
 }
-const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory', 'tab:protocols':'Opened Protocols',
+const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory', 'tab:protocols':'Opened Protocols', 'reference-shelf':'Opened the professional references',
   shift:'Opened a shift', options:'Looked for ways off a shift', 'options-loops':'Looked for three-person loops', propose:'Proposed an exchange', 'exchange-agree':'Agreed to an exchange', 'exchange-decline':'Declined an exchange',
   'form:offer':'Said they could pick up a shift', 'form:trade-rules':'Changed the trade rules', 'ask-next':'Pressed a next-step question', 'ask-yes':'Said an answer helped', 'ask-no':'Said an answer did not help', 'ask-send':'Sent a question to the record keeper', verify:'Checked the receipts', 'notice-ok':'Acknowledged the notice', notice:'Opened the notice', 'mark-copy':'Copied the latest fingerprint', 'form:mark':'Looked for an earlier fingerprint', 'form:teach':'Taught an answer', 'ask-open':'Opened Ask', 'ask-wrong':'Said what was wrong with an answer', 'form:reading-try':'Tried a rewording', 'reading-save':'Saved a reading correction', 'form:passage-find':'Looked for a passage', 'passage-pick':'Chose a passage for a question', 'correction-remove':'Removed a correction', 'teach-copy':'Copied the waiting questions', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
@@ -170,7 +170,7 @@ function markBoardSeen(value = new Date().toISOString()) {
 }
 const askWorld = () => ({ today: localToday(), now:new Date().toISOString(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
   documents: state.documents, releases: state.releases, requests: creditRequests(), trade: { ...tradeWorld(), offers: state.offers }, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt,
-  answers: state.answers, learned: state.learned, corrections: state.corrections, last: ui.askContext, versions:sourceVersions, protocols: state.protocols });
+  answers: state.answers, learned: state.learned, corrections: state.corrections, last: ui.askContext, versions:sourceVersions, protocols: state.protocols, references: referenceList?.records || [], referencesCollected: referenceList?.collectedOn });
 function currentAsk(dialog = ui.dialog) {
   const signs = patientSigns(dialog?.q || '');
   if (signs.length) return { title:'Remove patient details before asking.', lines:['The text screen saw ' + patientShown(dialog.q) + '. No records were searched.', ...(signs.some(sign => sign.startsWith('a long number')) ? [LONG_NUMBER_HELP] : [])],
@@ -556,11 +556,15 @@ const loadPdfjs = () => pdfjsReady ||= (async () => {
   return pdfjs;
 })();
 const viewTools = { h, button, valueAttr };
+// Professional references: titles and links only, shipped with the app and loaded after it starts. No text of any guideline is held.
+let referenceList = null;
+const loadReferences = () => import('./reference/respiratory-sources.json').then(module => { referenceList = module.default; if (ui.tab === 'protocols') render(); }).catch(() => {});
 const shownRevision = () => ui.protocols.family ? revisionOf(state.protocols, ui.protocols.revision) || landingRevision(state.protocols, ui.protocols.family, localToday()) : null;
 function protocolsScreen() {
   const view = ui.protocols, today = localToday();
+  if (view.shelf === 'references' && referenceList) return referencesView({ list:referenceList, query:view.refQuery, section:view.refSection, retired:view.refRetired, today }, viewTools);
   if (!view.family) return libraryView({ library:state.protocols, today, documents:state.documents, query:view.query, results:view.query ? searchLibrary(state.protocols, view.query, today) : [], keeper:isKeeper(), demo:publicDemo,
-    sampleNext:['1', '2'].find(label => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + label + '.pdf')) || null }, viewTools);
+    sampleNext:['1', '2'].find(label => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + label + '.pdf')) || null, references:referenceList }, viewTools);
   const revision = shownRevision();
   return familyView({ library:state.protocols, today, familyId:view.family, revisionId:revision?.id, pane:view.pane, cite:view.cite, keeper:isKeeper(), held:revision ? originals.get(revision.digest) : undefined,
     sampleMapping:Boolean(revision && SAMPLE_PROTOCOL.test(revision.file.name)), withdrawing:view.withdrawing, fromAsk:view.fromAsk && Boolean(ui.lastAsk),
@@ -1011,7 +1015,7 @@ function dialogMarkup() {
     const result = q ? currentAsk() : null;
     const canRemember = result?.taught || (ui.dialog.opened?.startsWith('doc|') && result?.items.some(entry => entry.go === ui.dialog.opened));
     const item = entry => '<div class="ask-item' + (entry.branch && !entry.go ? ' branch' : '') + '"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h((entry.go?.startsWith('doc|') ? 'Legacy document, not a reviewed protocol · ' : '') + entry.sub) + '</small>' : '') + '</div>' +
-      (entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
+      (entry.href ? '<a class="secondary link-button" href="' + h(entry.href) + '" target="_blank" rel="noopener noreferrer">Open official source ↗</a>' : entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
     return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
       '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
       (result ? '<div class="ask-answer" role="status">' + (result.partial ? '<p class="fair-line"><strong>Partial answer.</strong> ' + h(result.partial) + '</p>' : '') + (result.read || result.understood ? '<p class="subtle">' + h([result.read ? 'Read as: “' + result.read + '”' + (result.corrected?.kind === 'reading' ? ', a correction by ' + result.corrected.by + ' as record keeper' : '') : '',
@@ -1257,6 +1261,9 @@ app.addEventListener('change', event => {
   }
   if (event.target.id === 'photos') void importFiles([...event.target.files]).catch(fail);
   if (event.target.id === 'backup-file' && event.target.files[0]) void readBackup(event.target.files[0]).catch(fail);
+  // The collection and the retired box take effect at once, with whatever is typed in the search box.
+  if (event.target.id === 'reference-section' || event.target.id === 'reference-retired') { const form = event.target.closest('form'), data = Object.fromEntries(new FormData(form));
+    ui.protocols = { ...ui.protocols, refQuery:(data.q || '').trim().slice(0, 120), refSection:data.section || '', refRetired:Boolean(data.retired) }; render(); }
   if (event.target.id === 'protocol-mapping-file' && event.target.files[0]) void addMappingFile(event.target.files[0]).then(render).catch(fail);
   if (event.target.id === 'protocol-original-file' && event.target.files[0]) void restoreOriginal(event.target.files[0]).then(render).catch(fail);
 });
@@ -1376,6 +1383,7 @@ async function act({action, value, kind}) {
       if (ui.dialog?.type === 'ask' && ui.lastAsk) ui.lastAsk = { ...ui.lastAsk, opened:value };      // the one they chose to read is the one a yes is about
       if (kind === 'doc') { ui.dialog = { type:'doc', id:first, at:Number(second) }; ui.scrollTo = '#doc-mark'; break; }
       if (kind === 'note') { ui.dialog = { type:'note', id:first }; break; }
+      if (kind === 'refs') { ui.dialog = null; ui.tab = 'protocols'; ui.protocols = { ...ui.protocols, shelf:'references', refQuery:decodeURIComponent(first || ''), refSection:'', refRetired:second === 'retired', fromAsk:false }; ui.scrollTo = '.content'; break; }
       // The exact revision cited, at the cited place, even when a later revision has since replaced it.
       if (kind === 'protocol' || kind === 'protocol-family') {
         const revision = kind === 'protocol' ? revisionOf(state.protocols, first) : landingRevision(state.protocols, first, localToday());
@@ -1392,7 +1400,8 @@ async function act({action, value, kind}) {
       else if (kind === 'people' || kind === 'fairness') ui.tab = kind;
       break;
     }
-    case 'protocol-home': ui.protocols = { ...ui.protocols, family:null, revision:null, cite:null, withdrawing:false, fromAsk:false }; break;
+    case 'protocol-home': ui.protocols = { ...ui.protocols, family:null, revision:null, cite:null, withdrawing:false, fromAsk:false, shelf:null }; break;
+    case 'reference-shelf': ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'references' }; ui.scrollTo = '.content'; break;
     case 'protocol-open': ui.protocols = { ...ui.protocols, family:value, revision:landingRevision(state.protocols, value, localToday())?.id || null, cite:null, withdrawing:false, fromAsk:false }; ui.scrollTo = '.content'; break;
     case 'protocol-revision': ui.protocols = { ...ui.protocols, revision:value, cite:null, withdrawing:false }; break;
     case 'protocol-pane': ui.protocols = { ...ui.protocols, pane:['both', 'original', 'reading', 'answers'].includes(value) ? value : 'both' }; break;
@@ -2124,6 +2133,7 @@ async function submit(form) {
       break;
     }
     case 'protocol-search': ui.protocols = { ...ui.protocols, query:(data.q || '').trim().slice(0, 120) }; break;
+    case 'reference-search': ui.protocols = { ...ui.protocols, refQuery:(data.q || '').trim().slice(0, 120), refSection:data.section || '', refRetired:Boolean(data.retired) }; break;
     case 'protocol-add': {
       keeperOnly();
       const file = form.querySelector('#protocol-file')?.files[0];
@@ -2159,3 +2169,4 @@ async function submit(form) {
 sourceVersions = await versionsFor(state.documents);
 render();
 void hydrateMedia();
+void loadReferences();
