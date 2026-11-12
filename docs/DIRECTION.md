@@ -2,13 +2,15 @@
 
 Recorded 2026-11-10 from the owner's conversation with Claude. Read this after `CLAUDE-HANDOFF.md`. Where the two differ, this file is newer.
 
+**Current clarification — decided:** passkey sign-in with no email typed at sign-in; members enter their own phone/email information; no app-sent email/text is authorized here. **Open:** email's purpose and collection requirements, and whether to add app-sent notifications. `EMAIL-OPTIONS.md` records the alternatives without selecting one. Earlier no-email-collection language was an incorrect inference, not a ban to preserve. Historical implementation and validation entries below remain historical; this clarification adds no runtime feature.
+
 ## What the owner has decided
 
 ### Current rollout scope, clarified 2026-11-11
 
 The owner plans to introduce the app through his own department, invite willing coworkers, ask for patience and feedback, and improve it around their daily use. He expects to pay for a server in a few weeks and wants preparation done beforehand.
 
-- One private workspace per department, accessible only to approved department members. Each person has their own invited identity. The owner later explicitly ruled out email/password sign-in; see `docs/SIGN-IN.md`. This is not a shared department login.
+- One private workspace per department, accessible only to approved department members. Each person has their own invited identity. Sign-in uses a passkey with no typed email or Department Hub password; other email uses remain open in `docs/EMAIL-OPTIONS.md`. This is not a shared department login.
 - One readily available place for the department's schedule, updates, due dates, meetings and conversations. Avoid proliferating channels and group-selection buttons.
 - Information ordinarily sent through email should be easier to consume here. Automatic mailbox integration and replacing email are not part of this direction.
 - Departments remain isolated. Another job, cross-department membership, a workspace switcher and broader organizational administration are outside the current scope.
@@ -358,13 +360,13 @@ Validation: 124 app tests, two launcher tests, both builds, manifest verificatio
 
 The shared milestone is defined by access boundaries as well as successful synchronization. Tests now specify two synthetic departments, live authenticated session controls, cross-department read/search/write/download denial, private conversation and attachment participation, custodian-only named fairness/exports, resistance to client-supplied identity hints, and immediate membership/role revocation. `docs/SHARED-CONTRACT.md` defines the real HTTP contract. With no shared backend or fixture seeder available, `npm run test:shared` exits nonzero as blocked. Passing harness checks is not a passing backend gate.
 
-This earlier step retained an inferred email/password plan. The owner subsequently explicitly rejected that requirement; the passwordless direction below supersedes it. The permission suite itself uses authenticated fixture sessions without selecting an account provider. No Mac update or runtime feature change was part of this work.
+This earlier step retained an inferred email/password plan. Passkey sign-in with no typed email or Department Hub password supersedes that plan; it does not prohibit collecting email for another purpose. The permission suite itself uses authenticated fixture sessions without selecting an account provider. No Mac update or runtime feature change was part of this work.
 
 Validation: the 124 existing app tests plus four harness checks pass, as do the two launcher tests, both builds, artifact verification and the simulated interface check. Harness checks prove that a missing backend exits blocked and a live deny-everything HTTP server fails its legitimate-access controls. These are checks of the harness and the existing app, not a passing authorization suite. The real shared gate remains blocked, and the required backend CI job is still unbuilt.
 
 ## Passwordless joining and optional contact numbers
 
-The owner explicitly requires no email or Department Hub password for sign-in and suggested a PIN and optional facial recognition. The proposed implementation uses a member-bound invitation and passkey, unlocked by supported device biometrics or its existing PIN/passcode. An app-specific PIN scheme is not selected. The app would not receive biometric images or the device PIN. `docs/SIGN-IN.md` records the flow, same-identity recovery and remaining implementation; no accounts are built yet.
+Decided: sign-in uses a passkey without typed email or a Department Hub password. Members enter their own phone/email information. Open: email as optional contact information, an administrator-only recovery-confirmation channel, or two separate fields for both; none is selected. The proposed enrollment implementation uses a member-bound invitation and passkey, unlocked by supported device biometrics or its existing PIN/passcode. An app-specific PIN scheme is not selected. The app would not receive biometric images or the device PIN. `docs/SIGN-IN.md` records the unbuilt flow; `docs/EMAIL-OPTIONS.md` separates the open email alternatives.
 
 The shared permission contract now seeds explicitly shared, explicitly withheld, default-private and initially missing phone values. It checks that owners can still edit their own private number, while coworkers, administrators and custodians cannot retrieve it through directory views, search, Ask or directory export. Adding a number does not opt into sharing, and withdrawing sharing must invalidate already-used lookup paths on subsequent requests. The backend gate remains blocked until an actual server and fixture seeder exist.
 

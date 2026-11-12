@@ -2,6 +2,8 @@
 
 Status: contract tests written; shared backend, fixture seeder, sign-in and synchronization are not implemented. No access-control claim is established by this document. Version 15 on the Mac is unchanged.
 
+**Decided clarification:** sign-in uses a passkey with no email typed at sign-in; members enter their own phone/email information. **Open:** email as optional contact information, an administrator-only recovery-confirmation channel, or separate fields for both. Nothing here selects one, and this contract covers phone only.
+
 ## Run against the actual backend
 
 Start an isolated server and seed only synthetic records, then have that server's test setup write a fresh manifest following `tests/shared/fixture.example.json`. Keep the generated manifest and its credentials in ignored `local-data/`; never use a coworker's session, schedule or contact data. Reset the fixture for every run because the suite creates/deletes a control post, records one participant acceptance, adds/changes contact sharing, removes a custodian role and revokes membership.
@@ -14,7 +16,7 @@ Without that environment variable the command exits 2 and says the gate has **no
 
 The tests make real HTTP requests using fresh authenticated sessions. The manifest may supply an Authorization header or Cookie header for each session. It cannot supply trusted person/department/role headers. This deliberately leaves the sign-in mechanism open while testing the server's treatment of authenticated identity. When account enrollment and the chosen authentication integration exist, rerun using credentials from that same implementation; a test-only identity adapter is not evidence that real sign-in is correct. Fixture setup must not become a public production endpoint or bypass normal request authorization.
 
-The owner has ruled out email/password sign-in. The proposed invite/passkey flow is in `docs/SIGN-IN.md`; no email address, password or biometric data is required in this test fixture. Sessions produced by the eventual passwordless flow must satisfy the same contract.
+Sign-in uses a passkey without typing email or a Department Hub password. That does not prohibit email information for another purpose. The proposed enrollment flow is in `docs/SIGN-IN.md`; fixture sessions authenticate with existing test tokens, not contact addresses or biometric data. Sessions produced by the eventual passkey flow must satisfy the same contract.
 
 ## Seed and response contract
 
