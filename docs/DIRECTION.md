@@ -6,6 +6,15 @@ Recorded 2026-11-10 from the owner's conversation with Claude. Read this after `
 
 ## What the owner has decided
 
+### Protocol answers are a central purpose, decided 2026-11-12
+
+Immediate, source-backed answers from the department's actual protocols are a central purpose of Department Hub, not
+an extra on Ask. A dedicated Protocols section should let people browse the same material Ask uses, and every answer
+should open its exact source. The owner marked this very important. `docs/PROTOCOLS.md` records the decision, what
+the code does today, the five things to build, the rules that hold, two questions to settle first, and the first
+milestone: one complete protocol working end to end. None of it is built beyond the existing Documents list and
+passage search.
+
 ### Current rollout scope, clarified 2026-11-11
 
 The owner plans to introduce the app through his own department, invite willing coworkers, ask for patience and feedback, and improve it around their daily use. He expects to pay for a server in a few weeks and wants preparation done beforehand.
