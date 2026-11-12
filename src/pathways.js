@@ -78,6 +78,7 @@ export function protocolAnswer(question, world) {
   const candidates = library.families.map(family => {
     const now = applicable(library, family.id, today), revisions = historyOf(library, family.id).filter(revision => revision.state !== 'withdrawn');
     const source = now.revision, topics = now.answerable ? source.topics || [] : [];
+    // A protocol held with nothing mapped to it yet is recognised by two of its own words ("bellows drill"), not one ("fire drill").
     // Every wording any held revision was mapped with, used only to recognise that a question is about this protocol
     // when no revision can answer today. Recognising a question is not answering it.
     const everHeld = historyOf(library, family.id), known = everHeld.flatMap(revision => [...(revision.topics || []).flatMap(topic => [topic.title, ...(topic.said || [])]),
@@ -111,7 +112,7 @@ export function protocolAnswer(question, world) {
       const source = candidate.now.answerable ? candidate.now.revision : null, given = source ? readFacts(sequence, source.facts || {}, Object.keys(source.facts || {})) : {};
       const following = last?.family === candidate.family.id && !subject;
       return { candidate, subject, named, topics, given, following,
-        taken: (subject > 0 && (topics.length > 0 || Object.keys(given).length > 0 || named || ABOUT_RULES.test(read.text) || (!candidate.now.answerable && candidate.known.some(phrase => has(sequence, phrase))))) ||
+        taken: (subject > 0 && (topics.length > 0 || Object.keys(given).length > 0 || named || ABOUT_RULES.test(read.text) || (!candidate.now.answerable && (candidate.known.length ? candidate.known.some(phrase => has(sequence, phrase)) : subject >= 2)))) ||
           (following && (topics.length > 0 || Object.keys(given).length > 0)) };
     }).filter(entry => entry.taken).sort((a, b) => b.subject - a.subject || (b.topics[0]?.score || 0) - (a.topics[0]?.score || 0));
     if (!scored.length) return null;

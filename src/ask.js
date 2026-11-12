@@ -891,7 +891,7 @@ function lookup(question, world) {
         ...found.map(passage => ({ text: snippet(passage.text, [...passage.hits, ...passage.also]), sub: [passage.doc.title, passage.heading, passage.doc.kind, passage.doc.effective ? 'effective ' + passage.doc.effective : 'no effective date given',
           passage.chosen ? 'chosen for this question by ' + fix.by + ', as record keeper' : ''].filter(Boolean).join(' · '), go: 'doc|' + passage.doc.id + '|' + passage.offset })),
         ...mentions.map(post => ({ ...postItem(post), sub: 'A post on the board by ' + post.author + ', not policy' }))
-      ], found.length ? 'Quoted from the document as added. Check its date, and ask the person responsible if it does not settle the question.' : 'The board. Posts are from coworkers and are not policy.',
+      ], found.length ? 'Quoted from the document as added. Check its date, and ask the person responsible if it does not settle the question. A pasted document is searched by its words; it is not a reviewed protocol.' : 'The board. Posts are from coworkers and are not policy.',
         chosen ? { corrected: { id: fix.id, kind: 'passage', by: fix.by, at: fix.at } } : {});
     }
     // A document search finding nothing does not establish that the question was understood. Say which it was.

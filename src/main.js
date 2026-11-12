@@ -1,7 +1,8 @@
 import './style.css';
 import './sizes.css';
+import './protocols.css';
 import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
-import { putSource, getSource, clearSources, loadState, saveState } from './storage.js';
+import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
@@ -10,6 +11,11 @@ import { SUGGESTIONS, ask, findPeople, pretty as prettyDate, readingProblem, sea
 import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, parties, shiftName } from './trades.js';
 import { keywords, qualifiers, tidyQuestion } from './words.js';
 import { LONG_NUMBER_HELP, patientShown, patientSigns } from './guard.js';
+import { readPdf } from './pdftext.js';
+import { emptyLibrary, prepareLibrary, addRevision, checkExtraction, supplyText, markFigure, activate, withdraw, toggleMark, revisionOf, searchLibrary } from './protocols.js';
+import { addMapping, reviewBundle, markMappingsReviewed } from './bundles.js';
+import { protocolTopics } from './pathways.js';
+import { libraryView, familyView, addDialog, landingRevision } from './protocol-view.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
 const publicDemo = __PUBLIC_DEMO__;
@@ -65,6 +71,7 @@ const initial = {
   policy: POLICY,
   requests: [],
   posts: [{ id: 'sample-welcome', author: 'Avery', body: 'Use the schedule to start a trade or coverage request. The conversation stays attached to the shift.', created: null }],
+  protocols: emptyLibrary(),
   events: []
 };
 // Readies a workspace that was saved by any earlier version, whether it comes from this browser or from a backup file.
@@ -73,6 +80,8 @@ function prepare(loaded) {
   if (!next.people) next = { ...next, people: next.mode === 'sample' ? samplePeople : [], peopleSource: next.mode === 'sample' ? 'sample' : 'import', manualLinks: {} };
   for (const [field, empty] of [['releases', []], ['requests', []], ['posts', []], ['events', []], ['images', []], ['directory', {}], ['history', []], ['documents', []], ['answers', []], ['exchanges', []], ['offers', []], ['unanswered', []], ['learned', []], ['corrections', []],
     ['custodians', next.mode === 'sample' ? ['jordan'] : []], ['holidayRules', { off: [], extra: [] }]]) if (!next[field]) next = { ...next, [field]: empty };
+  // A workspace saved before protocols existed gets an empty library. Pasted documents stay documents: nothing is promoted.
+  next = { ...next, protocols: prepareLibrary(next.protocols) };
   next = withContacts(next);
   // The starter rules live in code. A saved workspace picks up a new rule version on load.
   if (next.policy?.version !== POLICY.version) next = { ...next, policy: POLICY };
@@ -123,7 +132,8 @@ const checkChange = (details, exceptId = null) => {
 // The notice is shown once on each device and answered with a press, before anything else.
 const noticeKey = 'department-hub-notice-v3';
 let noticeSeen = loadState(noticeKey, null);
-let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: noticeSeen ? null : { type:'notice' }, pending: loadDraft(), busy: null, notice: '', flash: '' };
+let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: noticeSeen ? null : { type:'notice' }, pending: loadDraft(), busy: null, notice: '', flash: '',
+  protocols: { family:null, revision:null, pane:'both', cite:null, query:'', withdrawing:false, fromAsk:false } };
 // Text size is a setting of this device, not of the workspace. It scales every rem in sizes.css.
 const TEXT_SIZES = [1, 1.15, 1.3], TEXT_NAMES = ['normal', 'large', 'larger'], textKey = 'department-hub-text-size';
 let textSize = Math.max(0, TEXT_SIZES.indexOf(Number(loadState(textKey, 1))));
@@ -142,7 +152,7 @@ function countPress(action, value) {
     localStorage.setItem(usageKey, JSON.stringify(usage));
   } catch { /* counting must never get in the way */ }
 }
-const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory',
+const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory', 'tab:protocols':'Opened Protocols',
   shift:'Opened a shift', options:'Looked for ways off a shift', 'options-loops':'Looked for three-person loops', propose:'Proposed an exchange', 'exchange-agree':'Agreed to an exchange', 'exchange-decline':'Declined an exchange',
   'form:offer':'Said they could pick up a shift', 'form:trade-rules':'Changed the trade rules', 'ask-next':'Pressed a next-step question', 'ask-yes':'Said an answer helped', 'ask-no':'Said an answer did not help', 'ask-send':'Sent a question to the record keeper', verify:'Checked the receipts', 'notice-ok':'Acknowledged the notice', notice:'Opened the notice', 'mark-copy':'Copied the latest fingerprint', 'form:mark':'Looked for an earlier fingerprint', 'form:teach':'Taught an answer', 'ask-open':'Opened Ask', 'ask-wrong':'Said what was wrong with an answer', 'form:reading-try':'Tried a rewording', 'reading-save':'Saved a reading correction', 'form:passage-find':'Looked for a passage', 'passage-pick':'Chose a passage for a question', 'correction-remove':'Removed a correction', 'teach-copy':'Copied the waiting questions', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
@@ -160,7 +170,7 @@ function markBoardSeen(value = new Date().toISOString()) {
 }
 const askWorld = () => ({ today: localToday(), now:new Date().toISOString(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
   documents: state.documents, releases: state.releases, requests: creditRequests(), trade: { ...tradeWorld(), offers: state.offers }, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt,
-  answers: state.answers, learned: state.learned, corrections: state.corrections, last: ui.askContext, versions:sourceVersions });
+  answers: state.answers, learned: state.learned, corrections: state.corrections, last: ui.askContext, versions:sourceVersions, protocols: state.protocols });
 function currentAsk(dialog = ui.dialog) {
   const signs = patientSigns(dialog?.q || '');
   if (signs.length) return { title:'Remove patient details before asking.', lines:['The text screen saw ' + patientShown(dialog.q) + '. No records were searched.', ...(signs.some(sign => sign.startsWith('a long number')) ? [LONG_NUMBER_HELP] : [])],
@@ -532,6 +542,103 @@ function shiftCaption(row) {
   return dayLabel(row.date, { weekday:'short', month:'short', day:'numeric' }) + ' · ' + SHIFTS[row.shift].label;
 }
 
+// Protocols. The library (revisions, readings, mapped answers) is part of the workspace. Each original file is kept in
+// this browser beside the board's files, under its own fingerprint, and is never changed after it is added.
+const originalKey = digest => 'protocol:' + digest;
+const originals = new Map();            // fingerprint → the file, or false when it is not on this device
+const pageCanvases = new Map();         // fingerprint|page → the drawn page, kept so a redraw of the screen is instant
+const SAMPLE_PROTOCOL = /^rt-train-014-rev[12]\.pdf$/;
+let pdfjsReady = null;
+// The PDF reader is large, so it is fetched only when a protocol is opened or added. It ships with the app; nothing is fetched from elsewhere.
+const loadPdfjs = () => pdfjsReady ||= (async () => {
+  const pdfjs = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
+  return pdfjs;
+})();
+const viewTools = { h, button, valueAttr };
+const shownRevision = () => ui.protocols.family ? revisionOf(state.protocols, ui.protocols.revision) || landingRevision(state.protocols, ui.protocols.family, localToday()) : null;
+function protocolsScreen() {
+  const view = ui.protocols, today = localToday();
+  if (!view.family) return libraryView({ library:state.protocols, today, documents:state.documents, query:view.query, results:view.query ? searchLibrary(state.protocols, view.query, today) : [], keeper:isKeeper(), demo:publicDemo,
+    sampleNext:['1', '2'].find(label => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + label + '.pdf')) || null }, viewTools);
+  const revision = shownRevision();
+  return familyView({ library:state.protocols, today, familyId:view.family, revisionId:revision?.id, pane:view.pane, cite:view.cite, keeper:isKeeper(), held:revision ? originals.get(revision.digest) : undefined,
+    sampleMapping:Boolean(revision && SAMPLE_PROTOCOL.test(revision.file.name)), withdrawing:view.withdrawing, fromAsk:view.fromAsk && Boolean(ui.lastAsk),
+    topics:protocolTopics(state.protocols, today).filter(entry => entry.family.id === view.family).map(entry => entry.topic.title) }, viewTools);
+}
+// Draws the original's pages into the frames on screen. The outline of a cited passage is ordinary markup over the
+// page, placed from the reading's coordinates, so it is there whether or not the drawing has finished.
+async function paintPages() {
+  const frames = [...app.querySelectorAll('[data-page-canvas]')];
+  if (!frames.length) return;
+  const digest = frames[0].dataset.pageCanvas.split('|')[0];
+  for (const frame of frames) { const ready = pageCanvases.get(frame.dataset.pageCanvas); if (ready) frame.prepend(ready); }
+  if (frames.every(frame => pageCanvases.has(frame.dataset.pageCanvas))) return;
+  if (!originals.has(digest)) {
+    const file = await getMedia(originalKey(digest)).catch(() => null);
+    // The stored bytes are checked against the revision's fingerprint every time they are first opened. A file that no longer matches is not shown.
+    const intact = file ? await sha256(await file.arrayBuffer()) === digest : false;
+    originals.set(digest, file ? (intact ? file : 'changed') : false);
+    if (!intact) { render(); return; }
+  }
+  const file = originals.get(digest);
+  if (!file || file === 'changed' || ui.painting === digest) return;
+  ui.painting = digest;
+  try {
+    const pdfjs = await loadPdfjs(), source = await pdfjs.getDocument({ data:new Uint8Array(await file.arrayBuffer()), isEvalSupported:false, verbosity:0 }).promise;
+    for (let number = 1; number <= source.numPages; number++) {
+      const key = digest + '|' + number;
+      if (pageCanvases.has(key)) continue;
+      const page = await source.getPage(number), viewport = page.getViewport({ scale:Math.min(2, window.devicePixelRatio || 1) * 1.4 }), canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height);
+      canvas.setAttribute('role', 'img'); canvas.setAttribute('aria-label', 'Page ' + number + ' of the original file');
+      await page.render({ canvas, canvasContext:canvas.getContext('2d'), viewport }).promise;
+      pageCanvases.set(key, canvas);
+      app.querySelector('[data-page-canvas="' + key + '"]')?.prepend(canvas);
+    }
+    await source.destroy?.();
+  } catch (error) { ui.notice = 'The original could not be drawn here: ' + (error.message || error) + ' The reading and its page numbers are still shown.'; }
+  finally { ui.painting = null; }
+}
+// One recorded step on the library. A refusal is shown as it is worded; nothing is saved.
+async function protocolStep(result, said) {
+  if (!result.ok) throw new Error(result.why);
+  if (result.receipt) await commit(result.receipt.type, result.receipt.details, previous => ({ ...previous, protocols:result.library }));
+  else await (saveQueue = saveQueue.then(() => { state = { ...state, protocols:result.library }; saveState(storageKey, state); }));
+  if (said) ui.notice = said;
+  return result;
+}
+const keeperOnly = () => { if (!isKeeper()) throw new Error('Only a record keeper can change the protocols held here.'); };
+// Reads a PDF on this device and adds it as an unchecked revision. The same path serves a chosen file and the invented example.
+async function addProtocolFile(file, fields) {
+  if (file.size > 40 * 1024 * 1024) throw new Error('That file is ' + fileSize(file.size) + '. A protocol can be up to 40 MB.');
+  const bytes = await file.arrayBuffer(), digest = await sha256(bytes), extraction = await readPdf(bytes.slice(0), await loadPdfjs());
+  const result = addRevision(state.protocols, { ...fields, digest, extraction, file:{ name:file.name, bytes:file.size } }, state.actor, new Date().toISOString());
+  if (!result.ok) throw new Error(result.why);
+  await putMedia(originalKey(digest), new Blob([bytes], { type:'application/pdf' }));
+  originals.set(digest, new Blob([bytes], { type:'application/pdf' }));
+  await protocolStep(result);
+  return result;
+}
+
+async function addMappingFile(file) {
+  keeperOnly();
+  if (file.size > 2 * 1024 * 1024) throw new Error('That file is too large to be a mapping.');
+  let mapping = null;
+  try { mapping = JSON.parse(await file.text()); } catch { throw new Error('That file is not a mapping. It could not be read as JSON.'); }
+  await protocolStep(addMapping(state.protocols, shownRevision().id, mapping, state.actor, new Date().toISOString()), 'Mapped answers added as proposals. None answers a question until it is reviewed against the original.');
+  ui.protocols = { ...ui.protocols, pane:'answers' };
+}
+// A backup carries the library, not the original files. A file chosen again is taken only if it is the very same file.
+async function restoreOriginal(file) {
+  const revision = shownRevision(), bytes = await file.arrayBuffer(), digest = await sha256(bytes);
+  if (digest !== revision.digest) throw new Error('That is a different file. Its fingerprint starts ' + digest.slice(0, 12) + '; this revision is ' + revision.digest.slice(0, 12) + '. Nothing was changed.');
+  const blob = new Blob([bytes], { type:'application/pdf' });
+  await putMedia(originalKey(digest), blob);
+  originals.set(digest, blob);
+  ui.notice = 'The original is back on this device. Its fingerprint matches.';
+}
+
 function render() {
   const focus = document.activeElement;
   const playing = [...app.querySelectorAll('[data-media]')].filter(player => player.currentTime > 0 && !player.ended)
@@ -539,12 +646,13 @@ function render() {
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
   app.innerHTML = top() + '<main>' + button('<b>Independent staff project—not an official hospital product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
     '<div class="top-tools">' + button('Aa', 'text-size', 'class="text-size" title="Text size" aria-label="Text size: ' + TEXT_NAMES[textSize] + '. Press to change."') +
-    button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board or the documents"') +
+    button('Protocols', 'tab', 'class="protocols-trigger' + (ui.tab === 'protocols' ? ' active' : '') + '" ' + valueAttr('protocols') + (ui.tab === 'protocols' ? ' aria-current="page"' : '')) +
+    button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board, the documents or the protocols"') +
     '<label class="actor">Viewing as <select id="actor" aria-label="Viewing as">' +
     (actorNames().length ? actorNames() : [state.actor]).map(name => '<option ' + (isSame(name, state.actor) ? 'selected' : '') + '>' + h(name) + '</option>').join('') +
     '</select></label></div></header><div class="content">' +
     (ui.notice ? '<div role="status" class="notice">' + h(ui.notice) + '</div>' : '') +
-    (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : schedule()) +
+    (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : ui.tab === 'protocols' ? protocolsScreen() : schedule()) +
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
     ' · No payroll or official schedule changes · <span data-build="' + h(BUILD_INFO.fingerprint || '') + '" title="' + h(BUILD_INFO.fingerprint || 'No release fingerprint available') + '">' + h(BUILD_LABEL) + '</span></span><span>' + (publicDemo ? '' : button('Backup and restore', 'data', 'class="text-button"') + ' ') +
     button('Activity log', 'audit', 'class="text-button"') + '</span></footer></div></main>' + dialogMarkup();
@@ -557,7 +665,10 @@ function render() {
     dialog.showModal();
     if (sameDialog && focus?.id) document.getElementById(focus.id)?.focus();
   }
-  if (ui.scrollTo) { app.querySelector(ui.scrollTo)?.scrollIntoView({ block:'start' }); ui.scrollTo = null; }
+  if (ui.tab === 'protocols') paintPages();
+  // A citation is shown in both places at once: the passage in the reading, then its outline on the original's page.
+  if (ui.scrollTo === '#cite-mark') app.querySelector('.reading-pane .cited')?.scrollIntoView({ block:'center' });
+  if (ui.scrollTo) { app.querySelector(ui.scrollTo)?.scrollIntoView({ block:ui.scrollTo === '#cite-mark' ? 'center' : 'start' }); ui.scrollTo = null; }
 }
 
 function shell(title, body) {
@@ -899,7 +1010,7 @@ function dialogMarkup() {
     // Recheck the current records and viewer every time; never reopen a cached keeper-only answer.
     const result = q ? currentAsk() : null;
     const canRemember = result?.taught || (ui.dialog.opened?.startsWith('doc|') && result?.items.some(entry => entry.go === ui.dialog.opened));
-    const item = entry => '<div class="ask-item"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h(entry.sub) + '</small>' : '') + '</div>' +
+    const item = entry => '<div class="ask-item' + (entry.branch && !entry.go ? ' branch' : '') + '"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h((entry.go?.startsWith('doc|') ? 'Legacy document, not a reviewed protocol · ' : '') + entry.sub) + '</small>' : '') + '</div>' +
       (entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
     return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
       '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
@@ -907,7 +1018,10 @@ function dialogMarkup() {
           result.understood ? 'Understood as: ' + result.understood : ''].filter(Boolean).join('. ')) + '.</p>' : '') + (result.title ? '<p class="fair-line">' + h(result.title) + '</p>' : '') + result.lines.map(text => '<p>' + h(text) + '</p>').join('') + result.items.map(item).join('') +
         '<p class="subtle">From: ' + h(result.source) + '</p>' +
         (result.next?.length ? '<div class="chip-list"><span class="subtle">Next</span><div>' + result.next.map((text, index) => button(h(text), 'ask-next', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' : '') +
-        (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' : result.empty ? '<div class="actions wrap">' + button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
+        (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' :
+          // A protocol answer is not open to a vote. Nothing a reader presses here can change it.
+          result.kind === 'protocol' ? '<p class="subtle">A protocol answer comes only from a reviewed mapping. “Yes”, repeated questions and search cannot change it. If it looks wrong, open the original and tell a record keeper.</p><div class="actions wrap">' +
+            button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + '</div>' : result.empty ? '<div class="actions wrap">' + button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
           (isKeeper() ? button('Teach the answer', 'ask-teach', 'class="secondary"') : '') + '</div>' :
           // A wrong answer has one of three causes, and each is fixed in a different place.
           ui.dialog.no ? '<p class="subtle">What was wrong? You can also ask it again in other words.</p><div class="actions wrap">' + button('It misread my question', 'ask-wrong', 'class="secondary" ' + valueAttr('misread')) +
@@ -918,9 +1032,10 @@ function dialogMarkup() {
           (canRemember ? '<p class="subtle">Remembering saves wording or search words in this browser and backups. It records relevance feedback, not policy approval.</p>' : '')) + '</div>' :
         '<p class="subtle">It looks up supported questions and opens the records it finds. Nothing is sent to an AI service. Question text is not routinely saved; sending it or remembering wording saves a reviewed example. Receipts record fingerprints and source versions.</p>') +
       '<div class="chip-list"><span class="subtle">Try</span><div>' + SUGGESTIONS.map((text, index) => button(h(text), 'ask-try', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' +
-      '<p>' + button('Documents it can search (' + state.documents.length + ')', 'docs', 'class="text-button"') + ' ' +
+      '<p>' + button('Protocols (' + state.protocols.families.length + ')', 'tab', 'class="text-button" ' + valueAttr('protocols')) + ' ' + button('Pasted documents it can search (' + state.documents.length + ')', 'docs', 'class="text-button"') + ' ' +
         (isKeeper() ? button('Corrections and notes (' + (state.corrections.length + state.answers.length) + '), waiting (' + state.unanswered.length + ')', 'teach-list', 'class="text-button"') : '') + '</p>');
   }
+  if (type === 'protocol-add') return shell(ui.busy ? 'Reading the protocol' : 'Add a protocol', addDialog({ busy:ui.busy }, viewTools));
   if (type === 'docs') {
     const about = doc => [doc.kind, doc.effective ? 'effective ' + doc.effective : 'no effective date given', 'added by ' + doc.by + ' on ' + prettyDate(doc.added.slice(0, 10)), fileSize(doc.text.length)].join(' · ');
     return shell('Documents', '<p class="subtle">Ask searches these and quotes them with their title, section and date. Add only what the department is allowed to share. They are kept in this browser and go into backups.</p>' +
@@ -1142,6 +1257,8 @@ app.addEventListener('change', event => {
   }
   if (event.target.id === 'photos') void importFiles([...event.target.files]).catch(fail);
   if (event.target.id === 'backup-file' && event.target.files[0]) void readBackup(event.target.files[0]).catch(fail);
+  if (event.target.id === 'protocol-mapping-file' && event.target.files[0]) void addMappingFile(event.target.files[0]).then(render).catch(fail);
+  if (event.target.id === 'protocol-original-file' && event.target.files[0]) void restoreOriginal(event.target.files[0]).then(render).catch(fail);
 });
 // A backup file made by this app, or a bare workspace. Nothing is replaced until the person confirms.
 async function readBackup(file) {
@@ -1259,11 +1376,81 @@ async function act({action, value, kind}) {
       if (ui.dialog?.type === 'ask' && ui.lastAsk) ui.lastAsk = { ...ui.lastAsk, opened:value };      // the one they chose to read is the one a yes is about
       if (kind === 'doc') { ui.dialog = { type:'doc', id:first, at:Number(second) }; ui.scrollTo = '#doc-mark'; break; }
       if (kind === 'note') { ui.dialog = { type:'note', id:first }; break; }
+      // The exact revision cited, at the cited place, even when a later revision has since replaced it.
+      if (kind === 'protocol' || kind === 'protocol-family') {
+        const revision = kind === 'protocol' ? revisionOf(state.protocols, first) : landingRevision(state.protocols, first, localToday());
+        if (!revision) throw new Error('That revision is no longer held on this device.');
+        ui.dialog = null; ui.tab = 'protocols';
+        ui.protocols = { ...ui.protocols, family:revision.family, revision:revision.id, cite:kind === 'protocol' ? second || null : null, pane:['both', 'original'].includes(ui.protocols.pane) ? ui.protocols.pane : 'both', withdrawing:false, fromAsk:true };
+        ui.scrollTo = ui.protocols.cite ? '#cite-mark' : '.content';
+        break;
+      }
       if (kind === 'options') { const target = state.assignments.find(item => item.key === String(value).slice(8)); if (target && isMine(target)) ui.dialog = { type:'options', row:target, found:optionsFor(target) }; break; }
       ui.dialog = null;
       if (kind === 'date') { ui.tab = 'schedule'; ui.view = 'week'; ui.date = first; ui.scrollTo = '.day-card[data-date="' + first + '"]'; }
       else if (kind === 'post') { ui.tab = 'board'; ui.boardFilter = 'all'; ui.scrollTo = '[data-post="' + CSS.escape(first) + '"]'; markBoardSeen(); }
       else if (kind === 'people' || kind === 'fairness') ui.tab = kind;
+      break;
+    }
+    case 'protocol-home': ui.protocols = { ...ui.protocols, family:null, revision:null, cite:null, withdrawing:false, fromAsk:false }; break;
+    case 'protocol-open': ui.protocols = { ...ui.protocols, family:value, revision:landingRevision(state.protocols, value, localToday())?.id || null, cite:null, withdrawing:false, fromAsk:false }; ui.scrollTo = '.content'; break;
+    case 'protocol-revision': ui.protocols = { ...ui.protocols, revision:value, cite:null, withdrawing:false }; break;
+    case 'protocol-pane': ui.protocols = { ...ui.protocols, pane:['both', 'original', 'reading', 'answers'].includes(value) ? value : 'both' }; break;
+    case 'protocol-cite': {
+      const [id, anchor] = String(value).split('|'), revision = revisionOf(state.protocols, id);
+      if (!revision) throw new Error('That revision is no longer held on this device.');
+      ui.protocols = { ...ui.protocols, family:revision.family, revision:id, cite:anchor, pane:ui.protocols.pane === 'original' ? 'original' : 'both', withdrawing:false };
+      ui.scrollTo = '#cite-mark';
+      break;
+    }
+    case 'protocol-mark': await protocolStep({ ok:true, library:toggleMark(state.protocols, value) }); break;
+    case 'protocol-add': keeperOnly(); ui.dialog = { type:'protocol-add' }; break;
+    case 'protocol-sample': {
+      keeperOnly();
+      const label = ['1', '2'].find(entry => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + entry + '.pdf'));
+      if (!label) break;
+      ui.busy = 'Reading the invented protocol on this device…'; ui.dialog = { type:'protocol-add' }; render();
+      try {
+        const name = 'rt-train-014-rev' + label + '.pdf', reply = await fetch(asset('fixtures/protocols/' + name));
+        if (!reply.ok) throw new Error('The invented protocol is not part of this copy of the app.');
+        const result = await addProtocolFile(new File([await reply.blob()], name, { type:'application/pdf' }), { title:'Blue Trainer Bellows Drill', identifier:'RT-TRAIN-014', label, effective:label === '1' ? '2026-06-01' : '2026-11-01',
+          authority:'Lakeside Training Hospital Respiratory Education Committee (fictional)', category:'Training drill (invented)', location:'Shipped with Department Hub as synthetic test material' });
+        ui.protocols = { ...ui.protocols, family:result.family.id, revision:result.revision.id, pane:'both', cite:null, withdrawing:false, fromAsk:false };
+        ui.notice = 'Added revision ' + label + ' of the invented protocol, unchecked. It answers nothing until its reading is confirmed, its answers are reviewed and it is made active.';
+      } finally { ui.busy = null; ui.dialog = null; }
+      break;
+    }
+    case 'protocol-sample-mapping': {
+      keeperOnly();
+      const revision = shownRevision(), reply = await fetch(asset('fixtures/protocols/' + revision.file.name.replace(/\.pdf$/, '.mapping.json')));
+      if (!reply.ok) throw new Error('No mapping ships for this file.');
+      await protocolStep(addMapping(state.protocols, revision.id, await reply.json(), state.actor, new Date().toISOString()), 'Mapped answers added as proposals. None answers a question until it is reviewed against the original.');
+      ui.protocols = { ...ui.protocols, pane:'answers' };
+      break;
+    }
+    case 'protocol-check': keeperOnly(); await protocolStep(checkExtraction(state.protocols, shownRevision().id, state.actor, new Date().toISOString()), 'Reading confirmed. Answers can now be mapped to it and reviewed.'); break;
+    case 'protocol-figure': {
+      keeperOnly();
+      const revision = shownRevision(), marked = revision.extraction.pages.some(page => page.blocks.some(block => block.anchor === value && block.figure));
+      await protocolStep(markFigure(state.protocols, revision.id, value, !marked));
+      break;
+    }
+    case 'protocol-review': keeperOnly(); await protocolStep(reviewBundle(state.protocols, shownRevision().id, value, state.actor, new Date().toISOString()), 'Recorded as reviewed against the original.'); break;
+    case 'protocol-reviewed': keeperOnly(); await protocolStep(markMappingsReviewed(state.protocols, shownRevision().id, state.actor, new Date().toISOString()), 'Answers recorded as reviewed. The revision can now be made active.'); ui.protocols = { ...ui.protocols, pane:'both' }; break;
+    case 'protocol-activate': {
+      keeperOnly();
+      const revision = shownRevision();
+      await protocolStep(activate(state.protocols, revision.id, state.actor, new Date().toISOString(), localToday()), revision.effective <= localToday() ? 'Revision ' + revision.label + ' is now active. Earlier revisions are history.' : 'Revision ' + revision.label + ' will be in use from ' + revision.effective + '.');
+      break;
+    }
+    case 'protocol-withdraw': keeperOnly(); ui.protocols = { ...ui.protocols, withdrawing:true }; ui.scrollTo = '.protocol-step'; break;
+    case 'protocol-withdraw-cancel': ui.protocols = { ...ui.protocols, withdrawing:false }; break;
+    case 'protocol-ask': {
+      // Opens Ask already pointed at this protocol, so "when do I stop?" needs no protocol name. Held for this conversation only.
+      const revision = shownRevision();
+      ui.askContext = { kind:'protocol', protocol:{ family:revision.family, revision:revision.digest, facts:{}, pending:'topic' } };
+      ui.lastAsk = null;
+      if (value) await runAsk(value); else ui.dialog = { type:'ask', previousContext:ui.askContext };
       break;
     }
     case 'docs': ui.dialog = { type:'docs' }; break;
@@ -1383,7 +1570,7 @@ async function act({action, value, kind}) {
       try { await navigator.clipboard.writeText(state.events.at(-1)?.hash || ''); ui.flash = 'Copied. Keep it somewhere outside this app.'; }
       catch { ui.flash = 'Copying was not allowed here. Press and hold the fingerprint to copy it.'; }
       break;
-    case 'ask-no': ui.lastAsk = ui.dialog = { ...ui.dialog, no:true }; break;
+    case 'ask-no': if (currentAsk()?.kind === 'protocol') return; ui.lastAsk = ui.dialog = { ...ui.dialog, no:true }; break;
     case 'ask-wrong': {
       const q = (ui.dialog?.q || '').trim(), result = q ? currentAsk() : null;
       if (!result || result.kind === 'blocked') return;
@@ -1440,7 +1627,7 @@ async function act({action, value, kind}) {
       const { q } = ui.dialog, result = currentAsk(), opened = ui.dialog.opened;
       const top = result.items.some(item => item.go === opened) ? opened : '';
       if (!result || ui.dialog.yes) return;
-      if (result.kind === 'blocked') return;
+      if (result.kind === 'blocked' || result.kind === 'protocol') return;
       const terms = keywords(result.read || q), documentId = top.startsWith('doc|') ? top.split('|')[1] : '', sourceHash = sourceVersions[documentId];
       const same = link => link.go === top && link.terms.join(' ') === terms.join(' ') && link.sourceHash === sourceHash, asked = q.trim();
       // Two ways it learns from a yes: a confirmed passage comes first next time, and a taught answer picks up this wording.
@@ -1934,6 +2121,35 @@ async function submit(form) {
       await commit('Thread reply', { id }, previous => ({
         ...previous, requests:previous.requests.map(item => item.id === id ? { ...item, messages:[...item.messages, message] } : item)
       }));
+      break;
+    }
+    case 'protocol-search': ui.protocols = { ...ui.protocols, query:(data.q || '').trim().slice(0, 120) }; break;
+    case 'protocol-add': {
+      keeperOnly();
+      const file = form.querySelector('#protocol-file')?.files[0];
+      if (!file) throw new Error('Choose the protocol’s PDF.');
+      ui.busy = 'Reading ' + file.name + ' on this device…'; render();
+      try {
+        const result = await addProtocolFile(file, { title:data.title, identifier:data.identifier, authority:data.authority, label:data.label, effective:data.effective, category:data.category, location:data.location });
+        const empty = result.revision.extraction.emptyPages || [];
+        ui.tab = 'protocols';
+        ui.protocols = { ...ui.protocols, family:result.family.id, revision:result.revision.id, pane:'both', cite:null, withdrawing:false, fromAsk:false };
+        ui.notice = 'Added revision ' + result.revision.label + ', unchecked. ' + (empty.length ? 'Page' + (empty.length === 1 ? ' ' : 's ') + empty.join(', ') + ' read as empty, which usually means a scan. Type the text in from the original, or withdraw this import.' :
+          'Compare the reading with the original before anything else.');
+      } finally { ui.busy = null; ui.dialog = null; }
+      break;
+    }
+    case 'protocol-supply': {
+      keeperOnly();
+      if (!patientCheck(form, data.text || '')) return;
+      await protocolStep(await supplyText(state.protocols, shownRevision().id, Number(data.page), data.text, state.actor, new Date().toISOString()), 'Typed text saved for page ' + Number(data.page) + '. It stays marked as typed in by a person.');
+      break;
+    }
+    case 'protocol-withdraw': {
+      keeperOnly();
+      if (!patientCheck(form, data.reason || '')) return;
+      await protocolStep(withdraw(state.protocols, shownRevision().id, data.reason, state.actor, new Date().toISOString()), 'Revision withdrawn. It stays in the history and no longer answers.');
+      ui.protocols = { ...ui.protocols, withdrawing:false };
       break;
     }
     default: return;

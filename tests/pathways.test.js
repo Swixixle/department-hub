@@ -103,3 +103,16 @@ test('nothing is answered from a library with no protocols, and held topics can 
   assert.deepEqual(protocolTopics(library, '2026-11-11').map(entry => entry.topic.title), ['Starting the drill', 'When the drill must not be started', 'Stopping the drill and who to call', 'Who may run the drill']);
   assert.deepEqual(protocolTopics(library, '2026-05-01'), []);
 });
+
+test('a protocol held with nothing mapped yet is still recognised, says its review is not finished, and leaves other questions alone', async () => {
+  for (const upTo of ['added', 'checked']) {
+    const { library, id } = await carryThrough(emptyLibrary(), 1, { upTo }), world = { today: '2026-11-11', protocols: library };
+    const reply = protocolAnswer('What rate do I start an adult Blue Trainer drill at, with a written order on file?', world);
+    assert.deepEqual([reply.kind, reply.protocol.status, reply.title], ['protocol', 'pending', 'No reviewed answer yet for the revision now in effect']);
+    assert.equal(reply.items[0].go, 'protocol|' + id + '|');
+    assert.ok(!/mk\/min|manikin/.test(JSON.stringify(reply)), 'an unreviewed reading was quoted');
+    assert.equal(protocolAnswer('Is there a fire drill on Friday?', world), null, 'one shared word is not enough to take a question');
+    assert.equal(protocolAnswer('Who am I working with on my next shift?', world), null);
+    assert.equal(protocolAnswer('What does RT-TRAIN-014 say?', world).protocol.status, 'pending', 'naming the protocol is enough');
+  }
+});
