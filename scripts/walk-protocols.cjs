@@ -33,7 +33,8 @@ const step = async (name, work) => { try { await work(); results.push([true, nam
   const page = await context.newPage();
   const problems = [];
   page.on('pageerror', error => problems.push('page error: ' + error.message));
-  page.on('console', message => { if (message.type() === 'error') problems.push('console: ' + message.text()); });
+  // Tesseract reports its own guess at a picture's resolution on the error channel. It is not an error.
+  page.on('console', message => { if (message.type() === 'error' && !/^Estimating resolution as \d+$/.test(message.text())) problems.push('console: ' + message.text()); });
   const demo = /demo/.test(folder);
   const stored = () => page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(key => [key, localStorage.getItem(key)]))));
   const state = () => page.evaluate(() => JSON.parse(localStorage.getItem(Object.keys(localStorage).find(key => /^department-hub-v1-(local|demo)$/.test(key)))));
@@ -335,28 +336,35 @@ const step = async (name, work) => { try { await work(); results.push([true, nam
     await page.setViewportSize({ width: 1360, height: 900 });
   });
 
-  await step('blood-gas cards are added from the held capture, and on a phone a checked card answers over the source’s own words', async () => {
+  await step('blood-gas cards are added only after the app reads the page’s screenshots, and answer in the source’s words with the picture', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await closeDialog(); await press('tab', 'protocols'); await press('protocol-home');
-    await press('knowledge-add'); await page.waitForSelector('[data-card="paco2"]');
+    const began = Date.now();
+    await press('knowledge-add');
+    await page.waitForSelector('.content .notice:has-text("Reading the page’s screenshots")', { timeout: 15000 });
+    await page.waitForSelector('[data-card="paco2"]', { timeout: 240000 });
     const added = (await state()).events.at(-1);
-    assert.deepEqual([added.type, added.details.sha256, added.details.bytes], ['Reference cards added', 'cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7', 25965], 'the browser hashed the held page and it matched');
+    assert.deepEqual([added.type, added.details.sha256, added.details.screenshots.length], ['Reference cards added', 'cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7', 7], 'the browser hashed the held files and they matched');
+    assert.match(added.details.found, /^\d+ of 1100 words, every number$/, 'the app’s own reader, in this browser, found every line');
+    console.log('        reading the screenshots took ' + Math.round((Date.now() - began) / 1000) + ' s; ' + added.details.found);
+    assert.equal(await page.locator('[data-action="knowledge-check"]').count(), 0);
     assert.match(await text('[data-card="paco2"]'), /35–45 mmHg\s+Less than 25 mmHg\./);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'the cards screen scrolls sideways on a phone');
-    await page.locator('[data-card="paco2"] .source-quote').nth(1).scrollIntoViewIfNeeded(); await shot('10-phone-cards');
-    await press('knowledge-check', 'paco2'); await settle();
+    await page.locator('[data-card="paco2"] .capture-picture').nth(1).scrollIntoViewIfNeeded(); await shot('10-phone-cards');
     await askFor('whats the normal range for PaCO2');
     const answer = await text('.ask-answer');
-    assert.match(answer, /Adult normal PaCO2 is 35-45 mmHg/);
+    assert.match(answer, /From the source: PaCO2: normal and critical values/);
     assert.match(answer, /PaCO2\s+Pressure of carbon dioxide in the blood\.[\s\S]*35–45 mmHg\s+Less than 25 mmHg\.\s+Greater than 60 mmHg\./, 'the answer shows the captured row');
-    assert.ok(await page.locator('.ask-answer .source-quote').first().isVisible());
-    assert.equal(await page.evaluate(() => [...document.querySelectorAll('.ask-answer .source-quote')].every(quote => quote.scrollWidth <= quote.clientWidth + 1)), true, 'a quoted passage is cut off');
-    await page.locator('.ask-answer .source-quote').nth(1).scrollIntoViewIfNeeded(); await shot('11-phone-card-answer');
+    const pictures = await page.evaluate(async () => Promise.all([...document.querySelectorAll('.ask-answer .capture-picture image')].map(async image => (await fetch(image.getAttribute('href'))).status)));
+    assert.ok(pictures.length >= 3 && pictures.every(status => status === 200), 'every picture in the answer loads: ' + pictures);
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('.ask-answer .capture-frame')].every(frame => frame.getBoundingClientRect().right <= window.innerWidth)), true, 'a picture’s frame is wider than the phone');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'the answer scrolls sideways on a phone');
+    await page.locator('.ask-answer .capture-picture').nth(1).scrollIntoViewIfNeeded(); await shot('11-phone-card-answer');
     await closeDialog();
     await page.setViewportSize({ width: 1360, height: 900 });
   });
 
-  await step('no page error or console error occurred during the walk', async () => { assert.deepEqual(problems, []); });
+  await step('no page error or console error occurred during the walk', async () => { assert.deepEqual(problems, [], JSON.stringify(problems)); });
 
   await browser.close(); server.close();
   const failed = results.filter(([ok]) => !ok).length;
