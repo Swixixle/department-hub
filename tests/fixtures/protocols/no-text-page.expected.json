@@ -1,0 +1,15 @@
+{
+ "note": "Synthetic test material — NOT FOR CLINICAL USE. Expected reading of no-text-page.pdf.",
+ "sha256": "3a7d310b5f79b01ce9f02674a4021d1dfe0b5896d9d0409fee88c9c9921bdf38",
+ "format": "department-hub-extraction-v1",
+ "emptyPages": [
+  1
+ ],
+ "pages": [
+  {
+   "number": 1,
+   "drawn": true,
+   "blocks": []
+  }
+ ]
+}

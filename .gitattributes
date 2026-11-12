@@ -1,0 +1,4 @@
+# The invented protocol PDFs are plain ASCII inside, so Git would otherwise diff them as text.
+# A whitespace "fix" while applying a patch would change their bytes and their fingerprints.
+public/fixtures/protocols/*.pdf binary
+tests/fixtures/protocols/*.pdf binary

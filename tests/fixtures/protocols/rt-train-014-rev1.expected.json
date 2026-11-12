@@ -1,0 +1,608 @@
+{
+ "note": "Synthetic test material — NOT FOR CLINICAL USE. Expected reading of rt-train-014-rev1.pdf.",
+ "sha256": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+ "format": "department-hub-extraction-v1",
+ "emptyPages": [],
+ "pages": [
+  {
+   "number": 1,
+   "drawn": false,
+   "blocks": [
+    {
+     "anchor": "p1.b1",
+     "kind": "text",
+     "running": true,
+     "under": null,
+     "hash": "399c66e39923afd28901b85a",
+     "box": [
+      72,
+      36.6,
+      216,
+      10.6
+     ],
+     "text": "Synthetic test material — NOT FOR CLINICAL USE"
+    },
+    {
+     "anchor": "p1.b2",
+     "kind": "heading",
+     "under": null,
+     "hash": "00deba98fcfeb6fccb8d52b0",
+     "box": [
+      72,
+      90.1,
+      206,
+      20.1
+     ],
+     "text": "Blue Trainer Bellows Drill"
+    },
+    {
+     "anchor": "p1.b3",
+     "kind": "text",
+     "under": "Blue Trainer Bellows Drill",
+     "hash": "2d8a728981193c8f5cbf4aeb",
+     "box": [
+      72,
+      121.4,
+      435.9,
+      26.4
+     ],
+     "text": "Protocol RT-TRAIN-014 · Revision 1 · Effective 1 June 2026 · Issued by the Lakeside Training Hospital Respiratory Education Committee (a fictional body)."
+    },
+    {
+     "anchor": "p1.b4",
+     "kind": "heading",
+     "under": null,
+     "hash": "cfb137e08bf1c969ff218611",
+     "box": [
+      72,
+      164.3,
+      66.5,
+      15.3
+     ],
+     "text": "1. Purpose"
+    },
+    {
+     "anchor": "p1.b5",
+     "kind": "text",
+     "under": "1. Purpose",
+     "hash": "2e71e2c3afc395a6db3fda80",
+     "box": [
+      72,
+      188.4,
+      466.3,
+      40.4
+     ],
+     "text": "This invented protocol exists only to test Department Hub. It describes a classroom drill on the Blue Trainer bellows, a device that does not exist. Rates are counted in marks per minute (mk/min), a unit made up for this document."
+    },
+    {
+     "anchor": "p1.b6",
+     "kind": "heading",
+     "under": null,
+     "hash": "26c8c88741023591c41cc9ff",
+     "box": [
+      72,
+      245.3,
+      147.4,
+      15.3
+     ],
+     "text": "2. Who may run the drill"
+    },
+    {
+     "anchor": "p1.b7",
+     "kind": "text",
+     "under": "2. Who may run the drill",
+     "hash": "873ceab3308aa4d609b13982",
+     "box": [
+      72,
+      269.4,
+      456.9,
+      26.4
+     ],
+     "text": "Only a therapist who holds a current Blue Trainer card may run the drill. A student may run the drill only while a card holder is present in the room."
+    },
+    {
+     "anchor": "p1.b8",
+     "kind": "heading",
+     "under": null,
+     "hash": "e0bbd8c576dc461a64dfad41",
+     "box": [
+      72,
+      312.3,
+      76.6,
+      15.3
+     ],
+     "text": "3. Drill order"
+    },
+    {
+     "anchor": "p1.b9",
+     "kind": "text",
+     "under": "3. Drill order",
+     "hash": "1bb27a8a00bb94bf706ade7b",
+     "box": [
+      72,
+      336.4,
+      466.8,
+      26.4
+     ],
+     "text": "A written drill order from the Simulation Lead is required before the drill is started. A verbal request is not a drill order."
+    },
+    {
+     "anchor": "p1.b10",
+     "kind": "text",
+     "running": true,
+     "under": null,
+     "hash": "399c66e39923afd28901b85a",
+     "box": [
+      72,
+      745.4,
+      184,
+      9.4
+     ],
+     "text": "Synthetic test material — NOT FOR CLINICAL USE"
+    },
+    {
+     "anchor": "p1.b11",
+     "kind": "text",
+     "running": true,
+     "under": null,
+     "hash": "dc543a58377428068a8f4d05",
+     "box": [
+      395.1,
+      745.4,
+      144.9,
+      9.4
+     ],
+     "text": "RT-TRAIN-014 · Revision 1 · Page 1 of 3"
+    }
+   ]
+  },
+  {
+   "number": 2,
+   "drawn": true,
+   "blocks": [
+    {
+     "anchor": "p2.b1",
+     "kind": "text",
+     "running": true,
+     "under": null,
+     "hash": "399c66e39923afd28901b85a",
+     "box": [
+      72,
+      36.6,
+      216,
+      10.6
+     ],
+     "text": "Synthetic test material — NOT FOR CLINICAL USE"
+    },
+    {
+     "anchor": "p2.b2",
+     "kind": "heading",
+     "under": null,
+     "hash": "57bb4dd253bc68ca8d28145c",
+     "box": [
+      72,
+      93.3,
+      129.3,
+      15.3
+     ],
+     "text": "4. Rates by age band"
+    },
+    {
+     "anchor": "p2.b3",
+     "kind": "table",
+     "under": "4. Rates by age band",
+     "hash": "b77d7cac2dfd70ca3db357d6",
+     "box": [
+      77,
+      117.8,
+      429.6,
+      49.8
+     ],
+     "columns": [
+      "Age band",
+      "Starting rate",
+      "Highest rate",
+      "Recheck after"
+     ],
+     "rows": [
+      {
+       "anchor": "p2.b3.r1",
+       "hash": "99083c68a7d7f72e02795390",
+       "cells": [
+        "Adult (18 years and over)",
+        "12 mk/min",
+        "20 mk/min",
+        "10 minutes"
+       ],
+       "text": "Age band: Adult (18 years and over) · Starting rate: 12 mk/min · Highest rate: 20 mk/min · Recheck after: 10 minutes"
+      },
+      {
+       "anchor": "p2.b3.r2",
+       "hash": "ce2b820a987998b84e70ec24",
+       "cells": [
+        "Pediatric (under 18 years)",
+        "6 mk/min",
+        "10 mk/min",
+        "5 minutes"
+       ],
+       "text": "Age band: Pediatric (under 18 years) · Starting rate: 6 mk/min · Highest rate: 10 mk/min · Recheck after: 5 minutes"
+      }
+     ]
+    },
+    {
+     "anchor": "p2.b4",
+     "kind": "heading",
+     "under": null,
+     "hash": "86e8ecad39e4e447c36dabc0",
+     "box": [
+      72,
+      192.3,
+      75.1,
+      15.3
+     ],
+     "text": "5. Adult drill"
+    },
+    {
+     "anchor": "p2.b5",
+     "kind": "text",
+     "under": "5. Adult drill",
+     "hash": "5cd5da3fa8aa2b463effdfb6",
+     "box": [
+      72,
+      216.4,
+      447.6,
+      26.4
+     ],
+     "text": "For an adult manikin, start the bellows at 12 mk/min. At each recheck, raise the rate by 2 mk/min while the green lamp stays lit. Never set an adult rate above 20 mk/min."
+    },
+    {
+     "anchor": "p2.b6",
+     "kind": "heading",
+     "under": null,
+     "hash": "195c488ff4912bd75a67b9ba",
+     "box": [
+      72,
+      259.3,
+      96.8,
+      15.3
+     ],
+     "text": "6. Pediatric drill"
+    },
+    {
+     "anchor": "p2.b7",
+     "kind": "text",
+     "under": "6. Pediatric drill",
+     "hash": "2d7c995d17aa7155e256b57b",
+     "box": [
+      72,
+      283.4,
+      451.1,
+      26.4
+     ],
+     "text": "For a pediatric manikin, fit the small cuff and start the bellows at 6 mk/min. At each recheck, raise the rate by 1 mk/min while the green lamp stays lit. Never set a pediatric rate above 10 mk/min."
+    },
+    {
+     "anchor": "p2.b8",
+     "kind": "text",
+     "running": true,
+     "under": null,
+     "hash": "399c66e39923afd28901b85a",
+     "box": [
+      72,
+      745.4,
+      184,
+      9.4
+     ],
+     "text": "Synthetic test material — NOT FOR CLINICAL USE"
+    },
+    {
+     "anchor": "p2.b9",
+     "kind": "text",
+     "running": true,
+     "under": null,
+     "hash": "1e2cfc8a855c5389ab1abb74",
+     "box": [
+      395.1,
+      745.4,
+      144.9,
+      9.4
+     ],
+     "text": "RT-TRAIN-014 · Revision 1 · Page 2 of 3"
+    }
+   ]
+  },
+  {
+   "number": 3,
+   "drawn": true,
+   "blocks": [
+    {
+     "anchor": "p3.b1",
+     "kind": "text",
+     "running": true,
+     "under": null,
+     "hash": "399c66e39923afd28901b85a",
+     "box": [
+      72,
+      36.6,
+      216,
+      10.6
+     ],
+     "text": "Synthetic test material — NOT FOR CLINICAL USE"
+    },
+    {
+     "anchor": "p3.b2",
+     "kind": "heading",
+     "under": null,
+     "hash": "5af106f6f8bdef3290d55912",
+     "box": [
+      72,
+      93.3,
+      224.7,
+      15.3
+     ],
+     "text": "7. When the drill must not be started"
+    },
+    {
+     "anchor": "p3.b3",
+     "kind": "text",
+     "under": "7. When the drill must not be started",
+     "hash": "f6c8b573b5f25b980a4348ff",
+     "box": [
+      72,
+      117.4,
+      461.6,
+      26.4
+     ],
+     "text": "Do not start the drill if the amber seal lamp on the manikin is lit, or if the bellows was serviced within the last 24 hours. This applies to adult and pediatric drills."
+    },
+    {
+     "anchor": "p3.b4",
+     "kind": "heading",
+     "under": null,
+     "hash": "8344b8777b436b0896899361",
+     "box": [
+      72,
+      160.3,
+      96.8,
+      15.3
+     ],
+     "text": "8. When to stop"
+    },
+    {
+     "anchor": "p3.b5",
+     "kind": "text",
+     "under": "8. When to stop",
+     "hash": "d87f6d5883b65b3721e493cd",
+     "box": [
+      72,
+      184.4,
+      364.2,
+      12.4
+     ],
+     "text": "Stop the drill at once if the red lamp lights or the gauge reads above 30 marks."
+    },
+    {
+     "anchor": "p3.b6",
+     "kind": "heading",
+     "under": null,
+     "hash": "b182fdb8c80bc183f11f08d5",
+     "box": [
+      72,
+      213.3,
+      83.8,
+      15.3
+     ],
+     "text": "9. Who to call"
+    },
+    {
+     "anchor": "p3.b7",
+     "kind": "text",
+     "under": "9. Who to call",
+     "hash": "0db05b5df2803feb30cc57b6",
+     "box": [
+      72,
+      237.4,
+      450.6,
+      26.4
+     ],
+     "text": "After stopping, call the Simulation Lead. If the Simulation Lead does not answer within 5 minutes, call the Education Supervisor."
+    },
+    {
+     "anchor": "p3.b8",
+     "kind": "heading",
+     "under": null,
+     "hash": "1d5ad03b1d488501d2595832",
+     "box": [
+      72,
+      280.3,
+      143.8,
+      15.3
+     ],
+     "text": "Figure 1. Start decision"
+    },
+    {
+     "anchor": "p3.b9",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "307d9d291f0a0e9b5a2ff9d1",
+     "box": [
+      281,
+      305,
+      10.9,
+      10
+     ],
+     "text": "No"
+    },
+    {
+     "anchor": "p3.b10",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "2edf4b58840c3959cc5b0bf0",
+     "box": [
+      85,
+      313.2,
+      90.8,
+      11.2
+     ],
+     "text": "Is a drill order on file?"
+    },
+    {
+     "anchor": "p3.b11",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "31c181f7123fd0ed64a2a99c",
+     "box": [
+      329,
+      313.2,
+      200.1,
+      11.2
+     ],
+     "text": "No order: do not start. Ask the Simulation Lead."
+    },
+    {
+     "anchor": "p3.b12",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "f701805235c3064b39a47c34",
+     "box": [
+      173,
+      338.5,
+      14.6,
+      10
+     ],
+     "text": "Yes"
+    },
+    {
+     "anchor": "p3.b13",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "f701805235c3064b39a47c34",
+     "box": [
+      281,
+      371,
+      14.6,
+      10
+     ],
+     "text": "Yes"
+    },
+    {
+     "anchor": "p3.b14",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "321536c14e6a1d256300fc5f",
+     "box": [
+      85,
+      379.2,
+      110.9,
+      11.2
+     ],
+     "text": "Is the amber seal lamp lit?"
+    },
+    {
+     "anchor": "p3.b15",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "d1a0be807c6b9d48aa99e6c4",
+     "box": [
+      329,
+      379.2,
+      88.7,
+      11.2
+     ],
+     "text": "Lamp lit: do not start."
+    },
+    {
+     "anchor": "p3.b16",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "307d9d291f0a0e9b5a2ff9d1",
+     "box": [
+      173,
+      404.5,
+      10.9,
+      10
+     ],
+     "text": "No"
+    },
+    {
+     "anchor": "p3.b17",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "18e8ccec74e6519c145bb6a4",
+     "box": [
+      329,
+      431.2,
+      105.1,
+      11.2
+     ],
+     "text": "Adult: start at 12 mk/min."
+    },
+    {
+     "anchor": "p3.b18",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "50cf29eb3113d639413de903",
+     "box": [
+      85,
+      445.2,
+      134.6,
+      11.2
+     ],
+     "text": "Which age band is the manikin?"
+    },
+    {
+     "anchor": "p3.b19",
+     "kind": "text",
+     "figure": true,
+     "under": "Figure 1. Start decision",
+     "hash": "be84d6e64986b5e9231c4f05",
+     "box": [
+      329,
+      467.2,
+      115.1,
+      11.2
+     ],
+     "text": "Pediatric: start at 6 mk/min."
+    },
+    {
+     "anchor": "p3.b20",
+     "kind": "text",
+     "running": true,
+     "under": null,
+     "hash": "399c66e39923afd28901b85a",
+     "box": [
+      72,
+      745.4,
+      184,
+      9.4
+     ],
+     "text": "Synthetic test material — NOT FOR CLINICAL USE"
+    },
+    {
+     "anchor": "p3.b21",
+     "kind": "text",
+     "running": true,
+     "under": null,
+     "hash": "741bd9bd04adaf54ca7ae7b7",
+     "box": [
+      395.1,
+      745.4,
+      144.9,
+      9.4
+     ],
+     "text": "RT-TRAIN-014 · Revision 1 · Page 3 of 3"
+    }
+   ]
+  }
+ ]
+}
