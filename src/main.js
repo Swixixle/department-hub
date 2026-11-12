@@ -567,7 +567,7 @@ function protocolsScreen() {
   if (view.shelf === 'references' && referenceList) return referencesView({ list:referenceList, query:view.refQuery, section:view.refSection, retired:view.refRetired, today }, viewTools);
   if (!view.family) return libraryView({ library:state.protocols, today, documents:state.documents, query:view.query, results:view.query ? searchLibrary(state.protocols, view.query, today) : [], keeper:isKeeper(), demo:publicDemo,
     sampleNext:['1', '2'].find(label => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + label + '.pdf')) || null, references:referenceList,
-    cardSetOffered:!(state.protocols.knowledge || []).some(set => set.id === 'blood-gases-adult' && !set.withdrawn) }, viewTools);
+    cardSetOffered:!(state.protocols.knowledge || []).some(set => set.id === 'blood-gases-adult-captured' && !set.withdrawn) }, viewTools);
   const revision = shownRevision();
   return familyView({ library:state.protocols, today, familyId:view.family, revisionId:revision?.id, pane:view.pane, cite:view.cite, keeper:isKeeper(), held:revision ? originals.get(revision.digest) : undefined,
     sampleMapping:Boolean(revision && SAMPLE_PROTOCOL.test(revision.file.name)), withdrawing:view.withdrawing, fromAsk:view.fromAsk && Boolean(ui.lastAsk),
@@ -1017,7 +1017,8 @@ function dialogMarkup() {
     // Recheck the current records and viewer every time; never reopen a cached keeper-only answer.
     const result = q ? currentAsk() : null;
     const canRemember = result?.taught || (ui.dialog.opened?.startsWith('doc|') && result?.items.some(entry => entry.go === ui.dialog.opened));
-    const item = entry => '<div class="ask-item' + (entry.branch && !entry.go ? ' branch' : '') + '"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h((entry.go?.startsWith('doc|') ? 'Legacy document, not a reviewed protocol · ' : '') + entry.sub) + '</small>' : '') + '</div>' +
+    const item = entry => '<div class="ask-item' + (entry.branch && !entry.go ? ' branch' : '') + '"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h((entry.go?.startsWith('doc|') ? 'Legacy document, not a reviewed protocol · ' : '') + entry.sub) + '</small>' : '') +
+      (entry.quote ? entry.quote.map(text => '<blockquote class="source-quote">' + h(text) + '</blockquote>').join('') : '') + '</div>' +
       (entry.href ? '<a class="secondary link-button" href="' + h(entry.href) + '" target="_blank" rel="noopener noreferrer">Open official source ↗</a>' : entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
     return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
       '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
@@ -1410,8 +1411,9 @@ async function act({action, value, kind}) {
     case 'knowledge-open': ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'knowledge:' + value, withdrawing:false }; ui.scrollTo = '.content'; break;
     case 'knowledge-add': {
       keeperOnly();
-      const set = (await import('./reference/cards-blood-gases.json')).default;
-      await protocolStep(addSet(state.protocols, set, state.actor, new Date().toISOString()), 'Reference cards added, unchecked. None answers until it has been compared with the cited page.');
+      const [set, text, licence] = (await Promise.all([import('./reference/cards-blood-gases.json'), import('./reference/sources/blinders-cef48181-5ed3-4ff5-b07d-382304cdcf95.txt?raw'),
+        import('./reference/sources/blinders-b0473561-e3f8-41c7-bb7f-0f8267669a62.txt?raw')])).map(module => module.default);
+      await protocolStep(await addSet(state.protocols, set, { text, licence }, state.actor, new Date().toISOString()), 'Reference cards added, unchecked. The captured page matched its receipt. None answers until it has been compared with its passages.');
       ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'knowledge:' + set.id, withdrawing:false };
       break;
     }

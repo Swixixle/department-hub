@@ -7,7 +7,7 @@ import { applicable, historyOf, standing, STANDING, shortDigest, familyOf, revis
 import { passageAt } from './pdftext.js';
 import { reviewHolds, validateBundle, wholeRule } from './bundles.js';
 import { cautionsFor, searchReferences } from './references.js';
-import { cardHolds, cite, NOT_A_PROTOCOL, CUSTODY } from './facts.js';
+import { cardHolds, cite, passagesOf, NOT_A_PROTOCOL, CUSTODY, CARD_FORMAT } from './facts.js';
 
 export const NOT_AUTHORITY = 'Recorded for the profile selected on this device. This prototype does not verify who that is, and a recorded review is not clinical sign-off.';
 export const HELD_HERE = 'This is the copy held on this device. Department Hub cannot tell whether whoever issued a protocol has published a newer one.';
@@ -40,10 +40,10 @@ export function libraryView({ library, today, documents, query, results, keeper,
       ? 'Adds revision 1 of a made-up training drill (' + h(SYNTHETIC) + ') exactly as a real file would be added: unchecked, unreviewed and answering nothing until you take each step.'
       : 'Adds revision 2 of the invented drill, effective 1 November 2026. From that date revision 1 is history, and nothing answers until revision 2 has been checked and reviewed.') + '</p>' +
       button(sampleNext === '1' ? 'Add the invented protocol' : 'Add revision 2 of the invented protocol', 'protocol-sample', 'class="secondary"') + '</div>' : '') +
-    '<h2 class="group-head">Reference knowledge</h2><p class="subtle">Short cards for general facts such as a normal range or a definition. Each states its figures, names the page they were read from and links to it. A card answers in Ask only after a person here has compared it with that page. ' + h(NOT_A_PROTOCOL) + '</p>' +
+    '<h2 class="group-head">Reference knowledge</h2><p class="subtle">Short cards for general facts such as a normal range or a definition. Each rests on passages of a page held here exactly as captured, and every figure on a card must appear in them. A card answers in Ask only after a person here has compared it with its passages. ' + h(NOT_A_PROTOCOL) + '</p>' +
     ((library.knowledge || []).filter(set => !set.withdrawn).length ? '<div class="line-list">' + library.knowledge.filter(set => !set.withdrawn).map(set => { const done = set.cards.filter(card => cardHolds(set, card)).length;
       return '<div><span><b>' + h(set.title) + '</b> <small>' + h(done + ' of ' + set.cards.length + ' cards checked · ' + set.source.publisher) + '</small></span><span class="pair">' + button('Open', 'knowledge-open', 'class="secondary" ' + valueAttr(set.id)) + '</span></div>'; }).join('') + '</div>' : '<p class="subtle">No reference cards are held.</p>') +
-    (keeper && cardSetOffered ? '<p>' + button('Add the blood-gas reference cards', 'knowledge-add', 'class="secondary"') + ' <span class="subtle">Twelve cards on adult arterial blood gas values, from an openly licensed textbook. They arrive unchecked.</span></p>' : '') +
+    (keeper && cardSetOffered ? '<p>' + button('Add the blood-gas reference cards', 'knowledge-add', 'class="secondary"') + ' <span class="subtle">Twelve cards on adult arterial blood gas values, resting on a Blinders capture of an openly licensed textbook page. They arrive unchecked.</span></p>' : '') +
     '<h2 class="group-head">Professional references</h2><p class="subtle">Published guidelines from AARC and others, and NBRC’s credentialing pages: titles and links to the official originals. Department Hub holds none of their text and answers nothing from them. They are not your hospital’s protocols.</p>' +
     (references ? '<p>' + button('Browse ' + references.records.length + ' professional references', 'reference-shelf', 'class="secondary"') + '</p>' : '<p class="subtle">The reference list is loading.</p>') +
     '<h2 class="group-head">Pasted documents</h2><p class="subtle">Added before protocols were kept as files, or pasted as plain text. Ask searches their words and quotes what it finds. They are not reviewed protocols and do not become one by being here.</p>' +
@@ -179,19 +179,26 @@ export function referencesView({ list, query, section, retired, today }, { h, bu
 // are, how many times they were read, and one button a person presses after looking.
 export function knowledgeView({ set, keeper, withdrawing }, { h, button, valueAttr }) {
   if (!set) return '<div class="panel empty"><h3>Those cards are no longer held</h3>' + button('All protocols', 'protocol-home', 'class="secondary"') + '</div>';
-  const done = set.cards.filter(card => cardHolds(set, card)).length;
+  const done = set.cards.filter(card => cardHolds(set, card)).length, captured = set.format === CARD_FORMAT && set.held, capture = set.source.capture;
+  const quote = text => '<blockquote class="source-quote">' + h(text) + '</blockquote>';
   return '<p class="pair start">' + button('‹ All protocols', 'protocol-home', 'class="text-button"') + '</p><div class="intro"><div><div class="eyebrow">REFERENCE KNOWLEDGE</div><h1>' + h(set.title) + '</h1>' +
     '<div class="standing-line"><span class="badge standing ' + (set.withdrawn ? 'withdrawn' : done === set.cards.length ? 'active' : 'added') + '">' + (set.withdrawn ? 'Withdrawn' : done + ' of ' + set.cards.length + ' cards checked') + '</span></div></div></div>' +
     '<div class="notice reference-terms" role="note"><b>' + h(NOT_A_PROTOCOL) + '</b> ' + h(set.applies) + '</div>' +
-    '<section class="panel knowledge-source"><h3>Where these come from</h3><p>' + h(cite(set)) + '</p><p><a class="secondary link-button" href="' + h(set.source.url) + '" target="_blank" rel="noopener noreferrer">Open the source page ↗</a></p>' +
-      '<p class="subtle">' + h(set.written) + ' Read on ' + h(set.source.readOn) + '. The page may have changed since.</p></section>' +
-    (set.withdrawn ? '<div class="notice" role="status">Withdrawn by ' + h(set.withdrawn.by) + ': ' + h(set.withdrawn.reason) + '. These cards no longer answer.</div>' : '') +
-    '<h2 class="group-head">Cards</h2><p class="subtle">To check a card: open the source page, find the place named on the card, and compare every figure and unit. ' + h(CUSTODY) + '</p>' +
+    (set.withdrawn ? '<div class="notice" role="status">Withdrawn by ' + h(set.withdrawn.by) + ': ' + h(/[.!?]$/.test(set.withdrawn.reason) ? set.withdrawn.reason : set.withdrawn.reason + '.') + ' These cards no longer answer.</div>' : '') +
+    '<section class="panel knowledge-source"><h3>Where these come from</h3><p>' + h(cite(set)) + '</p>' +
+      (captured ? '<p>Held here as the exact text of the page, captured with ' + h(capture.tool) + ' on ' + h(capture.savedAt.slice(0, 16).replace('T', ' ')) + ' UTC: ' + h(capture.of) + '</p>' +
+        '<dl class="record"><dt>Capture</dt><dd>' + h(capture.id) + '</dd><dt>SHA-256</dt><dd class="digest">' + h(capture.sha256) + '</dd><dt>Size</dt><dd>' + h(capture.bytes.toLocaleString('en-US')) + ' bytes</dd></dl>' +
+        '<p class="subtle">When the cards were added, the held text was hashed and matched this receipt, and every figure on every card was found in the passages it cites.</p>' +
+        (set.held.licence ? '<p class="subtle">The page’s licence line, as captured: “' + h(set.held.licence.trim()) + '” Card wording is Department Hub’s; quoted passages are unchanged. <a href="' + h(set.source.licenceUrl) + '" target="_blank" rel="noopener noreferrer">The licence ↗</a></p>' : '')
+        : '<p class="notice">These cards are in the earlier format. Their figures were read from the page by an AI assistant and the page’s text is not held, so they no longer answer. Add the cards built on a captured copy instead.</p>') +
+      '<p><a class="secondary link-button" href="' + h(set.source.url) + '" target="_blank" rel="noopener noreferrer">Open the live page ↗</a></p><p class="subtle">The live page may have changed since it was captured. The captured text is what these cards rest on.</p></section>' +
+    '<h2 class="group-head">Cards</h2><p class="subtle">To check a card: read it, then read the passages under it, which are the captured page’s own words. Record the check only if the card says what they say, with every figure and unit the same. ' + h(CUSTODY) + '</p>' +
     '<div class="reference-list">' + set.cards.map(card => { const holds = cardHolds(set, card);
       return '<article class="panel bundle ' + (holds ? 'reviewed' : 'open') + '" data-card="' + h(card.id) + '"><h4>' + h(card.title) + ' <span class="badge ' + (holds ? '' : 'learning') + '">' + (holds ? 'Checked' : card.review ? 'Changed since it was checked' : 'Not checked') + '</span></h4>' +
-        '<p class="fair-line">' + h(card.answer) + '</p><p class="subtle">In the source: ' + h(card.where) + ' · ' + (card.read === 'twice' ? 'two separate readings of the page agreed on these figures' : 'read from the page once; not cross-checked') + '</p>' +
-        (holds ? '<p class="subtle">Checked against the page by ' + h(card.review.by) + ' on ' + h(String(card.review.at).slice(0, 10)) + '.</p>' :
-          keeper && !set.withdrawn ? button('I opened the page and this card matches it', 'knowledge-check', 'class="primary" ' + valueAttr(card.id)) : '') + '</article>'; }).join('') + '</div>' +
+        '<p class="fair-line">' + h(card.answer) + '</p>' +
+        (captured ? '<p class="subtle">The source’s own words · ' + h(card.where) + '</p>' + passagesOf(set, card).map(quote).join('') : '<p class="subtle">In the source: ' + h(card.where) + '</p>') +
+        (holds ? '<p class="subtle">Checked against these passages by ' + h(card.review.by) + ' on ' + h(String(card.review.at).slice(0, 10)) + '.</p>' :
+          keeper && captured && !set.withdrawn ? button('The card says what these passages say', 'knowledge-check', 'class="primary" ' + valueAttr(card.id)) : '') + '</article>'; }).join('') + '</div>' +
     (keeper && !set.withdrawn ? '<section class="panel protocol-step"><h3>Record</h3>' + (withdrawing ? '<form data-form="knowledge-withdraw"><label>Why are these cards being withdrawn? The reason is kept with the record.<input name="reason" maxlength="200" required autocomplete="off"></label>' +
       '<div class="actions inline"><button class="danger">Withdraw these cards</button>' + button('Cancel', 'protocol-withdraw-cancel', 'class="secondary"') + '</div></form>' : '<p>' + button('Withdraw these cards…', 'protocol-withdraw', 'class="text-button"') + '</p>') + '</section>' : '');
 }

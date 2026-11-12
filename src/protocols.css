@@ -76,3 +76,7 @@
 .group-divider{margin:8px 0 0;padding-top:10px;border-top:1px solid var(--line)}
 .reference .badge{justify-self:start}
 .knowledge-source{max-width:900px;margin:10px 0;display:grid;gap:6px;justify-items:start}
+/* A captured page's own words. Tabs and line breaks are the page's table layout, kept as captured. */
+.source-quote{margin:6px 0 0;padding:8px 10px;border-left:3px solid var(--line);background:#fff;border-radius:0 6px 6px 0;white-space:pre-wrap;tab-size:3;overflow-wrap:anywhere;font-size:.9375rem;width:100%;box-sizing:border-box}
+.ask-item .source-quote{font-weight:400}
+.record .digest{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8125rem;overflow-wrap:anywhere}

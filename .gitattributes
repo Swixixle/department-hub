@@ -2,3 +2,6 @@
 # A whitespace "fix" while applying a patch would change their bytes and their fingerprints.
 public/fixtures/protocols/*.pdf binary
 tests/fixtures/protocols/*.pdf binary
+
+# Blinders captures are held byte for byte; their SHA-256 is checked against the receipt.
+src/reference/sources/*.txt binary

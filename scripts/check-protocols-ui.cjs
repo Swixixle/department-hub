@@ -183,7 +183,7 @@ const { JSDOM } = require('jsdom');
   await click('close');
   await actor('Jordan');
 
-  // Reference knowledge: cards arrive unchecked, answer only after a person records the check, and cite their page.
+  // Reference knowledge: cards rest on a held Blinders capture, arrive unchecked, answer only after a person records the check.
   await click('tab', 'protocols'); await click('protocol-home');
   assert.match(content(), /Reference knowledge[\s\S]*No reference cards are held\./);
   await click('knowledge-add');
@@ -191,6 +191,9 @@ const { JSDOM } = require('jsdom');
   assert.equal(document.querySelectorAll('[data-action="knowledge-check"]').length, 12);
   assert.match(content(), /0 of 12 cards checked[\s\S]*Reference knowledge\. It is not your hospital’s protocol and not an order for any patient\./);
   assert.equal(document.querySelector('.knowledge-source a.link-button').href, 'https://wtcs.pressbooks.pub/nursingfundamentals/chapter/15-5-acid-base-balance/');
+  assert.equal(document.querySelector('.knowledge-source .digest').textContent, 'cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7');
+  assert.equal(read().events.at(-1).details.sha256, 'cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7', 'the page the built app held is the captured page');
+  assert.ok([...document.querySelectorAll('[data-card="paco2"] .source-quote')].some(quote => quote.textContent.includes('\t35–45 mmHg\tLess than 25 mmHg.')), 'the card is shown over the captured row');
   reply = await ask('What is a normal PaCO2?');
   assert.match(reply, /A reference card on this is held and has not been checked against its source/);
   assert.ok(!/35-45/.test(reply), 'an unchecked card showed its figure');
@@ -202,12 +205,14 @@ const { JSDOM } = require('jsdom');
   assert.equal(localStorage.getItem(key), beforeCard);
   await actor('Jordan'); await click('tab', 'protocols');
   await click('knowledge-check', 'paco2');
-  assert.deepEqual([types().at(-1), read().events.at(-1).details.card, read().events.at(-1).details.where], ['Reference card checked', 'PaCO2', 'Table 15.5a']);
+  assert.deepEqual([types().at(-1), read().events.at(-1).details.card, read().events.at(-1).details.where], ['Reference card checked', 'PaCO2', 'Table 15.5a, PaCO2 row']);
   assert.match(content(), /1 of 12 cards checked/);
   reply = await ask('whats the normal range for PaCO2');
-  assert.match(reply, /Understood as: reference knowledge: paco2\.[\s\S]*Adult normal PaCO2 is 35-45 mmHg\. The source lists a PaCO2 less than 25 mmHg or greater than 60 mmHg as critical\.[\s\S]*Reference knowledge\. It is not your hospital’s protocol and not an order for any patient\./);
+  assert.match(reply, /Understood as: reference knowledge: paco2\.[\s\S]*Adult normal PaCO2 is 35-45 mmHg\. The source lists a PaCO2 less than 25 mmHg or greater than 60 mmHg as critical,[\s\S]*Reference knowledge\. It is not your hospital’s protocol and not an order for any patient\./);
   const cited = document.querySelector('.ask-answer .ask-item a.link-button');
   assert.deepEqual([cited.href, cited.target, cited.rel], ['https://wtcs.pressbooks.pub/nursingfundamentals/chapter/15-5-acid-base-balance/', '_blank', 'noopener noreferrer']);
+  assert.ok([...document.querySelectorAll('.ask-answer .source-quote')].some(quote => quote.textContent.includes('\t35–45 mmHg\tLess than 25 mmHg.')), 'the answer shows the source’s own words');
+  assert.match(reply, /exact text captured with Blinders on 2026-11-12, SHA-256 cf48652c…cde3e7/);
   assert.equal(find('ask-yes'), undefined, 'a reference card offers no Yes or No');
   reply = await ask('What is a normal pH?');
   assert.match(reply, /has not been checked against its source/, 'checking one card does not check another');
@@ -257,7 +262,11 @@ const { JSDOM } = require('jsdom');
   await click('close');
 
   // What was kept, and what was not.
-  const kept = JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(name => [name, localStorage.getItem(name)])));
+  // The captured textbook page is held on purpose, and it contains ordinary words such as "suction". It is set aside
+  // here so that the check is of what was typed, not of what the page says.
+  const unheld = value => { try { const parsed = JSON.parse(value); for (const set of parsed?.protocols?.knowledge || []) if (set.held) set.held = 'set aside'; return JSON.stringify(parsed); } catch { return value; } };
+  const kept = JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(name => [name, unheld(localStorage.getItem(name))])));
+  assert.ok(JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(name => [name, localStorage.getItem(name)]))).includes('WakeMed Pathology Laboratories'), 'the captured page is held in storage');
   for (const typed of ['Blue Trainer drill at', 'amber seal lamp serviced', 'swallow screen before', 'suction', 'normal range for PaCO2', 'normal SpO2']) assert.ok(!kept.includes(typed), 'storage holds what was typed: ' + typed);
   assert.deepEqual(types().slice(receiptsAtStart), ['Protocol reading confirmed', 'Protocol answers mapped', ...Array(6).fill('Protocol answer reviewed'), 'Protocol answers reviewed', 'Protocol revision made active',
     'Reference cards added', 'Reference card checked', 'Protocol revision withdrawn']);

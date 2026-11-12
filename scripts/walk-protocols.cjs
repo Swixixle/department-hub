@@ -335,6 +335,27 @@ const step = async (name, work) => { try { await work(); results.push([true, nam
     await page.setViewportSize({ width: 1360, height: 900 });
   });
 
+  await step('blood-gas cards are added from the held capture, and on a phone a checked card answers over the source’s own words', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await closeDialog(); await press('tab', 'protocols'); await press('protocol-home');
+    await press('knowledge-add'); await page.waitForSelector('[data-card="paco2"]');
+    const added = (await state()).events.at(-1);
+    assert.deepEqual([added.type, added.details.sha256, added.details.bytes], ['Reference cards added', 'cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7', 25965], 'the browser hashed the held page and it matched');
+    assert.match(await text('[data-card="paco2"]'), /35–45 mmHg\s+Less than 25 mmHg\./);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'the cards screen scrolls sideways on a phone');
+    await page.locator('[data-card="paco2"] .source-quote').nth(1).scrollIntoViewIfNeeded(); await shot('10-phone-cards');
+    await press('knowledge-check', 'paco2'); await settle();
+    await askFor('whats the normal range for PaCO2');
+    const answer = await text('.ask-answer');
+    assert.match(answer, /Adult normal PaCO2 is 35-45 mmHg/);
+    assert.match(answer, /PaCO2\s+Pressure of carbon dioxide in the blood\.[\s\S]*35–45 mmHg\s+Less than 25 mmHg\.\s+Greater than 60 mmHg\./, 'the answer shows the captured row');
+    assert.ok(await page.locator('.ask-answer .source-quote').first().isVisible());
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('.ask-answer .source-quote')].every(quote => quote.scrollWidth <= quote.clientWidth + 1)), true, 'a quoted passage is cut off');
+    await page.locator('.ask-answer .source-quote').nth(1).scrollIntoViewIfNeeded(); await shot('11-phone-card-answer');
+    await closeDialog();
+    await page.setViewportSize({ width: 1360, height: 900 });
+  });
+
   await step('no page error or console error occurred during the walk', async () => { assert.deepEqual(problems, []); });
 
   await browser.close(); server.close();
