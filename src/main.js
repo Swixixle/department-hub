@@ -159,9 +159,15 @@ const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Boar
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
   import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
   over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog',
-  'text-screen-blocked':'Text screen stops (including repeats and false alarms)' };
+  'text-screen-blocked':'Text screen stops (including repeats and false alarms)', 'my-links':'Opened your links', 'my-link-remove':'Removed one of their links', 'form:my-link':'Added one of their links' };
 // When the board was last opened on this device, so Ask can say what is new since then.
 const seenKey = storageKey + '-seen';
+// Links a person keeps for themselves (their own study rooms, say). Kept in this browser only: not in the workspace,
+// backups or receipts, and not shown to anyone else, because nothing here is shared.
+const linksKey = storageKey + '-my-links';
+const safeLink = value => { try { const url = new URL(String(value || '').trim()); return ['http:', 'https:'].includes(url.protocol) ? url.href : null; } catch { return null; } };
+let myLinks = (loadState(linksKey, []) || []).filter(link => link && typeof link.name === 'string' && safeLink(link.url));
+const saveLinks = () => { try { localStorage.setItem(linksKey, JSON.stringify(myLinks)); } catch { /* storage full: the links stay for this visit */ } };
 let sourceVersions = {};
 const versionsFor = async documents => Object.fromEntries(await Promise.all(documents.map(async doc => [doc.id, await documentVersion(doc)])));
 let boardSeen = loadState(seenKey, null);
@@ -296,7 +302,9 @@ function top() {
   return '<aside><div class="brand"><img src="' + h(asset('mark.svg')) + '" alt=""><div><b>Department Hub</b><small>WORKSPACE</small></div></div>' +
     '<div class="space-label">YOUR DEPARTMENT</div><div class="space-name">Respiratory Care</div><nav aria-label="Workspace">' +
     nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Board') + nav('requests', '⇄', 'Requests') + nav('fairness', '⚖', 'Fairness') + nav('people', '☎', 'Directory') +
-    '</nav><div class="aside-bottom"><span class="status-dot"></span>' + (publicDemo ? 'Public demo · fictional data' :
+    '</nav><div class="my-links"><div class="space-label">YOUR LINKS</div>' +
+    myLinks.map(link => '<a class="nav-item my-link" href="' + h(link.url) + '" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">↗</span>' + h(link.name) + '</a>').join('') +
+    button(myLinks.length ? 'Edit your links' : 'Add a link for yourself', 'my-links', 'class="text-button"') + '</div><div class="aside-bottom"><span class="status-dot"></span>' + (publicDemo ? 'Public demo · fictional data' :
       button('Saved in this browser · ' + h(location.host), 'data', 'class="where" title="Backup, restore and where this workspace is kept"')) + '</div></aside>';
 }
 
@@ -1103,6 +1111,11 @@ function dialogMarkup() {
       '<p class="subtle">One line per person. Add a name, fix one, or clear a line to take someone off. A name entered twice is kept once.</p>' +
       nameLines(rows, rows.length) + knownList(actorNames()) + '<div class="actions"><button class="primary">Save</button></div></form>');
   }
+  if (type === 'my-links') return shell('Your links', '<p class="subtle">Links you keep for yourself, such as your own study rooms. They are kept only in this browser on this device: not in the workspace, not in backups or receipts, and nobody else sees them.</p>' +
+    (myLinks.length ? '<div class="line-list">' + myLinks.map((link, index) => '<div><span><b>' + h(link.name) + '</b> <small>' + h(link.url) + '</small></span><span class="pair">' + button('Remove', 'my-link-remove', 'class="secondary" ' + valueAttr(index)) + '</span></div>').join('') + '</div>' : '') +
+    '<form data-form="my-link"><label>Name<input name="name" maxlength="40" required autocomplete="off" placeholder="Chia Learning Rooms"></label>' +
+    '<label>Address<input name="url" type="url" maxlength="500" required autocomplete="off" inputmode="url" placeholder="http://127.0.0.1:…"></label>' +
+    '<div class="actions inline"><button class="primary">Add the link</button></div></form>');
   if (type === 'data') {
     const { restore, confirmErase } = ui.dialog;
     // A step that replaces or removes everything gets the sheet to itself: one question, two answers.
@@ -1872,6 +1885,8 @@ async function act({action, value, kind}) {
     case 'release': if (row) ui.dialog = { type:'release', row }; break;
     case 'over': { const [date, shift] = value.split('|'); ui.dialog = { type:'over', date, shift }; break; }
     case 'data': ui.dialog = { type:'data' }; break;
+    case 'my-links': ui.dialog = { type:'my-links' }; break;
+    case 'my-link-remove': myLinks = myLinks.filter((_, index) => index !== Number(value)); saveLinks(); ui.dialog = { type:'my-links' }; break;
     case 'staff-setup': ui.dialog = { type:'staff-setup' }; break;
     case 'erase':
       await clearSources();
@@ -1919,6 +1934,12 @@ async function submit(form) {
   const body = (data.body || '').trim();
   const message = { author:state.actor, body, created:new Date().toISOString() };
   switch (form.dataset.form) {
+    case 'my-link': {
+      const url = safeLink(data.url), name = String(data.name || '').trim().slice(0, 40);
+      if (!url || !name) { ui.flash = 'Give the link a name and an address that starts with http:// or https://.'; break; }
+      myLinks = [...myLinks.filter(link => link.url !== url), { name, url }].slice(0, 12); saveLinks(); ui.dialog = { type:'my-links' }; ui.flash = 'Added to your links, on this device only.';
+      break;
+    }
     case 'post': {
       const files = [...(form.querySelector('#post-files')?.files || [])];
       if (!body && !files.length) return;

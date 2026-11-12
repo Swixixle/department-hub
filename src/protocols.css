@@ -90,3 +90,9 @@
 .capture-picture{min-width:0;max-width:100%}
 .ask-item>div{min-width:0}
 .ask-answer{grid-template-columns:minmax(0,1fr)}
+/* Your links: kept on this device only, under the main navigation. */
+.my-links{display:grid;gap:5px}
+.my-links .space-label{margin-top:14px}
+.my-link{text-decoration:none}
+.my-links .text-button{color:#a8c1b5;justify-self:start;font-size:12px;padding:2px 10px}
+@media(max-width:780px){.my-links{display:none}}
