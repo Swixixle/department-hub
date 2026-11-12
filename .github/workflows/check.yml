@@ -1,0 +1,31 @@
+name: Check Department Hub
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install Pillow
+      - run: npm ci
+      - run: npm test
+      - run: python -m unittest discover -s tests -p 'test_*.py'
+      - run: npm run build
+      - run: npm run build:demo
+      - name: Prepare simulated interface checks
+        run: npm install --prefix "$RUNNER_TEMP/department-hub-ui" --no-package-lock --no-audit --no-fund jsdom@26.1.0
+      - name: Check production interface and receipts
+        run: NODE_PATH="$RUNNER_TEMP/department-hub-ui/node_modules" node scripts/check-ask-ui.cjs
