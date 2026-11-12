@@ -112,6 +112,16 @@ export function runPlan(plan, world) {
     return { status: eligible.length ? 'ok' : 'empty', period, rows: eligible, winners: eligible, missing: [] };
   }
 
+  // "who has more weekends than Blair": everybody past one person's figure. The mark is that person's own number,
+  // so it is reported too — a list of names without the number it had to beat is not an answer.
+  if (plan.op === 'threshold') {
+    const mark = rows.find(row => key(row.person) === key(plan.than));
+    if (!mark) return { status: 'empty', period, rows: eligible, winners: [], missing: [plan.than], mark: null };
+    const past = eligible.filter(row => key(row.person) !== key(plan.than)
+      && (plan.direction === 'lowest' ? row.value < mark.value : row.value > mark.value));
+    return { status: 'ok', period, rows: eligible, winners: past, missing: [], mark };
+  }
+
   if (plan.op === 'compare') {
     const wanted = plan.people.filter(name => !excluded.has(key(name)));
     const found = wanted.map(name => eligible.find(row => key(row.person) === key(name)) || null);

@@ -23,12 +23,13 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const argv = process.argv.slice(2);
 const show = argv.includes('--show');
 const wanted = argv.filter(value => !value.startsWith('--'));
-const sets = (wanted.length ? wanted : ['set-a', 'set-b']).map(name => name.replace(/\.json$/, ''));
+const sets = (wanted.length ? wanted : ['set-a', 'set-b', 'set-c']).map(name => name.replace(/\.json$/, ''));
 
 // What each set measured the first time it was run, before anything was changed because of it.
 const BEFORE = {
   'set-a': 'first run, before any fix: 49 correct, 0 clarifications, 12 non-answers, 2 confidently wrong of 63',
-  'set-b': 'first run, before any fix: 42 correct, 0 clarifications, 4 non-answers, 2 confidently wrong of 48'
+  'set-b': 'first run, before any fix: 42 correct, 0 clarifications, 4 non-answers, 2 confidently wrong of 48',
+  'set-c': 'written for the threshold operation; its first-run figure is recorded in docs/ASK-PLANNER.md'
 };
 
 let worst = 0;
@@ -38,7 +39,7 @@ for (const name of sets) {
   for (const [question, want] of cases) {
     const found = ask(question, world);
     const plan = found.context?.plan || null;
-    const isPlan = ['rank', 'compare', 'count'].includes(found.kind);
+    const isPlan = ['rank', 'compare', 'count', 'threshold'].includes(found.kind);
     const clarifies = /I can read that question but I cannot work out|I do not have anybody on the schedule called|A fair share is worked out within one shift|^Which/.test(found.title || '');
 
     if (want.notAPlan) {
@@ -75,6 +76,7 @@ for (const name of sets) {
       const got = (plan?.people || []).slice().sort().join(',');
       if (!want.people.every(name => got.includes(name))) off.push('people [' + got + '] missing ' + want.people.join(','));
     }
+    if (want.than && (plan?.than ?? null) !== want.than) off.push('than ' + plan?.than + ' not ' + want.than);
     if (want.period && !plan?.when) off.push('the period was dropped');
     if (off.length) tally.wrong.push([question, off.join('; ')]);
     else tally.correct.push([question, found.understood]);

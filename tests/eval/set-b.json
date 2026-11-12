@@ -137,7 +137,8 @@
    "people": [
     "Morgan",
     "Jordan"
-   ]
+   ],
+   "direction": "highest"
   }
  ],
  [
@@ -148,7 +149,8 @@
    "people": [
     "Blair",
     "Jamie"
-   ]
+   ],
+   "direction": "highest"
   }
  ],
  [
@@ -159,7 +161,8 @@
    "people": [
     "Casey",
     "Emery"
-   ]
+   ],
+   "direction": "lowest"
   }
  ],
  [
@@ -171,7 +174,8 @@
    "people": [
     "Blair",
     "Casey"
-   ]
+   ],
+   "direction": "highest"
   }
  ],
  [

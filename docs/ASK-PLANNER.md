@@ -37,13 +37,14 @@ that the right query ran, and the only way to tell from outside is to see the pl
 ## What the plan holds
 
 ```js
-{ op: 'rank' | 'compare' | 'count',
+{ op: 'rank' | 'compare' | 'count' | 'threshold',
   metric: 'weekend-shifts' | 'distinct-weekends' | 'weekend-fair-gap' | 'shifts' | 'hours' | 'charge-turns' | 'icu-turns' | 'holidays',
   direction: 'highest' | 'lowest',
   limit: 3,                       // "the top three"
   shift: 'D' | 'N' | null,
   role: 'charge' | 'icu' | null,
   people: ['Blair', 'Casey'],     // for a comparison between named people
+  than: 'Casey',                  // for a threshold: the one figure everybody else is measured against
   exclude: ['Avery'],
   when: { from, to, label } | null,
   ties: true,
@@ -54,6 +55,33 @@ that the right query ran, and the only way to tell from outside is to see the pl
 These are parts that combine. One more kind of question is one more value, not one more branch: the same machinery
 answers the fewest, the top three, a comparison between two people, a month, a role, several exclusions, and a
 follow-up that changes any of those.
+
+## Four operations, and the line between two of them
+
+| Operation | The question | What comes back |
+| --- | --- | --- |
+| rank | who has the most weekends on day shift | the top (or bottom), ties together |
+| compare | who has more weekend day shifts, Blair or Casey | the two named people, and which leads |
+| count | how many separate weekends does each person have | every person's figure, nobody singled out |
+| threshold | who has more weekend day shifts than Casey | everybody past Casey, and Casey's own figure as the mark |
+
+**"more than" was in the build brief's list of things that must never be silently dropped, and it was being dropped.**
+The planner did not claim a threshold question at all, so it fell through to the ordinary routing, and *"does anyone
+have more weekend day shifts than Blair"* came back as *"Blair has 1 shift this weekend"* — a confident answer to a
+different question, with the metric word "weekend" eaten as a date on the way out. That is now its own operation.
+
+The line between a comparison and a threshold is which side the question names:
+
+- An open subject — "**who** has more than Blair", "**does anyone** beat Blair" — names only the mark. A threshold.
+- A named near side — "**do I** work more weekends than Blair", "**does Morgan** do more than Jordan" — names both
+  sides. A comparison.
+
+"More than their fair share" is not a threshold either: there is no person being measured against, because "more
+than their share" *is* the metric. All three of those distinctions were got wrong on the first attempt and found by
+the evaluation sets rather than by thinking about it harder.
+
+A threshold reports the mark's own figure alongside the names. A list of people who beat Casey, without the number
+they had to beat, is not an answer.
 
 ## Metrics that are not the same question
 
@@ -135,10 +163,23 @@ The numbers that mean something are the first ones, before anything was changed 
 | --- | --- | --- |
 | set A, 63 questions | **49 correct, 2 confidently wrong** | 63 correct, 0 wrong |
 | set B, 48 questions, written after set A's fixes | **42 correct, 2 confidently wrong** | 48 correct, 0 wrong |
+| set C, 18 questions, written for the threshold operation | **17 correct, 0 confidently wrong, 1 non-answer** | 18 correct, 0 wrong |
 
-Both sets have now been tuned against, and after that a set reports whether a fix held, not how good the engine is.
-A new measurement needs a new set. The two serious misses on set B were both the dangerous kind — a constraint
-silently dropped — and both were a missing word rather than a missing idea.
+Each set has now been tuned against, and after that a set reports whether a fix held, not how good the engine is. A
+new measurement needs a new set. The two serious misses on set B were both the dangerous kind — a constraint
+silently dropped — and both were a missing word rather than a missing idea. Set C's one miss was "who is above
+Casey on weekend day shifts": a threshold written without the word "than".
+
+### A gap in the labels, and what it cost
+
+The compare cases in sets A and B originally labelled the operation, the metric and the people, **but not the
+direction**. So when the direction was read as "highest" whatever the question said — "who has fewer shifts, Emery
+or Indigo" naming the one with more — the scorer passed it, and the bug was found by review instead. A label that
+does not check a field cannot catch a fault in it.
+
+Every compare case now labels its direction, and adding those labels immediately paid for itself: it caught three
+cases where the new threshold operation had taken over questions that were comparisons. The lesson generalises past
+this file — a test that asserts less than it could is the thing that lets a fault through while reporting green.
 
 **What none of this measures.** Both sets were written by whoever wrote the engine, who knew which words it
 recognises. They show that a stated constraint survives into the plan. They show nothing about whether a respiratory

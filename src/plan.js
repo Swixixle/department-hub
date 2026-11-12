@@ -38,6 +38,10 @@ const COUNTS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, e
 // comma or a question mark ends the exclusion rather than swallowing the rest of the sentence.
 // Every way a person says "leave this one out". A missing one here is the worst kind of miss: the question is
 // answered confidently about a group the asker did not ask about. Found by an evaluation set, not by guessing.
+const THRESHOLD_LEAD = /\bthan\b|\b(?:beats?|beat|outworks?)\b|\b(?:above|over|under|below|ahead of|behind)\b/g;
+// Who the question is asking ABOUT. An interrogative on the near side means the askers wants a list — a threshold.
+// A person or the asker on the near side means two named sides, which is a comparison.
+const OPEN_SUBJECT = /^\s*(?:so|ok|okay|um|and|well)?[\s,]*(?:who|whos|who's|whose|which|anyone|anybody|does anyone|does anybody|is there anyone|is there anybody|is anyone|is anybody|any ?one|any ?body)\b/i;
 const EXCLUDE_LEAD = /\b(?:other than|apart from|aside from|except(?: for)?|excluding|not counting|leaving out|leave out|left out|taking out|take out|without|besides|but not|minus|skip|skipping|ignore|ignoring|forget|barring|save for|everyone but|everybody but|anyone but|all but)\b/g;
 const INCLUDE_LEAD = /\b(?:include|including|count|counting|add|put|with)\b/g;
 
@@ -58,6 +62,11 @@ const COMPARE_WORDS = /\b(?:more|less|fewer|higher|lower|than|compare[sd]?|compa
 const EACH_PERSON = /\b(?:each|every)\s+(?:person|one|member|therapist|rt)\b|\beveryone\b|\beverybody\b|\bper\s+person\b|\beach\s+of\s+(?:them|us)\b/;
 const COUNT_WORDS = /\b(?:how many|how much|number of|count|total)\b/;
 const FIRST_PERSON = /\b(?:i|me|my|mine|myself)\b/;
+// "who has more weekends than Blair", "does anyone beat Blair on weekend days", "who works fewer than me".
+// A threshold, not a ranking and not a two-person comparison: it asks for everybody past one person's figure.
+// The earlier version of this file dropped the "than Blair" and the question fell through to an ordinary lookup,
+// which answered Blair's own shifts instead — the exact failure the build brief names for "more than".
+const THRESHOLD = /\b(?:more|less|fewer|higher|lower|greater|beats?|beat|above|over|under|below|behind|ahead of)\b[^?]*?\bthan\b|\b(?:beats?|beat|outworks?)\b|\b(?:above|over|under|below|ahead of|behind)\s+[a-z][a-z'-]{2,}/;
 
 // A follow-up that continues the last question rather than starting a new one. Without this, "who is on tonight?"
 // after a ranking would be read as a date change to the ranking.
@@ -87,6 +96,7 @@ const positionsOf = (text, names) => names.map(name => {
 
 // Words that can follow an exclusion without being a name: "except on weekends", "excluding the night shift".
 const NOT_A_NAME = new Set([...CORE_WORDS, 'the', 'a', 'an', 'and', 'or', 'on', 'in', 'for', 'from', 'of', 'this', 'that',
+  'their', 'theirs', 'his', 'hers', 'its', 'our', 'ours', 'your', 'yours', 'mine', 'own', 'usual', 'average',
   'these', 'those', 'time', 'times', 'one', 'two', 'three', 'four', 'five', 'me', 'my', 'myself', 'him', 'her', 'them',
   'anyone', 'anybody', 'everyone', 'everybody', 'nobody', 'staff', 'crew', 'side', 'nights', 'days', 'shifts', 'shift']);
 
@@ -114,6 +124,7 @@ function namesAfter(text, leads, names) {
   return { taken, unresolved };
 }
 
+const metricOf = q => readMetric(q);
 function readMetric(q) {
   // "above their fair share", "over their weekend share", "under his share of weekends". Up to two words sit
   // between the possessive and "share", which is what a noun-phrase head would give for nothing.
@@ -169,7 +180,22 @@ export function readPlan({ text, names = [], people = [], when = null, actor = '
   const ranks = RANK_WORDS.test(q) || (metric === 'weekend-fair-gap' && /^ (?:who|which|whos|who's)\b/.test(q));
   // "do i work more weekends than Blair" compares the asker with a named person, so the asker is a subject too.
   const withActor = actor && FIRST_PERSON.test(q) && subjects.length ? [actor, ...subjects] : subjects;
-  const compares = withActor.length > 1 && COMPARE_WORDS.test(q);
+  // "than <person>" or "beats <person>": whoever is named is the mark to pass, not a person being ranked.
+  // A threshold asks for everybody past one person. It needs an open subject ("who", "does anyone") — with a person
+  // or the asker named on the near side the question compares two sides instead, and "more than their fair share"
+  // is a metric rather than a mark, so it is not a threshold at all.
+  const lead = THRESHOLD.exec(q);
+  const nearSide = lead ? q.slice(0, lead.index) : q;
+  const looksLikeThreshold = Boolean(lead) && OPEN_SUBJECT.test(q.trim()) && metricOf(q) !== 'weekend-fair-gap'
+    && !FIRST_PERSON.test(nearSide) && !positionsOf(nearSide, names).length;
+  const after = looksLikeThreshold ? namesAfter(q, THRESHOLD_LEAD, names) : { taken: [], unresolved: [] };
+  const marked = looksLikeThreshold
+    ? after.taken[0] || (FIRST_PERSON.test(lead ? q.slice(lead.index) : q) ? actor : null) || null : null;
+  const threshold = marked && metricOf(q) ? marked : null;
+  // A name after "than" that matches nobody. Without this the whole threshold is dropped and the question falls
+  // through to an ordinary lookup, which is how "more than" went missing in the first place.
+  const unknownMark = !marked && looksLikeThreshold && metricOf(q) ? after.unresolved : [];
+  const compares = !threshold && withActor.length > 1 && COMPARE_WORDS.test(q);
   const perPerson = EACH_PERSON.test(q) && COUNT_WORDS.test(q);
   const unsupported = UNSUPPORTED.filter(([pattern]) => pattern.test(q)).map(([, what]) => what);
 
@@ -180,9 +206,9 @@ export function readPlan({ text, names = [], people = [], when = null, actor = '
   // A modifier that cannot be executed is claimed even without a ranking word, so that "what percentage of
   // weekends does Blair work" is refused rather than answered with Blair's weekend count, which is a different
   // question wearing the same clothes.
-  if (!ranks && !compares && !perPerson && !unsupported.length) return null;
+  if (!ranks && !compares && !perPerson && !threshold && !unknownMark.length && !unsupported.length) return null;
 
-  const op = perPerson && !ranks && !compares ? 'count' : compares && !ranks ? 'compare' : 'rank';
+  const op = threshold || unknownMark.length ? 'threshold' : perPerson && !ranks && !compares ? 'count' : compares && !ranks ? 'compare' : 'rank';
   const direction = op === 'count' ? 'highest' : LOW.test(q) && !HIGH.test(q) ? 'lowest' : LOW.test(q) && HIGH.test(q) ? (q.search(LOW) < q.search(HIGH) ? 'lowest' : 'highest') : 'highest';
 
   // "weekend day shifts" names a metric, not a period. parseWhen reads the bare word as "this weekend", which would
@@ -201,14 +227,16 @@ export function readPlan({ text, names = [], people = [], when = null, actor = '
     limit: readLimit(q),
     shift: readShift(q),
     role: metric === 'charge-turns' || metric === 'icu-turns' ? null : readRole(q),
-    people: op === 'compare' ? [...new Set(withActor)] : subjects,
+    people: op === 'compare' ? [...new Set(withActor)] : op === 'threshold' ? [] : subjects,
+    // The person whose figure everybody else is measured against.
+    than: threshold,
     exclude,
     when: when && !when.bare && pointsAtAPeriod ? when : null,
     ties: true,
     unsupported,
     // A name the question asked to leave out that matches nobody on the schedule. Answering as if the exclusion
     // were not there would be answering a different question.
-    unresolved: excluded.unresolved,
+    unresolved: [...excluded.unresolved, ...unknownMark],
     // What the question asked for and the plan could not represent is carried, never dropped.
     asked: String(text || '').trim()
   };
@@ -272,6 +300,7 @@ export function describePlan(plan, { periodLabel = '' } = {}) {
   const among = plan.op !== 'compare' && plan.people.length ? ', among ' + joined(plan.people) : '';
   const head = plan.op === 'compare' ? joined(plan.people) + ' compared by ' + metric
     : plan.op === 'count' ? metric + ' for each person'
+    : plan.op === 'threshold' ? 'Everybody with ' + (plan.direction === 'lowest' ? 'fewer ' : 'more ') + metric + ' than ' + (plan.than || 'somebody I could not identify')
     : (plan.direction === 'lowest' ? 'Lowest ' : 'Highest ') + metric;
   const top = plan.op === 'compare' || !plan.limit ? '' : ', the ' + (plan.direction === 'lowest' ? 'lowest ' : 'highest ') + plan.limit;
   return head + shift + role + period + top + among + without;
