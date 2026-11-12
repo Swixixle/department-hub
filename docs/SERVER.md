@@ -2,11 +2,13 @@
 
 Updated 2026-11-11 from the owner's clarified direction. This is a plan. The current local build is still one-browser software: shared accounts, storage, messages between devices and notifications are not built.
 
+**Clarification — decided:** passkey sign-in with no email typed at sign-in; members supply their own phone/email information; no app-sent email/text is authorized by this work. **Open:** email's purpose, collection requirements and app-sent notifications. `EMAIL-OPTIONS.md` records alternatives, not a selected design. The implementation stages below remain proposals, not built features.
+
 ## The department is the workspace
 
 The owner will introduce the app to willing coworkers in his own department, ask for patience and feedback, and improve it around their actual use. He intends to fund a server in a few weeks. The next milestone is useful adoption in that department.
 
-There is one private workspace for the department and one personal identity per member, enrolled by invitation. The owner explicitly requires no email address or Department Hub password for sign-in. Only approved members can enter. Another job, cross-department membership, global profiles and a workspace switcher are outside the pilot's scope.
+There is one private workspace for the department and one personal identity per member, enrolled by invitation. Passkey sign-in requires no typed email or Department Hub password; this is not a prohibition on collecting email information. Only approved members can enter. Another job, cross-department membership, global profiles and a workspace switcher are outside the pilot's scope.
 
 The daily experience is one place for the schedule, department updates, due dates, meetings, messages and request conversations. Keep one department feed and stable navigation. Avoid a collection of channels and group-selection screens. Private conversations stay inside the same department.
 
@@ -24,15 +26,15 @@ Write the synthetic permission contract before account screens or synchronizatio
 
 ### Membership and accounts
 
-The owner has now explicitly ruled out email/password sign-in. The earlier email/password plan was an inference and is superseded. Invitations identify the intended member and department using stable internal IDs, not an email address. They are single-use and expire. A member keeps the same identity for agreements, personal records and recovery; there is no shared department login or shared PIN.
+Sign-in is by passkey, without typing email or a Department Hub password. The earlier blanket prohibition on email collection was an incorrect inference. Invitations identify the intended member and department using stable internal IDs, not an email sign-in field. They are single-use and expire. A member keeps the same identity for agreements, personal records and recovery; there is no shared department login or shared PIN.
 
-The proposed implementation is a passkey, unlocked through the phone's existing Face ID, Touch ID or device PIN/passcode. Biometrics stay with the operating system; Department Hub receives a signed response, not face images, fingerprint data or the device PIN. A separate app-specific PIN scheme has not been selected or built. `docs/SIGN-IN.md` describes this passwordless design and its remaining checks. Use a maintained WebAuthn implementation that supports enrollment without collecting an email address; no provider or account backend is built yet.
+The proposed implementation uses the phone's existing Face ID, Touch ID or device PIN/passcode to unlock its passkey. Biometrics stay with the operating system; Department Hub receives a signed response, not face images, fingerprint data or the device PIN. A separate app-specific PIN scheme has not been selected or built. `docs/SIGN-IN.md` describes this design and its remaining checks. Use a maintained WebAuthn implementation that does not require email as a sign-in identifier; no provider or account backend is built yet.
 
 First enrollment creates a pending claim and grants no department data until an authorized administrator confirms the intended person and that claim through an independently known channel. Either administrator can do this remotely; no shift overlap or simultaneous two-administrator approval is required. A forwarded link, incoming text or newly supplied phone number does not establish identity. Raw invite/recovery links are bearer secrets as well as session tokens. All have explicit purpose, expiry and revocation; invite/recovery links are also consumed only once.
 
 Plan administrator recovery as routine, without assuming coworkers enroll a second device or buy a hardware key. Before the pilot, establish at least two administrators who can recover members independently and remotely. Use the same confirmation discipline for enrollment and every recovery. A lost-admin account is recovered by the other administrator. Activation must preserve the same member and phone-consent choices, revoke old credentials/sessions and recheck current membership/roles atomically. Recovery cannot restore removed membership or revoked privileges. `docs/SIGN-IN.md` specifies the remaining implementation tests; none is implemented yet. Existing passkeys may sync across devices, and fresh verification with an existing credential is required to add another. Separate membership administration from custodian access to named fairness records.
 
-Members enter their own optional phone numbers. Do not upload the whole imported telephone directory on their behalf. Phone sharing defaults off, and each person controls it. A withheld number remains visible to its owner for editing, and is excluded from coworkers' directory, search, Ask and directory exports; membership administrators and fairness custodians have no exception. Withdrawing sharing takes effect on subsequent requests, including already-used lookup routes. Phone numbers are not required for sign-in or recovery. Authenticated membership replaces Viewing as in shared mode. That selector stays only in the local simulation and fictional demo.
+Members enter their own phone/email information. Do not upload the whole imported directory on their behalf. Existing phone direction remains optional entry, sharing off by default and owner-controlled withdrawal. A withheld number remains visible to its owner and excluded from coworkers' directory, search, Ask and directory exports; administrators/custodians have no exception. Email's purpose is open: optional contact sharing, administrator-only recovery confirmation, or two separate fields for both. The contact candidate would use the same visibility/withdrawal rules; the recovery candidate would never enter the directory and could not be edited by the person requesting recovery. See `EMAIL-OPTIONS.md`; neither is selected or implemented. Authenticated membership replaces Viewing as in shared mode. That selector stays only in the local simulation and fictional demo.
 
 ### Shared records and department boundaries
 
@@ -52,7 +54,7 @@ Recommended first shared screen: the person's next shift, important department u
 
 Prepare a per-person read position and visible new-item indicators. Announcements can carry source, author, due/meeting/event dates and an important/pinned status. Include correction, post-reporting and app-feedback routes. A read marker is not evidence of attendance, course completion or assent.
 
-Plan opt-in notification preferences and minimal-content notices that avoid exposing department material on a locked phone. The unread view must work if permission or delivery is unavailable. Verify notifications on actual phones before relying on them; publishing a web app alone is not notification delivery.
+Open question: whether the app should contact people at all. App-sent email/text would add a sending service and costs, a sending domain, possible hospital spam filtering and interruptions to coworkers. No delivery mechanism is designed or authorized here. Leave Share unchanged: it transfers a post/files through the person's own apps, without attaching coworker addresses or the directory. The in-app unread view remains useful without external delivery.
 
 ### Separate-person agreements
 
@@ -87,10 +89,10 @@ Prepare backups and tested restore of structured data and attachment bytes, rete
 | Stage | Prepare | Evidence before enabling |
 | --- | --- | --- |
 | Permission contract first | Synthetic departments, principals, role and resource boundaries, HTTP tests before account screens or sync | Real backend passes `npm run test:shared`, including allowed controls, cross-department denials, private threads/files, custodian restrictions and immediate revocation; no backend means blocked, not passed |
-| Passwordless enrollment and sessions | Member-bound invitations, passkeys, device unlock, recovery and chosen WebAuthn integration | No email/password required; real-device enrollment/unlock, single-use invites and recovery work; rerun the same access gate with real sign-in sessions |
+| Passwordless enrollment and sessions | Member-bound invitations, passkeys, device unlock, recovery and chosen WebAuthn integration | No email typed at sign-in or Department Hub password; real-device enrollment/unlock, single-use invites and recovery work; rerun the same access gate with real sign-in sessions |
 | Shared consumption | Versioned roster, feed, dated/pinned posts, personal unread state and directory self-entry | Another signed-in phone receives a post and schedule correction; failure and stale states are accurate |
 | Conversations and exchanges | Private messages, request threads, immutable proposals and atomic agreement | Only participants can read messages; distinct accounts accept; competing trades cannot double-commit |
-| Reliable pilot | Notifications, reporting/removal, reviewed corrections, backups and checkpoints | Actual-phone checks, successful restore including media, failure tests and a short member-facing privacy explanation |
+| Reliable pilot | Reporting/removal, reviewed corrections, backups and checkpoints; external notification choice remains open | Actual-phone checks, successful restore including media, failure tests and a short member-facing privacy explanation |
 
 Recruit a few willing coworkers first, with an obvious feedback route and clear expectations that it is an independent pilot. Observe finding a next shift, new announcement, deadline and conversation. When shared agreement is ready, observe a complete exchange from separate accounts. The existing docs/USER-TEST.md is a local-prototype exercise; shared pilot tasks should match the capabilities enabled.
 

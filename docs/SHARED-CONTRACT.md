@@ -2,6 +2,8 @@
 
 Status: contract tests written; shared backend, fixture seeder, sign-in and synchronization are not implemented. No access-control claim is established by this document. Version 15 on the Mac is unchanged.
 
+**Decided clarification:** sign-in uses a passkey with no email typed at sign-in; members enter their own phone/email information. **Open:** email as optional contact information, administrator-only recovery confirmation or separate fields for both. The candidate email contract below explores only the contact option; it does not settle that choice, select a production schema or authorize sending. See `EMAIL-OPTIONS.md`.
+
 ## Run against the actual backend
 
 Start an isolated server and seed only synthetic records, then have that server's test setup write a fresh manifest following `tests/shared/fixture.example.json`. Keep the generated manifest and its credentials in ignored `local-data/`; never use a coworker's session, schedule or contact data. Reset the fixture for every run because the suite creates/deletes a control post, records one participant acceptance, adds/changes contact sharing, removes a custodian role and revokes membership.
@@ -14,7 +16,7 @@ Without that environment variable the command exits 2 and says the gate has **no
 
 The tests make real HTTP requests using fresh authenticated sessions. The manifest may supply an Authorization header or Cookie header for each session. It cannot supply trusted person/department/role headers. This deliberately leaves the sign-in mechanism open while testing the server's treatment of authenticated identity. When account enrollment and the chosen authentication integration exist, rerun using credentials from that same implementation; a test-only identity adapter is not evidence that real sign-in is correct. Fixture setup must not become a public production endpoint or bypass normal request authorization.
 
-The owner has ruled out email/password sign-in. The proposed invite/passkey flow is in `docs/SIGN-IN.md`; no email address, password or biometric data is required in this test fixture. Sessions produced by the eventual passwordless flow must satisfy the same contract.
+Sign-in uses a passkey without typing email or a Department Hub password. That does not prohibit email information for another purpose. The proposed enrollment flow is in `docs/SIGN-IN.md`; fixture sessions authenticate with existing test tokens, not contact addresses or biometric data. Sessions produced by the eventual passkey flow must satisfy the same contract.
 
 ## Seed and response contract
 
@@ -50,6 +52,26 @@ Positive controls run before negative assertions: a backend that rejects everybo
 Source kinds are `post`, `document`, `file`, `conversation`, `fairness`, `schedule` and `person`. Private conversation content uses the conversation ID, attachments use their file ID, and named fairness uses the subject person's ID. Unknown kinds require a reviewed contract update; they cannot silently bypass source checks. Both legitimate and unauthorized requests hit the same seeded records, so the negative cases also follow already warmed reads.
 
 Phone controls prove an explicitly shared number is returned through directory list/detail, name search, the named-number Ask question and directory export. Private-number checks then exercise those same routes across coworkers, administrators and custodians. The phone assertion checks raw, formatted and encoded numbers in content and headers. Sharing-withdrawal checks first warm every route with a real shared result, then require the same existing session to stop receiving it on the next request. Search sources may still identify the coworker; their name is not treated as a private phone number. Consent applies to the structured contact record, not a promise to erase screenshots, previously downloaded copies or independently authored text.
+
+## Candidate email-contact contract — exploratory, not selected
+
+This is a separate candidate contract under `tests/shared/`, not an implicit expansion of the selected product direction. The existing `test:shared` command still runs the permission/phone suite. Run the email-contact candidate explicitly, against a fresh isolated backend fixture:
+
+```sh
+DEPARTMENT_HUB_TEST_FIXTURE="$PWD/local-data/shared-email-fixture.json" npm run test:shared:email-contact
+```
+
+With no backend fixture this also exits 2 and says it has **not passed**. It does not skip or manufacture a green result. The command does not send messages. The `email` values in `fixture.example.json` are synthetic `example.invalid` candidate data, distinct per person and containing the run ID. The ordinary gate does not require an email implementation just because those example values exist.
+
+If the contact-information option is selected, seed the same four scenarios as phone: explicitly shared member, explicitly withheld partner, outsider with an email and no sharing consent, and keeper initially without an email. The test adds the keeper's address without consent and requires it to stay private. Candidate profile notation is `{personId,email,shareEmail}` with self-only update authority; adding an address does not share it, and email consent does not change phone consent. These are candidate test-interface names, not a production/recovery schema decision.
+
+The candidate requires shared-address positive controls in directory list, direct person lookup, name search, Ask's named-email question and `exports/directory`. A server that hides every address fails. Withheld/default-private/withdrawn values must be absent from those routes and the authorized `exports/fairness` response, including administrator/custodian views. Owners may retain their own value through the self-profile route. Directory/detail email fields are absent/null rather than partial addresses. No fixture email, including a shared one, may appear in response headers. Case and surrounding whitespace are normalized when comparing values; nested JSON, URI encoding and response headers are inspected.
+
+Withdrawal first warms all five public lookup routes with a real shared result, then requires the same live session and other coworkers/admin/custodian sessions to lose that address on the next request. Fairness export must still return actual records without withheld addresses; denying the export is not a passing privacy result. Forged self-profile person IDs cannot read/change another person's address or sharing choice. The foreign-department session cannot retrieve even a legitimately shared address from this department.
+
+Before enabling contact email, this candidate must be adopted deliberately and pass against the real implementation, alongside the permission gate. If only administrator recovery email is selected, a distinct contract must instead cover that purpose's restricted access/update rules. If both are selected, separate fields and both contracts are needed; directory-sharing positives cannot authorize disclosure of a recovery channel. No recovery-email endpoint or sending mechanism is specified here.
+
+Share remains the existing device handoff. A simulated-interface regression checks that a native Share payload contains the post text, without structured coworker addresses, and that email/text fallback links have no prefilled recipient. This does not claim to inspect arbitrary words or attachments a person authored, or prove delivery from a real phone.
 
 ## What still remains
 
