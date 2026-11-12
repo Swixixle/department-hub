@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildIdentity, identifyBuild } from '../scripts/build-identity.mjs';
@@ -17,11 +17,13 @@ test('source identity names the actual clean commit and marks modified or unknow
     git(['init']);
     git(['-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','--allow-empty','-m','Fixture']);
     assert.deepEqual(sourceRevision(root), {commit:git(['rev-parse','HEAD']),dirty:false});
+    await symlink(root,root+'-alias','dir');
+    assert.deepEqual(sourceRevision(root+'-alias'), {commit:git(['rev-parse','HEAD']),dirty:false});
     await writeFile(join(root, 'changed.txt'), 'Synthetic uncommitted change');
     assert.equal(sourceRevision(root).dirty,true);
     const nested = join(root, 'unrelated-copy'); await mkdir(nested);
     assert.deepEqual(sourceRevision(nested), {commit:null,dirty:null});
-  } finally { await rm(root, {recursive:true,force:true}); }
+  } finally { await rm(root+'-alias', {force:true}); await rm(root, {recursive:true,force:true}); }
 });
 
 test('source identity is covered by the manifest fingerprint', async () => {
