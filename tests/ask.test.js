@@ -21,6 +21,55 @@ const documents = [{ id: 'leave', title: 'Time off requests', kind: 'Policy', ef
 const world = { today, actor: 'Jordan', assignments, posts, documents, directory: {}, people: [{ id: 'lane,avery', first: 'Avery', last: 'Lane', cell: '3175550100' }], links: { avery: 'lane,avery' }, releases: [], requests: [], rules: {}, keeper: false, seen: '2026-11-09T12:00:00Z', published: '2026-11-08T09:00:00Z' };
 const reply = question => ask(question, world);
 
+test('this and next weekdays use their calendar week while a bare weekday means its next occurrence', () => {
+  const cases = [
+    ['Sunday', '2026-11-08', '2026-11-15', '2026-11-15'],
+    ['Monday', '2026-11-09', '2026-11-16', '2026-11-16'],
+    ['Tuesday', '2026-11-10', '2026-11-17', '2026-11-17'],
+    ['Wednesday', '2026-11-11', '2026-11-18', '2026-11-11'],
+    ['Thursday', '2026-11-12', '2026-11-19', '2026-11-12'],
+    ['Friday', '2026-11-13', '2026-11-20', '2026-11-13'],
+    ['Saturday', '2026-11-14', '2026-11-21', '2026-11-14']
+  ];
+  for (const [day, current, next, bare] of cases) {
+    assert.equal(parseWhen('this ' + day, today).from, current, 'this ' + day);
+    assert.equal(parseWhen('next ' + day, today).from, next, 'next ' + day);
+    assert.equal(parseWhen(day, today).from, bare, day);
+  }
+  assert.equal(parseWhen('next Thu night', today).shift, 'N');
+  assert.equal(parseWhen('next Thu night', today).from, '2026-11-19');
+  assert.equal(parseWhen('when is my next shift Friday', today).from, '2026-11-13');
+  assert.equal(parseWhen('next Sunday', '2026-11-14').from, '2026-11-15');
+  assert.equal(parseWhen('next Sunday', '2026-11-15').from, '2026-11-22');
+  assert.equal(parseWhen('this Monday', '2026-11-15').from, '2026-11-16');
+  assert.equal(parseWhen('next Monday', '2026-11-15').from, '2026-11-23');
+  assert.equal(parseWhen('this Friday', '2026-12-30').from, '2027-01-01');
+  assert.equal(parseWhen('next Friday', '2026-12-30').from, '2027-01-08');
+});
+
+test('this Friday and next Friday answer different dates and their compound question is marked partial', () => {
+  const current = { ...world, assignments: [...world.assignments, row('2026-11-20', 'N', 'Jordan')] };
+  assert.deepEqual(ask('Do I work this Friday?', current).items.map(item => item.go), ['date|2026-11-13']);
+  assert.deepEqual(ask('Do I work next Friday?', current).items.map(item => item.go), ['date|2026-11-20']);
+  const compound = ask('Am I working this Friday or next Friday?', current);
+  assert.match(compound.partial, /You asked about Fri, Nov 13 and Fri, Nov 20/);
+  assert.equal(compound.context.when.from, '2026-11-13');
+  const reversed = ask('Am I working next Friday or this Friday?', current);
+  assert.match(reversed.partial, /You asked about Fri, Nov 20 and Fri, Nov 13/);
+  assert.equal(reversed.context.when.from, '2026-11-20');
+});
+
+test('an explicitly dated weekday trade never falls back to a different week', async () => {
+  const model = await import('../src/model.js');
+  const assignments = [...world.assignments, row('2026-11-20', 'N', 'Morgan')];
+  const trade = { roster: model.projectRoster(assignments, []), directory: world.directory, policy: model.POLICY, committed: [], today, offers: [] };
+  const result = ask('I need next Friday off', { ...world, assignments, trade });
+  assert.equal(result.kind, 'trade');
+  assert.equal(result.context.when.from, '2026-11-20');
+  assert.equal(result.title, 'You are not on the schedule Fri, Nov 20.');
+  assert.deepEqual(result.items, []);
+});
+
 test('a question names its day: today, tonight, weekdays, weekends, dates and holidays', () => {
   const when = text => { const found = parseWhen(text, today); return found && [found.from, found.to, found.shift]; };
   assert.deepEqual(when('who is on tonight'), [today, today, 'N']);

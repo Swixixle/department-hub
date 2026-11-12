@@ -320,6 +320,16 @@ Prioritize the authenticated shared pilot in `docs/SERVER.md`: accounts and acce
 
 Validation: 115 Node tests and both production builds pass. The production-bundle simulated-DOM check confirms the notice is first in the answer, ordinary questions do not show it, follow-ups retain their shift context, and the question's raw wording is absent from saved state. Earlier Ask/audit/exchange flows pass. This is regression evidence, not a coworker question-accuracy measurement or a physical-phone check.
 
+## Explicit weekday correction, 2026-11-11
+
+Review found that on Wednesday, November 11, both this Friday and next Friday resolved to November 13, and next Thursday resolved to November 12. The weekday parser advanced by a week only when the named day was today, and did not bind the modifier to the named day.
+
+The convention now matches the existing Sunday–Saturday calendar weeks: this Friday is in the current week, next Friday in the following week, and bare Friday is its next occurrence including today. Thus, for that Wednesday, the two Fridays are November 13 and November 20, and next Thursday is November 19. The printed interpretation still shows the actual date. The existing partial-answer notice now distinguishes this Friday from next Friday. Explicit this/next weekday trade requests also stay on that date instead of using the fallback for an unqualified weekday to find another week's shift. Payroll week settings are unchanged.
+
+The shared backend remains the next major milestone. Remaining compound-role, compound-person, multi-intent and unjoined-list limitations are unchanged.
+
+Validation: 118 Node tests, both production builds and the production-bundle simulated-DOM checks pass. Regressions cover all seven weekday names, calendar and year boundaries, unchanged bare-weekday behavior, distinct this/next answers and the compound disclosure, plus keeping an explicit trade date fixed. These checks use fictional data; the reviewer's real-photo and real-schedule measurements were not independently repeated here.
+
 ## Still open from the review
 
 - Matches that are blocked are hidden with no reason given.
