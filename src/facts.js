@@ -11,6 +11,7 @@ import { stem, nearest, CORE_WORDS } from './words.js';
 import { sealOf } from './protocols.js';
 import { sha256 } from './audit.js';
 import { witnessCard, shotOf } from './witness.js';
+import { setFingerprint, checksForFact } from './assurance.js';
 
 export const CARD_FORMAT = 'department-hub-fact-cards-v3';
 export const EARLIER_FORMATS = ['department-hub-fact-cards-v1', 'department-hub-fact-cards-v2'];
@@ -124,13 +125,13 @@ export async function addSet(library, set, held, who, at) {
   if (failed.length) return { ok: false, why: 'The cards were not added. The screenshots do not bear out ' + failed.length + ' of them: ' + failed.join('; ') + '.', problems: failed };
   const replaced = setsOf(library).filter(other => !other.withdrawn && (set.replaces || []).includes(other.id));
   const reason = 'Replaced by cards in the source’s own words, borne out by screenshots of the page (' + set.source.capture.tool + ' capture ' + set.source.capture.id + ').';
-  const taken = { ...base, cards, added: { by: who, at }, withdrawn: null };
+  const fingerprint = await setFingerprint(set), taken = { ...base, cards, fingerprint, added: { by: who, at }, withdrawn: null };
   const kept = setsOf(library).filter(other => other.id !== set.id).map(other => replaced.includes(other) ? { ...other, withdrawn: { by: who, at, reason } } : other);
   const words = cards.reduce((sum, card) => sum + card.witness.words, 0), matched = cards.reduce((sum, card) => sum + card.witness.matched, 0);
   return { ok: true, library: { ...library, knowledge: [...kept, taken] }, set: taken, replaced: replaced.map(other => other.id),
     receipt: { type: 'Reference cards added', details: { set: set.id, title: set.title, cards: cards.length, source: set.source.url, licence: set.source.licence,
       capture: set.source.capture.id, sha256: set.source.capture.sha256, bytes: set.source.capture.bytes, captured: set.source.capture.savedAt,
-      screenshots: set.source.screenshots.map(shot => shot.id + ' ' + shot.sha256), found: matched + ' of ' + words + ' words, every number', replaced: replaced.map(other => other.id), note: WITNESS } } };
+      screenshots: set.source.screenshots.map(shot => shot.id + ' ' + shot.sha256), found: matched + ' of ' + words + ' words, every number', fingerprint, replaced: replaced.map(other => other.id), note: WITNESS } } };
 }
 
 export function withdrawSet(library, setId, reason, who, at) {
@@ -169,7 +170,7 @@ export function factAnswer(question, world) {
   return { ...base, title: holding.length === 1 ? 'From the source: ' + first.card.title : 'From the source: ' + holding.map(hit => hit.card.title).join('; '),
     understood: 'reference knowledge: ' + holding.map(hit => hit.card.title.toLowerCase()).join('; '),
     lines: [NOT_A_PROTOCOL + ' ' + first.set.applies],
-    items: holding.map(({ set, card }) => ({ text: 'The source’s own words · ' + card.where, quote: passagesOf(set, card), pictures: card.witness.pictures, href: set.source.url, card: card.id,
+    items: holding.map(({ set, card }) => ({ text: 'The source’s own words · ' + card.where, quote: passagesOf(set, card), pictures: card.witness.pictures, href: set.source.url, card: card.id, checks: checksForFact(set, card, world.today),
       sub: [set.source.publisher + (set.source.year ? ', ' + set.source.year : ''), set.source.licence,
         'exact text captured with ' + set.source.capture.tool + ' on ' + set.source.capture.savedAt.slice(0, 10) + ', SHA-256 ' + shortDigest(set.source.capture.sha256),
         'found on the page’s screenshots: ' + card.witness.matched + ' of ' + card.witness.words + ' words, every number'].join(' · ') })),

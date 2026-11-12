@@ -9,6 +9,15 @@ import { reviewHolds, validateBundle, wholeRule } from './bundles.js';
 import { cautionsFor, searchReferences } from './references.js';
 import { cardHolds, cite, passagesOf, NOT_A_PROTOCOL, WITNESS, CARD_FORMAT } from './facts.js';
 import { sentenceOf, comparedBy, RESTATED } from './guidelines.js';
+import { freshness } from './assurance.js';
+
+// Where a held set stands: its fingerprint, to compare with docs/CARD-FINGERPRINTS.md on GitHub, and whether its source
+// is known to be the newest edition.
+function standingOf(set, today, h) {
+  const fresh = freshness(set.source, today);
+  return '<dt>Newest edition?</dt><dd class="' + (fresh.state === 'current' ? '' : 'due') + '">' + h(fresh.label) + (fresh.how ? '. ' + h(fresh.how) : '') + '</dd>' +
+    '<dt>Card set fingerprint</dt><dd class="digest">' + (set.fingerprint ? h(set.fingerprint) + '<small class="subtle">The same as in docs/CARD-FINGERPRINTS.md on the project’s GitHub page if these are the cards that were published.</small>' : 'Not recorded: these cards were added before fingerprints were. Withdraw and add them again to record one.') + '</dd>';
+}
 
 export const NOT_AUTHORITY = 'Recorded for the profile selected on this device. This prototype does not verify who that is, and a recorded review is not clinical sign-off.';
 export const HELD_HERE = 'This is the copy held on this device. Department Hub cannot tell whether whoever issued a protocol has published a newer one.';
@@ -194,7 +203,7 @@ export function pictureOf(picture, url, h) {
     '<figcaption>On screenshot ' + h(picture.shot.slice(0, 8)) + ' of the page</figcaption></figure>';
 }
 
-export function knowledgeView({ set, keeper, withdrawing }, { h, button, shotUrl = () => null }) {
+export function knowledgeView({ set, keeper, withdrawing, today }, { h, button, shotUrl = () => null }) {
   if (!set) return '<div class="panel empty"><h3>Those cards are no longer held</h3>' + button('All protocols', 'protocol-home', 'class="secondary"') + '</div>';
   const done = set.cards.filter(card => cardHolds(set, card)).length, current = set.format === CARD_FORMAT && set.held, capture = set.source.capture;
   const quote = text => '<blockquote class="source-quote">' + h(text) + '</blockquote>';
@@ -205,7 +214,7 @@ export function knowledgeView({ set, keeper, withdrawing }, { h, button, shotUrl
     '<section class="panel knowledge-source"><h3>Where these come from</h3><p>' + h(cite(set)) + '</p>' +
       (current ? '<p>Held here as the exact text of the page, captured with ' + h(capture.tool) + ' on ' + h(capture.savedAt.slice(0, 16).replace('T', ' ')) + ' UTC: ' + h(capture.of) + '</p>' +
         '<dl class="record"><dt>Capture</dt><dd>' + h(capture.id) + '</dd><dt>SHA-256</dt><dd class="digest">' + h(capture.sha256) + '</dd><dt>Size</dt><dd>' + h(capture.bytes.toLocaleString('en-US')) + ' bytes</dd>' +
-        '<dt>Screenshots</dt><dd>' + h(String(set.source.screenshots.length)) + ', captured with ' + h(capture.tool) + ' ' + h(set.source.screenshots[0].savedAt.slice(0, 10)) + '. ' + h(set.source.screenshotsOf || '') + '</dd></dl>' +
+        '<dt>Screenshots</dt><dd>' + h(String(set.source.screenshots.length)) + ', captured with ' + h(capture.tool) + ' ' + h(set.source.screenshots[0].savedAt.slice(0, 10)) + '. ' + h(set.source.screenshotsOf || '') + '</dd>' + standingOf(set, today, h) + '</dl>' +
         '<p class="subtle">' + h(WITNESS) + ' Nothing on a card is reworded: each shows the page’s own lines, and the picture of where they were found.</p>' +
         (set.held.licence ? '<p class="subtle">The page’s licence line, as captured: “' + h(set.held.licence.trim()) + '” The passages and screenshots are unchanged. <a href="' + h(set.source.licenceUrl) + '" target="_blank" rel="noopener noreferrer">The licence ↗</a></p>' : '')
         : '<p class="notice">These cards are in an earlier format and no longer answer. Add the cards whose lines are borne out by screenshots of the page.</p>') +
@@ -222,7 +231,7 @@ export function knowledgeView({ set, keeper, withdrawing }, { h, button, shotUrl
 
 // One restated guideline: each card's sentence, where it is in the guideline, who has found it in their own copy and
 // who has compared it with the guideline. Anyone can give the app their own copy; nobody is shown the guideline's text.
-export function guidelineView({ set, actor, keeper, withdrawing }, { h, button, valueAttr }) {
+export function guidelineView({ set, actor, keeper, withdrawing, today }, { h, button, valueAttr }) {
   if (!set) return '<div class="panel empty"><h3>Those cards are no longer held</h3>' + button('All protocols', 'protocol-home', 'class="secondary"') + '</div>';
   const capture = set.source.capture, mine = card => (card.matched || []).some(entry => entry.by === actor);
   return '<p class="pair start">' + button('‹ All protocols', 'protocol-home', 'class="text-button"') + '</p><div class="intro"><div><div class="eyebrow">GUIDELINE, RESTATED</div><h1>' + h(set.title) + '</h1>' +
@@ -230,7 +239,7 @@ export function guidelineView({ set, actor, keeper, withdrawing }, { h, button, 
     '<div class="notice reference-terms" role="note"><b>' + h(RESTATED) + '</b> ' + h(set.applies || '') + '</div>' +
     (set.withdrawn ? '<div class="notice" role="status">Withdrawn by ' + h(set.withdrawn.by) + ': ' + h(set.withdrawn.reason) + '</div>' : '') +
     '<section class="panel knowledge-source"><h3>The guideline</h3><p>' + h(set.source.title) + '. ' + h(set.source.citation || '') + '.</p><p class="subtle">' + h(set.source.rights) + '</p>' +
-      '<dl class="record"><dt>Built from</dt><dd>' + h(capture.tool) + ' capture ' + h(capture.id) + ', ' + h(String(capture.savedAt).slice(0, 10)) + '</dd><dt>SHA-256</dt><dd class="digest">' + h(capture.sha256) + '</dd></dl>' +
+      '<dl class="record"><dt>Built from</dt><dd>' + h(capture.tool) + ' capture ' + h(capture.id) + ', ' + h(String(capture.savedAt).slice(0, 10)) + '</dd><dt>SHA-256</dt><dd class="digest">' + h(capture.sha256) + '</dd>' + standingOf(set, today, h) + '</dl>' +
       '<p><a class="secondary link-button" href="' + h(set.source.url) + '" target="_blank" rel="noopener noreferrer">Open the guideline ↗</a></p></section>' +
     (set.withdrawn ? '' : '<section class="panel protocol-step"><h3>Check these cards against your own copy</h3><p class="subtle">Open the guideline, capture its article text with Blinders, and give the app that file. ' +
       'It looks for each card’s passage in your copy, word for word, and checks every number again. Your copy is not kept. Then read each found passage in your copy and record whether the card says the same.</p>' +

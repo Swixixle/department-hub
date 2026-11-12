@@ -96,3 +96,11 @@
 .my-link{text-decoration:none}
 .my-links .text-button{color:#a8c1b5;justify-self:start;font-size:12px;padding:2px 10px}
 @media(max-width:780px){.my-links{display:none}}
+/* Each check an answer passed, named, and each it has not: never one badge for all. */
+.checks{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:4px 10px;font-size:.8125rem}
+.checks li{display:flex;gap:4px;align-items:baseline}
+.checks li.done{color:#2f6a46}
+.checks li.open{color:#8a5a12}
+.checks li span{font-weight:800}
+.record dd.due{color:#8a5a12;font-weight:650}
+.record dd small{display:block;margin-top:2px;font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:var(--muted);font-size:12px;word-break:normal}
