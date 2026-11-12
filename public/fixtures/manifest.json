@@ -1,0 +1,1101 @@
+{
+  "files": [
+    "schedule-01.png",
+    "schedule-02.png",
+    "schedule-03.png",
+    "schedule-04.png",
+    "schedule-05.png",
+    "schedule-06.png",
+    "schedule-07.png",
+    "schedule-08.png",
+    "schedule-09.png",
+    "schedule-10.png"
+  ],
+  "truth": [
+    {
+      "date": "2026-11-08",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-08",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-08",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-11-08",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-11-08",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-08",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-08",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-09",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-11-09",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-11-09",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-11-09",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-11-09",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-09",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-09",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-11-10",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-11-10",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-11-10",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-10",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-10",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-11-10",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-10",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-11",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-11-11",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-11-11",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-11-11",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-11-11",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-11",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-11",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-12",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-11-12",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-11-12",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-11-12",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-11-12",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-11-12",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-11-12",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-13",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-13",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-13",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-11-13",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-11-13",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-13",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-13",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-14",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-11-14",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-11-14",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-11-14",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-11-14",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-14",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-11-14",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-11-15",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-11-15",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-11-15",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-15",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-15",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-15",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-15",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-16",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-11-16",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-11-16",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-11-16",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-11-16",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-16",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-16",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-11-17",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-11-17",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-11-17",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-11-17",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-11-17",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-11-17",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-17",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-18",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-18",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-18",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-11-18",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-11-18",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-18",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-18",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-19",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-11-19",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-11-19",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-11-19",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-11-19",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-11-19",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-11-19",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-20",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-11-20",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-11-20",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-20",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-20",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-20",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-20",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-21",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-11-21",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-11-21",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-11-21",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-11-21",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-21",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-11-21",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-11-22",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-11-22",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-11-22",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-11-22",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-11-22",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-22",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-22",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-23",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-23",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-23",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-11-23",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-11-23",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-23",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-23",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-11-24",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-11-24",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-11-24",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-11-24",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-11-24",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-11-24",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-24",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-25",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-11-25",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-11-25",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-25",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-25",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-25",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-25",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-26",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-11-26",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-11-26",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-11-26",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-11-26",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-11-26",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-11-26",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-27",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-11-27",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-11-27",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-11-27",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-11-27",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-27",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-27",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-28",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-28",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-28",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-11-28",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-11-28",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-28",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-11-28",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-11-29",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-11-29",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-11-29",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-11-29",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-11-29",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-11-29",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-11-29",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-11-30",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-11-30",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-11-30",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-11-30",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-11-30",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-11-30",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-11-30",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-12-01",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-12-01",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-12-01",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-12-01",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-12-01",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-12-01",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-12-01",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-12-02",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-12-02",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-12-02",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-12-02",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-12-02",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-12-02",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-12-02",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-12-03",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-12-03",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-12-03",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-12-03",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-12-03",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-12-03",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-12-03",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-12-04",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-12-04",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-12-04",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-12-04",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-12-04",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-12-04",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-12-04",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-12-05",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-12-05",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-12-05",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-12-05",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-12-05",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-12-05",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-12-05",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-12-06",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-12-06",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-12-06",
+      "shift": "D",
+      "person": "Emery"
+    },
+    {
+      "date": "2026-12-06",
+      "shift": "D",
+      "person": "Frankie"
+    },
+    {
+      "date": "2026-12-06",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-12-06",
+      "shift": "N",
+      "person": "Morgan"
+    },
+    {
+      "date": "2026-12-06",
+      "shift": "N",
+      "person": "Parker"
+    },
+    {
+      "date": "2026-12-07",
+      "shift": "D",
+      "person": "Gray"
+    },
+    {
+      "date": "2026-12-07",
+      "shift": "D",
+      "person": "Harper"
+    },
+    {
+      "date": "2026-12-07",
+      "shift": "D",
+      "person": "Indigo"
+    },
+    {
+      "date": "2026-12-07",
+      "shift": "D",
+      "person": "Jamie"
+    },
+    {
+      "date": "2026-12-07",
+      "shift": "N",
+      "person": "Quinn"
+    },
+    {
+      "date": "2026-12-07",
+      "shift": "N",
+      "person": "Riley"
+    },
+    {
+      "date": "2026-12-07",
+      "shift": "N",
+      "person": "Sam"
+    },
+    {
+      "date": "2026-12-08",
+      "shift": "D",
+      "person": "Avery"
+    },
+    {
+      "date": "2026-12-08",
+      "shift": "D",
+      "person": "Blair"
+    },
+    {
+      "date": "2026-12-08",
+      "shift": "D",
+      "person": "Casey"
+    },
+    {
+      "date": "2026-12-08",
+      "shift": "D",
+      "person": "Drew"
+    },
+    {
+      "date": "2026-12-08",
+      "shift": "N",
+      "person": "Taylor"
+    },
+    {
+      "date": "2026-12-08",
+      "shift": "N",
+      "person": "Jordan"
+    },
+    {
+      "date": "2026-12-08",
+      "shift": "N",
+      "person": "Morgan"
+    }
+  ]
+}
