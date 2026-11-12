@@ -117,7 +117,7 @@ const checkChange = (details, exceptId = null) => {
     projections:result.people.map(part=>({person:part.person,weeks:part.weeks}))};
 };
 // The notice is shown once on each device and answered with a press, before anything else.
-const noticeKey = 'department-hub-notice-v2';
+const noticeKey = 'department-hub-notice-v3';
 let noticeSeen = loadState(noticeKey, null);
 let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: noticeSeen ? null : { type:'notice' }, pending: loadDraft(), busy: null, notice: '', flash: '' };
 // Text size is a setting of this device, not of the workspace. It scales every rem in sizes.css.
@@ -162,19 +162,12 @@ function currentAsk(dialog = ui.dialog) {
     items:[], source:'Patient-information screen; it cannot detect every disclosure.', empty:true, kind:'blocked', context:null };
   return ask(dialog.q, { ...askWorld(), last:dialog.previousContext });
 }
-async function askAndLog(q) {
+async function runAsk(q) {
   sourceVersions = await versionsFor(state.documents);
   const dialog = { type:'ask', q, previousContext:ui.askContext }, result = currentAsk(dialog);
   ui.askContext = result.context;
   ui.lastAsk = ui.dialog = dialog;
-  await commit(result.kind === 'blocked' ? 'Question blocked by text screen' : 'Question asked', {
-    ...(result.kind === 'blocked' ? {} : { fingerprint:await sha256(q.trim().toLowerCase()) }),
-    engine:'ask-13-weekday-scope-1', build:BUILD, kind:result.kind, answered:!result.empty, ...(result.corrected ? { correction:result.corrected.id } : {}),
-    resolved:result.context?.when || null,
-    sources:result.items.map(item => ({ reference:item.go || 'note',
-      ...(item.go?.startsWith('doc|') ? { version:sourceVersions[item.go.split('|')[1]] } : {}) })),
-    answerHash:await sha256(JSON.stringify({ title:result.title, lines:result.lines, items:result.items, source:result.source, ...(result.partial ? { partial:result.partial } : {}) }))
-  }, previous => previous);
+  // A lookup stays in this conversation. Only explicitly saved feedback changes the record.
 }
 // A repeated press never overrides this screen. Files' contents are not inspected; the visible notice explains that.
 function patientCheck(form, text) {
@@ -186,7 +179,6 @@ function patientCheck(form, text) {
   note.textContent = 'Not saved. This looks like it points to a patient: ' + patientShown(text) + '. Take that out and save again. ' + (signs.some(sign => sign.startsWith('a long number')) ? LONG_NUMBER_HELP + ' ' : '') +
     'Repeated presses do not override this screen, and it can miss other forms of patient information.';
   note.scrollIntoView({ block:'nearest' });
-  void commit('Text screen blocked saving', { surface:form.dataset.form, signs }, previous => previous).catch(error => { note.textContent += ' The audit could not be saved: ' + error.message; });
   return null;
 }
 
@@ -344,7 +336,7 @@ const SCHEDULE_KINDS = ['when', 'who', 'off', 'offlist', 'run', 'hours', 'trade'
 const WRONG = { misread:'reported as misread', passage:'reported as quoting the wrong part', unanswered:'nothing answered it' };
 const sameAsk = (item, text) => item.asks.some(asked => asked.trim().toLowerCase() === text.trim().toLowerCase());
 const liveDocuments = () => state.documents.filter(doc => doc.status !== 'withdrawn' && (!doc.effective || doc.effective <= localToday()));
-const RULE = 'No patient information: no names, faces, monitors, charts or record numbers. Posts, uploads and questions are logged with a fingerprint and the name in use.';
+const RULE = 'No patient information: no names, faces, monitors, charts or record numbers. Saved posts and uploads leave a fingerprint and the name in use. Ordinary questions are not logged.';
 function postMarkup(post) {
   const link = videoLink(post.body);
   const words = post.body ? '<p>' + linkParts(post.body).map(part => part.href ?
@@ -775,7 +767,7 @@ function dialogMarkup() {
   if (type === 'audit') {
     const head = state.events.at(-1)?.hash || '';
     const who = event => isKeeper() || isSame(event.actor, state.actor) ? ' · ' + event.actor : '';
-    return shell('Activity log', '<p class="subtle">Changes, questions and recorded access requests leave hash-linked receipts. They record the selected profile, device time and source fingerprints. No authenticated identity or active human monitoring is provided. Internal changes and missing middle entries can be detected; detecting a missing tail or replaced log requires a checkpoint kept separately. ' +
+    return shell('Activity log', '<p class="subtle">Changes, agreements, rule changes, saved corrections and export requests leave hash-linked receipts. Opening shifts, posts, documents and Ask answers does not create a named receipt; ordinary navigation keeps button totals only. Older browsing receipts remain unchanged in the history. Receipts record the selected profile, device time and source fingerprints. No authenticated identity or active human monitoring is provided. Internal changes and missing middle entries can be detected; detecting a missing tail or replaced log requires a checkpoint kept separately. ' +
       (isKeeper() ? 'You keep the record, so you see every name.' : 'You see your own name. Whoever keeps the record sees them all.') + '</p>' +
       (state.events.length ? '<p><b>' + state.events.length + ' receipts.</b> The newest 25:</p><ul class="compact">' + [...state.events].reverse().slice(0,25).map(event => '<li>' +
         h(event.type + who(event) + ' · ' + timeLabel(event.time) + ' · ' + event.hash.slice(0,12)) + '</li>').join('') + '</ul>' : '<p>Nothing recorded yet.</p>') +
@@ -831,7 +823,7 @@ function dialogMarkup() {
     button('Keep it', 'close', 'class="secondary"') + button('Remove it', 'remove-post-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
   if (type === 'notice') return shell('Before you use this', '<p><b>This is not an official hospital product.</b> It is run by department staff to make the schedule and department news easier to follow. The hospital’s own systems stay the official record.</p>' +
     '<p><b>Never put patient information here.</b> No names, faces, monitors, charts, record numbers or anything that could point to a patient, in a post, a picture, a video, a recording or a question.</p>' +
-    '<p><b>Recorded actions use cryptographic audit receipts.</b> Changes, question lookups and recorded access requests keep fingerprints and selected source versions. Routine receipts do not keep question text. Sending a reviewed question or remembering wording saves that text or its search words in this browser and in backups.</p>' +
+    '<p><b>Changes and exports use cryptographic audit receipts.</b> Agreements, rule changes and saved corrections are included. Ordinary browsing and Ask lookups keep button totals only, without names, question fingerprints or opened-record details. Your last board visit is kept on this device to show what is new. Sending a reviewed question or remembering wording saves that text or its search words in this browser and in backups. Older browsing receipts remain in existing history.</p>' +
     '<p><b>Hashing does not protect patient information.</b> It is not encryption, a patient-information detector, hospital approval or proof of who acted. The text screen checks only some patterns; it does not inspect uploaded images, video, audio or document-file contents. No one is actively monitoring this device. Deleted content cannot be recovered from its fingerprint.</p>' +
     '<p class="subtle">Receipts use the selected Viewing as profile and this device’s clock. Whoever controls this browser can replace the whole history; keep an independent checkpoint to detect replacement. Keep backups and exports private.</p>' +
     (noticeSeen ? '<p class="subtle">Acknowledged on this device ' + h(timeLabel(noticeSeen.at)) + ', viewing as ' + h(noticeSeen.by) + '.</p><div class="actions">' + button('Close', 'close', 'class="secondary"') + '</div>' :
@@ -1231,10 +1223,6 @@ function fail(error) { ui.notice = error.message || String(error); ui.flash = ui
 async function act({action, value, kind}) {
   if (!noticeSeen && !['notice-ok', 'notice'].includes(action)) { ui.dialog = { type:'notice' }; render(); return; }
   const row = state.assignments.find(item => item.key === value);
-  // A request to open or export is recorded, not a claim that an external share/download finished.
-  if (['shift', 'source', 'thread', 'doc-open', 'ask-go', 'share', 'copy-share', 'backup', 'export', 'export-record', 'audit', 'verify', 'verify-content', 'mark-copy'].includes(action)) {
-    void commit('Record access requested', { action, reference:value || null, ...(action === 'doc-open' ? { version:sourceVersions[value] || null } : {}) }, previous => previous).catch(fail);
-  }
   if (action === 'more-lines') {          // added in place, so nothing already typed is lost
     const rows = app.querySelector('dialog .name-rows');
     if (rows) rows.insertAdjacentHTML('beforeend', Array.from({ length: 3 }, (_, index) => nameLine(null, rows.children.length + index)).join(''));
@@ -1250,8 +1238,8 @@ async function act({action, value, kind}) {
       break;
     case 'ask-open': ui.dialog = ui.lastAsk || { type:'ask' }; break;
     case 'ask-back': ui.dialog = ui.lastAsk || { type:'ask' }; break;
-    case 'ask-try': await askAndLog(SUGGESTIONS[Number(value)]); break;
-    case 'ask-next': { const next = ui.dialog?.type === 'ask' && ui.dialog.q ? currentAsk().next?.[Number(value)] : null; if (next) await askAndLog(next); break; }
+    case 'ask-try': await runAsk(SUGGESTIONS[Number(value)]); break;
+    case 'ask-next': { const next = ui.dialog?.type === 'ask' && ui.dialog.q ? currentAsk().next?.[Number(value)] : null; if (next) await runAsk(next); break; }
     case 'ask-post': if (patientSigns(ui.dialog.q).length) return; ui.draftPost = ui.dialog.q || ''; ui.tab = 'board'; ui.boardFilter = 'all'; ui.dialog = null; ui.scrollTo = '.composer'; markBoardSeen(); break;
     case 'ask-go': {
       const [kind, first, second] = String(value).split('|');
@@ -1288,6 +1276,7 @@ async function act({action, value, kind}) {
       break;
     case 'export-record': {
       if (!isKeeper()) return;
+      await commit('Export requested', { kind:'fairness-record' }, previous => previous);
       const rows = recordRows(), quote = value => '"' + String(value).replace(/"/g, '""') + '"';
       const lines = [['Name', 'Shift', 'Shifts', 'Weekend turns', 'Share', 'Difference', 'Holidays worked', 'Which holidays', 'Charge', 'ICU', 'Low-census turns', 'Low-census hours', 'Offered to go'].map(quote).join(',')];
       for (const pool of ['D', 'N']) {
@@ -1325,6 +1314,7 @@ async function act({action, value, kind}) {
     case 'edit-shift': { const [date, shift] = value.split('|'); ui.dialog = { type:'edit-shift', date, shift }; break; }
     case 'erase-ask': ui.dialog = { type:'data', confirmErase:true }; break;
     case 'backup': {
+      await commit('Export requested', { kind:'workspace-backup' }, previous => previous);
       const file = { app:'department-hub', kind:'backup', version:1, savedAt:new Date().toISOString(), from:location.host, state };
       const url = URL.createObjectURL(new Blob([JSON.stringify(file)], { type:'application/json' }));
       const link = document.createElement('a');
@@ -1428,6 +1418,7 @@ async function act({action, value, kind}) {
     case 'teach-copy': {
       if (!isKeeper()) return;
       const lines = state.unanswered.map(item => [item.text, WRONG[item.reason] || WRONG.unanswered, item.understood ? 'understood as: ' + item.understood : ''].filter(Boolean).join(' | '));
+      void commit('Export requested', { kind:'waiting-questions', count:lines.length }, previous => previous).catch(fail);
       try { await navigator.clipboard.writeText(lines.join('\n')); ui.flash = 'Copied ' + lines.length + ' waiting question' + (lines.length === 1 ? '' : 's') + '.'; }
       catch { ui.flash = 'Copying was not allowed here.'; }
       break;
@@ -1469,6 +1460,8 @@ async function act({action, value, kind}) {
       const files = (post.media || []).map(item => mediaBlobs.get(item.id) ? new File([mediaBlobs.get(item.id)], item.name, { type: item.type || mediaBlobs.get(item.id).type }) : null).filter(Boolean);
       if (navigator.share) {
         const words = { title: 'Department Hub', text: shareText(post) };
+        // Queue the receipt without awaiting it: native sharing needs the original tap's activation.
+        void commit('Export requested', { kind:'board-share', reference:post.id }, previous => previous).catch(fail);
         try { await navigator.share(files.length && navigator.canShare?.({ files }) ? { ...words, files } : words); return; }
         catch (error) { if (error.name === 'AbortError') return; }
       }
@@ -1477,7 +1470,8 @@ async function act({action, value, kind}) {
     }
     case 'copy-share': {
       const post = state.posts.find(item => item.id === value);
-      if (!post) return;
+      if (!post || post.inside) return;
+      void commit('Export requested', { kind:'board-copy', reference:post.id }, previous => previous).catch(fail);
       try { await navigator.clipboard.writeText(shareText(post)); ui.flash = 'Copied.'; }
       catch { ui.flash = 'Select the words in the box and copy them.'; }
       break;
@@ -1649,6 +1643,7 @@ async function act({action, value, kind}) {
       break;
     case 'export': {
       if (!isKeeper()) return;
+      await commit('Export requested', { kind:'receipt-history' }, previous => previous);
       const url = URL.createObjectURL(new Blob([JSON.stringify({ format:1, rules:state.policy, events:state.events }, null, 2)], { type:'application/json' }));
       const link = document.createElement('a');
       link.href = url;
@@ -1706,7 +1701,7 @@ async function submit(form) {
     case 'ask': {
       const q = (data.q || '').trim();
       if (!q) return;
-      await askAndLog(q);
+      await runAsk(q);
       break;
     }
     case 'teach': {

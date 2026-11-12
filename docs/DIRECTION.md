@@ -330,7 +330,13 @@ The shared backend remains the next major milestone. Remaining compound-role, co
 
 Validation: 118 Node tests, both production builds and the production-bundle simulated-DOM checks pass. Regressions cover all seven weekday names, calendar and year boundaries, unchanged bare-weekday behavior, distinct this/next answers and the compound disclosure, plus keeping an explicit trade date fixed. These checks use fictional data; the reviewer's real-photo and real-schedule measurements were not independently repeated here.
 
-## Still open from the review
+## Later receipt-scope decision
+
+New local receipts cover changes, agreements, saved corrections, rule changes and export requests. Routine browsing and Ask lookups no longer create named receipts or question fingerprints. Anonymous button totals stay separate from the workspace and backups; the last board visit stays on the device for unread answers. Earlier browsing receipts are not rewritten or removed, so existing checkpoints remain usable. The notice is shown again with the new scope. Shared accounts and server-side enforcement are still not built; `docs/SERVER.md` carries this decision into the proposed data model.
+
+`docs/CONTENT-REPORTS.md` records the separate proposed learning-content report design, including retained content versions, a private review inbox and source-based dispositions. It is not an implemented feature. Compound-date Ask questions still perform one lookup with a partial-answer notice; the remaining broader Ask parsing gaps stay backlog work rather than prerequisites for the shared pilot.
+
+## Earlier open import issues
 
 - Matches that are blocked are hidden with no reason given.
 - A date missing from an import is not detected, so weekly hours can be understated.
