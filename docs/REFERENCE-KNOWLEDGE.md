@@ -1,6 +1,6 @@
-# Reference knowledge: cards that answer, each resting on a captured page
+# Reference knowledge: answers in the source's own words, borne out by pictures of the page
 
-Branch `claude/reference-capture`, on top of `claude/reference-knowledge` as pushed (`1a963e0`). Written 2026-11-12.
+Branch `claude/reference-witness`, on top of `main` at `242e282`. Written 2026-11-12.
 
 ## What this is
 
@@ -8,106 +8,107 @@ The owner needs Ask to answer technical questions with the figure, not with a li
 about one hospital's protocol at all: a normal range, a definition, how a result is read. That is general reference
 knowledge, and it has its own layer.
 
-A **reference card** states one fact in the app's own words. Under it are the passages of the source page it rests
-on, shown exactly as captured. Ask answers from a card only after a person on the device has compared the card with
-those passages and recorded that it says what they say. Every answer says it is reference knowledge, not the
-hospital's protocol and not an order for any patient, and shows the source's own words under the card.
+A **reference card** is a title, the wordings a question might use, and passages of a captured source page. It holds
+no sentence of its own. Ask answers with the passages exactly as captured, and under each one a picture: the
+screenshot of the page, cropped to where that passage was found, each found line outlined. Every answer says it is
+reference knowledge, not the hospital's protocol and not an order for any patient.
 
 There are four kinds of source, strongest first: a held hospital protocol (the original file, reviewed answers);
-a reference card (resting on a captured page, checked by a person); a pasted document (searched text); a
-professional reference (a link only). A held protocol always answers first.
+a reference card (a captured page, borne out by its screenshots); a pasted document (searched text); a professional
+reference (a link only). A held protocol always answers first.
 
-## The first set: adult arterial blood gases
+## Why the cards no longer have a person check them
 
-Twelve cards from one section of an openly licensed textbook: *Nursing Fundamentals 2e*, section 15.5 "Acid-Base
-Balance", WisTech Open (Open RN), 2024, Creative Commons Attribution 4.0. They cover the adult normal values (pH,
-PaO2, PaCO2, HCO3, SaO2), the values the source lists as critical, acidosis and alkalosis by pH, the respiratory and
-metabolic disorders, compensation, and which value the lungs manage and which the kidneys.
-
-It is a nursing textbook, chosen because it is the clearest openly licensed statement of these figures that was
-found. It is not a respiratory therapy text and not a laboratory's reference range.
-
-**The critical values are one laboratory's.** The capture shows what the earlier cards missed: the table's title
-carries note [2], and note [2] is "WakeMed Pathology Laboratories. (2016). Critical values." The textbook took its
-critical values from one hospital laboratory's list of 2016. Every card that states a critical value now says so, and
-shows that note among its passages. A department's own laboratory sets its own critical values.
+The earlier cards each carried a sentence written by an AI assistant, and a person compared that sentence with the
+page before it could answer. The owner did not want to be the link that vouches for an AI's paraphrase. The answer to
+that was not a better check of the paraphrase; it was to remove the paraphrase. With nothing reworded there is nothing
+to compare for meaning, and what is left to check is custody: that the text shown is the text that was on the page.
+That the app checks by itself, against pictures of the page.
 
 ## How the page got here
 
-The owner's capture tool, Blinders, saved the chapter from his own Chrome on 2026-11-12 at 14:55 UTC:
+The owner's capture tool, Blinders, saved from his own Chrome on 2026-11-12:
 
 | | Capture | Bytes | SHA-256 |
 | --- | --- | --- | --- |
-| The chapter's rendered text | `cef48181-5ed3-4ff5-b07d-382304cdcf95` | 25,965 | `cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7` |
-| The page's licence line | `b0473561-e3f8-41c7-bb7f-0f8267669a62` | 163 | `bb75fe52a30252cbac59bb5ecb8f89d4f3beb09f99f461584cb299f31dccc495` |
+| The chapter's rendered text (14:55 UTC) | `cef48181-…cdcf95` | 25,965 | `cf48652c…cde3e7` |
+| The page's licence line (14:55 UTC) | `b0473561-…7a62` | 163 | `bb75fe52…ccc495` |
+| Seven screenshots of the visible page (16:23–16:25 UTC) | `a750f9ff`, `38b08e04`, `9a04d9b2`, `49343fa5`, `06179dd5`, `5fd1d205`, `d433e7a5` | 238,546–459,096 each | in each receipt |
 
-Both were taken through Blinders' bridge: the inbox asked the paired tab for the rendered text of one element (the
-chapter section, and the licence line), and Blinders hashed and stored what the browser returned. The owner exported
-them to his project folder; the export re-hashed each file against its receipt. They are held in
-`src/reference/sources/` with Blinders' receipts beside them, byte for byte (Git treats them as binary so nothing can
-re-wrap them).
+All were taken through Blinders' bridge. For the screenshots, the paired tab was moved to each cited part of the page
+by a link to an anchor or to words on the page; Chrome marks words reached that way in purple, and the marks are in the
+pictures. Each screenshot is 2812 × 1540 pixels, the screen at twice its scale. They were moved from the Blinders inbox
+to this repository through the Claude app's browser and re-hashed on arrival; every one matched its receipt. They are
+held in `src/reference/sources/` with Blinders' receipts beside them, as binary files Git will not alter.
 
-**What a capture is and is not.** It is the text as Chrome rendered it: table cells separated by tabs, a cell's lines
-on separate lines. It is not the page's HTML, and it holds none of the page's images or videos. The receipt is a row
-in a local database with no signature, so it shows which bytes were saved and when; it does not show that no one
-changed that database since. The page was licensed CC BY 4.0, which permits holding and showing its text with credit;
-the licence line is shown with the cards, and the cards say their wording is the app's and the passages are unchanged.
+A receipt is a row in a local database with no signature. It shows which bytes were saved and when, not that no one
+changed the database since. The page is licensed CC BY 4.0, which permits holding and showing its text and pictures
+with credit; the licence line is shown with the cards.
 
-This replaces the earlier set, whose figures were read from the page by an AI assistant through a reader that returned
-only short quotations, with the page's text not held. One of those cards also said something the page does not: that
-SaO2 "is not the pulse-oximeter reading". The capture shows no such sentence, so the new card does not say it. Every
-other figure on the earlier cards was found in the capture.
+## What the app checks when the cards are added, and no person does
 
-## What the app checks, and what a person checks
+Adding the cards runs on the device, in the browser, and takes about 45 seconds:
 
-When the cards are added, in the browser, three things are checked mechanically and the cards are refused if any fails:
+1. The held text, licence line and all seven screenshots hash to the SHA-256 and byte count in their receipts.
+2. Every passage a card cites is a run of lines that exists in the held text.
+3. The app's own text reader (the bundled Tesseract already used for schedule photos) reads each screenshot three
+   ways: as a page, as one block, and as scattered words. Each line of every cited passage must be found in one of
+   those readings: its words in order, laid out together (a table row's cells side by side, a paragraph's lines
+   stacked in one column), **every number exactly as captured**, and no clearly read word on the screen where the
+   text has a different one. A word the reader could not make out may be missing; most passages lose none, the worst
+   line loses one in eight.
 
-1. The held page and licence line hash to the SHA-256 and byte count in the capture receipt.
-2. Every passage a card cites is a run of lines that exists in the held page and is not blank.
-3. Every number a card states (7.35, 60, 2016) appears in that card's own passages.
+If any card fails, none is added, and the refusal says which and why. Across the twelve cards, 1,091 of 1,100 words
+were found, every number. The check is sealed onto each card with its passages and receipts; editing any of them in
+storage afterwards stops that card answering.
 
-Check 3 catches a mistyped or invented figure. It does not catch a figure moved to the wrong place: if the PaCO2
-card said the critical high was 45 instead of 60, 45 is in the same passage (as the top of the normal range), and the
-check would pass. That is why a person still checks each card, now against the passages shown under it rather than a
-page somewhere else. The check is recorded with a seal over the card, the text of its passages and the capture receipt; changing
-any of them afterwards stops the card answering.
+### What it was tested against
 
-Cards held from the earlier format stop answering, and adding the captured set withdraws them with the reason
-recorded. A card the owner checked in the earlier set must be checked again in this one.
+The witness was built against what can go wrong, and each of these was tried as a change to the held text with its
+receipt recomputed to match, so that only the screenshots stood in the way. All fourteen are refused: a critical value
+swapped for its neighbouring row's (PaCO2 25 → 60, PaO2 60 → 25); a critical high moved to the normal range's top
+(60 → 45); the pH range and its critical low swapped; SaO2 88 → 95; HCO3 10 → 22; `>45` → `>35`; `<7.35` → `>7.35`;
+"acidotic" → "alkalotic"; "kidneys" → "lungs"; "decreases" → "increases"; "both out of range" → "or … is out of range";
+"not both" → "both"; an added number. Swapping one screenshot's reading for another's is refused too. Eleven
+deliberate breaks of the checking code were each caught by a test; one (ignoring a missing number) was missed at
+first, and the added-number case was written to catch it.
 
-## What Ask does
+### What it cannot check
 
-"What is a normal PaCO2?" returns the card's sentence, the line saying what it is not, and under it the source's own
-words: the table's title, the PaCO2 row exactly as captured, and the note crediting the critical values. The citation
-names the capture and its digest, and links to the live page. Two subjects in one question return both cards. A card
-that has not been checked returns "held and not checked", with no figure and no passage. A card offers no Yes or No.
+**Which passage a question wants.** "Normal PaCO2" reaches the PaCO2 card because the card lists that wording. That
+matching is the app's, it can be wrong, and the answer always shows the source's own text so a reader sees what it is
+answering with. The tests hold the expected card for each of a set of questions.
 
-A card answers only what it is about. The arterial saturation card does not answer a pulse-oximetry question, and
-schedule questions answer exactly as before.
+**A word the reader cannot see.** The reader does not reliably read subscripted chemical names or white text on the
+table's blue header. A table row's label (a lone "SaO2") may be counted as missed rather than read. A label holding a
+number is never skipped. In the screenshots the unread words are there to see.
+
+**The live page now.** The cards rest on the capture. The live page may have changed since; the app says so.
+
+**What the textbook gets right.** Its critical values are credited, in its own note [2], to one laboratory's 2016
+list (WakeMed Pathology Laboratories), and the cards show that note. A department's own laboratory sets its own.
+
+## The cards
+
+Twelve, from *Nursing Fundamentals 2e*, section 15.5 "Acid-Base Balance", WisTech Open (Open RN), 2024: adult normal
+values; pH, PaO2, PaCO2, HCO3 and SaO2 each with their critical values; the critical values together; acidosis or
+alkalosis from the pH; respiratory and metabolic acidosis and alkalosis; compensation; what the lungs and kidneys
+manage. The SaO2 card answers arterial-saturation questions only; "normal SpO2" gets no card.
+
+Adding them withdraws the earlier sets (the AI-reading set and the person-checked set), with the reason recorded.
+Those no longer answer in any case.
 
 ## Checks
 
 | Check | Result |
 | --- | --- |
-| `npm test` | 253 pass (251 before; the card tests rewritten, 8 now) |
+| `npm test` | 256 pass, 11 of them for the cards |
+| `npm run test:server` | 78 pass |
 | `npm run eval:ask` | 0 confidently wrong; unchanged |
 | `npm run gate:protocols` | 16 of 16 faults caught |
-| `scripts/check-protocols-ui.cjs` (CI) | Passes; now checks the built app holds the captured page by its digest and shows the captured row in Ask |
-| Browser walk, `dist` and `dist-demo` | 17 steps pass on each; the new step adds the cards on a phone, checks one, and asks |
-| Builds | Both verify, 55 files each; the built page chunk hashes to the capture's SHA-256 |
-| Mutations of the card code, by hand | 9 of 9 caught |
+| `scripts/check-protocols-ui.cjs` (CI) | Passes; the reader's recorded output stands in for the reader, which jsdom cannot run |
+| Browser walk, `dist` and `dist-demo` | 17 steps pass on each; the cards step runs the real reader in Chromium (about 45 s) and finds the same 1,091 of 1,100 words |
+| Builds | Both verify, 64 files each; the seven screenshots add 2.2 MB, loaded only when cards are shown |
 
-## What it cannot do
-
-It knows twelve things. Each further fact is another card that someone writes and checks, though the capture now
-makes the check a comparison on one screen.
-
-It matches a question to a card by the card's own listed wording. A question phrased another way gets no card. It
-does not interpret a result: "is a pH of 7.2 with a CO2 of 60 compensated?" returns the definitions, not a reading of
-those numbers, and it must stay that way. Reading a patient's result is clinical judgement, not reference lookup.
-
-The held text is checked against its receipt when the cards are added, not each time the app opens. A change to the
-stored copy afterwards stops a card answering if it touches that card's passages, because the check's seal covers
-them; a change elsewhere in the stored page is not detected.
-
-The live page can change after it was captured. Nothing detects that; the cards rest on the capture, and say so.
+`scripts/read-capture-shots.cjs` records the reader's output for the Node tests, in a real browser with the app's
+own reader. Rerun it if the screenshots or the reader change.

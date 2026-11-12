@@ -1,9 +1,12 @@
 {
- "format": "department-hub-fact-cards-v2",
- "id": "blood-gases-adult-captured",
+ "format": "department-hub-fact-cards-v3",
+ "id": "blood-gases-adult-witnessed",
  "title": "Arterial blood gases: adult normal values and reading a result",
  "applies": "Adult values, as the source's own table is titled. A laboratory sets its own reference ranges and critical values, and your hospital's may differ.",
- "replaces": ["blood-gases-adult"],
+ "replaces": [
+  "blood-gases-adult",
+  "blood-gases-adult-captured"
+ ],
  "source": {
   "title": "Nursing Fundamentals 2e, section 15.5 Acid-Base Balance",
   "publisher": "WisTech Open (Open RN)",
@@ -29,57 +32,80 @@
    "savedAt": "2026-11-12T14:55:28.461585+00:00",
    "method": "bridge",
    "of": "The page's licence line, as displayed."
-  }
+  },
+  "screenshots": [
+   {
+    "tool": "Blinders",
+    "id": "a750f9ff-51dd-4d9d-b64e-907920f74567",
+    "sha256": "6e361ca486c5cbbc1d2759863ca5d1edd7c9386107c16dd8bc52f4ca5413a3c2",
+    "bytes": 280464,
+    "savedAt": "2026-11-12T16:23:30.634725+00:00",
+    "method": "bridge"
+   },
+   {
+    "tool": "Blinders",
+    "id": "38b08e04-5679-4e30-8885-19bb302a545f",
+    "sha256": "5c71cb7fb2b2ee11a554482e3cb1aa600a296065a4a4d54cdfb14d2d51f0daa6",
+    "bytes": 238546,
+    "savedAt": "2026-11-12T16:24:22.862186+00:00",
+    "method": "bridge"
+   },
+   {
+    "tool": "Blinders",
+    "id": "9a04d9b2-a4ef-4e5d-8917-48e565109196",
+    "sha256": "08dd89768530851ab91a9816f6caa5c0706aaf5666bb0bfb1a449209d9b35f79",
+    "bytes": 313986,
+    "savedAt": "2026-11-12T16:25:04.735346+00:00",
+    "method": "bridge"
+   },
+   {
+    "tool": "Blinders",
+    "id": "49343fa5-01ef-4eec-9521-78fc1b4325a8",
+    "sha256": "b26144e48c29327bb5f012fa81031a6d128008e4bd3584ca33ee38eb3f698bdb",
+    "bytes": 320365,
+    "savedAt": "2026-11-12T16:25:12.472164+00:00",
+    "method": "bridge"
+   },
+   {
+    "tool": "Blinders",
+    "id": "06179dd5-81fb-4ee2-97e3-292e713a6f0d",
+    "sha256": "b1c4a9e6b3cfc133f46c348f811df3ea340f2ba0642b9525c4735c58ad7d13a2",
+    "bytes": 330745,
+    "savedAt": "2026-11-12T16:25:20.269960+00:00",
+    "method": "bridge"
+   },
+   {
+    "tool": "Blinders",
+    "id": "5fd1d205-9294-4a31-af17-d81b9d401663",
+    "sha256": "c3034be4d810f4ff32c7ca36fcef67aa4cc130ef53e2575a0fdd73b85e57085a",
+    "bytes": 306489,
+    "savedAt": "2026-11-12T16:25:27.546045+00:00",
+    "method": "bridge"
+   },
+   {
+    "tool": "Blinders",
+    "id": "d433e7a5-db41-4b0b-9cd8-205a30bf7620",
+    "sha256": "7fefe9c8ead33dd1cd80798e0b56896dd22a8b27d297d55d69be47bde8b905b1",
+    "bytes": 459096,
+    "savedAt": "2026-11-12T16:25:35.408446+00:00",
+    "method": "bridge"
+   }
+  ],
+  "screenshotsOf": "The visible part of the page in the owner's Chrome, scrolled to each cited part in turn by a link to words on the page; Chrome marks those words in purple, and the marks are in the pictures."
  },
- "written": "Each card is a short statement in Department Hub's own words. Under it are the passages of the captured page it rests on, shown exactly as captured. Every number a card states must appear in those passages, or the cards are refused.",
+ "written": "Each card is a title, the wording a question may use, and the passages of the captured page it rests on, shown exactly as captured. Nothing on a card is reworded. Every line a card shows must be found on the page's screenshots, every number exactly, or the cards are refused.",
  "cards": [
-  { "id": "abg-normal", "title": "Normal arterial blood gas values", "where": "Table 15.5a, the Adult Normal Value column",
-    "passages": [[37, 46], [49, 49], [50, 60], [63, 73], [76, 76]],
-    "said": ["normal abg", "abg normal", "normal abg values", "abg values", "abg ranges", "normal blood gas", "blood gas normal", "blood gas values", "blood gas ranges", "normal arterial blood gas"],
-    "answer": "Adult normal arterial blood gas values: pH 7.35-7.45, PaO2 80-100 mmHg, PaCO2 35-45 mmHg, HCO3 22-26 mEq/L, SaO2 95-100%." },
-  { "id": "ph", "title": "Arterial pH", "where": "Table 15.5a, pH row",
-    "passages": [[36, 37], [38, 46], [220, 220]],
-    "said": ["normal ph", "ph normal", "ph range", "arterial ph", "blood ph", "critical ph"],
-    "answer": "Adult normal arterial pH is 7.35-7.45. The source lists a pH less than 7.25 or greater than 7.60 as critical, crediting its critical values to one laboratory's 2016 list." },
-  { "id": "pao2", "title": "PaO2", "where": "Table 15.5a, PaO2 row",
-    "passages": [[36, 37], [49, 49], [220, 220]],
-    "said": ["pao2", "po2", "arterial oxygen pressure"],
-    "answer": "Adult normal PaO2 is 80-100 mmHg. The source lists a PaO2 less than 60 mmHg as critical, crediting its critical values to one laboratory's 2016 list." },
-  { "id": "paco2", "title": "PaCO2", "where": "Table 15.5a, PaCO2 row",
-    "passages": [[36, 37], [50, 60], [220, 220]],
-    "said": ["paco2", "pco2", "normal co2", "arterial co2", "co2 range"],
-    "answer": "Adult normal PaCO2 is 35-45 mmHg. The source lists a PaCO2 less than 25 mmHg or greater than 60 mmHg as critical, crediting its critical values to one laboratory's 2016 list." },
-  { "id": "hco3", "title": "HCO3 (bicarbonate)", "where": "Table 15.5a, HCO3 row",
-    "passages": [[36, 37], [63, 73], [220, 220]],
-    "said": ["hco3", "bicarb", "bicarbonate"],
-    "answer": "Adult normal HCO3 is 22-26 mEq/L. The source lists an HCO3 less than 10 mEq/L or greater than 40 mEq/L as critical, crediting its critical values to one laboratory's 2016 list." },
-  { "id": "sao2", "title": "SaO2 (arterial oxygen saturation)", "where": "Table 15.5a, SaO2 row",
-    "passages": [[36, 37], [76, 76], [220, 220]],
-    "said": ["sao2", "arterial saturation", "arterial oxygen saturation"],
-    "answer": "Adult normal SaO2 is 95-100%. The source lists an SaO2 less than 88% as critical, crediting its critical values to one laboratory's 2016 list." },
-  { "id": "abg-critical", "title": "Critical arterial blood gas values", "where": "Table 15.5a, the Critical Value column, and its note [2]",
-    "passages": [[36, 46], [49, 49], [50, 60], [63, 73], [76, 76], [220, 220]],
-    "said": ["critical abg", "abg critical", "critical blood gas", "critical values", "critical abg values", "panic values"],
-    "answer": "Critical values in the source's adult table: pH less than 7.25 or greater than 7.60; PaO2 less than 60 mmHg; PaCO2 less than 25 mmHg or greater than 60 mmHg; HCO3 less than 10 mEq/L or greater than 40 mEq/L; SaO2 less than 88%. The table credits them to WakeMed Pathology Laboratories' critical values list of 2016." },
-  { "id": "acidosis-alkalosis", "title": "Acidosis or alkalosis, from the pH", "where": "Table 15.5b, step 1",
-    "passages": [[154, 158]],
-    "said": ["acidosis or alkalosis", "acidosis", "alkalosis", "acidotic", "alkalotic", "acidemia", "alkalemia"],
-    "answer": "A pH less than 7.35 is acidosis. A pH greater than 7.45 is alkalosis." },
-  { "id": "respiratory", "title": "Respiratory acidosis and respiratory alkalosis", "where": "Table 15.5b, step 2",
-    "passages": [[161, 171]],
-    "said": ["respiratory acidosis", "respiratory alkalosis", "respiratory problem", "respiratory cause"],
-    "answer": "The source calls it respiratory acidosis when the pH is less than 7.35 and the PaCO2 is greater than 45, and respiratory alkalosis when the pH is greater than 7.45 and the PaCO2 is less than 35." },
-  { "id": "metabolic", "title": "Metabolic acidosis and metabolic alkalosis", "where": "Table 15.5b, step 3",
-    "passages": [[176, 186]],
-    "said": ["metabolic acidosis", "metabolic alkalosis", "metabolic problem", "metabolic cause"],
-    "answer": "The source calls it metabolic acidosis when the pH is less than 7.35 and the HCO3 is less than 22, and metabolic alkalosis when the pH is greater than 7.45 and the HCO3 is greater than 26." },
-  { "id": "compensation", "title": "Fully compensated, partially compensated, uncompensated", "where": "Table 15.5b, step 4",
-    "passages": [[189, 215]],
-    "said": ["compensated", "compensation", "compensating", "fully compensated", "partially compensated", "uncompensated"],
-    "answer": "In the source's step 4: fully compensated means the pH is back to normal (7.35-7.45) while PaCO2 and HCO3 are both out of range. Partially compensated means the pH is still abnormal and PaCO2 and HCO3 are both abnormal. Uncompensated means the pH is abnormal and only one of PaCO2 or HCO3 is abnormal." },
-  { "id": "lungs-kidneys", "title": "Which value the lungs manage and which the kidneys", "where": "Table 15.5a, the PaCO2 and HCO3 descriptions",
-    "passages": [[52, 56], [65, 69]],
-    "said": ["lungs or kidneys", "respiratory component", "metabolic component", "which organ", "managed by the lungs", "managed by the kidneys"],
-    "answer": "The source describes CO2 as an acid managed by the lungs and HCO3 as a base managed by the kidneys. As PaCO2 increases the pH decreases; as HCO3 increases the pH increases." }
+  {"id": "abg-normal", "title": "Adult normal arterial blood gas values", "where": "Table 15.5a, the Adult Normal Value column", "passages": [[37, 46], [49, 49], [50, 60], [63, 73], [76, 76]], "said": ["normal abg", "abg normal", "normal abg values", "abg values", "abg ranges", "normal blood gas", "blood gas normal", "blood gas values", "blood gas ranges", "normal arterial blood gas"]},
+  {"id": "ph", "title": "Arterial pH: normal and critical values", "where": "Table 15.5a, pH row", "passages": [[36, 37], [38, 46], [220, 220]], "said": ["normal ph", "ph normal", "ph range", "arterial ph", "blood ph", "critical ph"]},
+  {"id": "pao2", "title": "PaO2: normal and critical values", "where": "Table 15.5a, PaO2 row", "passages": [[36, 37], [49, 49], [220, 220]], "said": ["pao2", "po2", "arterial oxygen pressure"]},
+  {"id": "paco2", "title": "PaCO2: normal and critical values", "where": "Table 15.5a, PaCO2 row", "passages": [[36, 37], [50, 60], [220, 220]], "said": ["paco2", "pco2", "normal co2", "arterial co2", "co2 range"]},
+  {"id": "hco3", "title": "HCO3 (bicarbonate): normal and critical values", "where": "Table 15.5a, HCO3 row", "passages": [[36, 37], [63, 73], [220, 220]], "said": ["hco3", "bicarb", "bicarbonate"]},
+  {"id": "sao2", "title": "SaO2: normal and critical values", "where": "Table 15.5a, SaO2 row", "passages": [[36, 37], [76, 76], [220, 220]], "said": ["sao2", "arterial saturation", "arterial oxygen saturation"]},
+  {"id": "abg-critical", "title": "Critical arterial blood gas values", "where": "Table 15.5a, the Critical Value column, and its note [2]", "passages": [[36, 46], [49, 49], [50, 60], [63, 73], [76, 76], [220, 220]], "said": ["critical abg", "abg critical", "critical blood gas", "critical values", "critical abg values", "panic values"]},
+  {"id": "acidosis-alkalosis", "title": "Acidosis or alkalosis, from the pH", "where": "Table 15.5b, step 1", "passages": [[154, 158]], "said": ["acidosis or alkalosis", "acidosis", "alkalosis", "acidotic", "alkalotic", "acidemia", "alkalemia"]},
+  {"id": "respiratory", "title": "Respiratory acidosis and alkalosis", "where": "Table 15.5b, step 2", "passages": [[161, 171]], "said": ["respiratory acidosis", "respiratory alkalosis", "respiratory problem", "respiratory cause"]},
+  {"id": "metabolic", "title": "Metabolic acidosis and alkalosis", "where": "Table 15.5b, step 3", "passages": [[176, 186]], "said": ["metabolic acidosis", "metabolic alkalosis", "metabolic problem", "metabolic cause"]},
+  {"id": "compensation", "title": "Fully compensated, partially compensated, uncompensated", "where": "Table 15.5b, step 4", "passages": [[189, 215]], "said": ["compensated", "compensation", "compensating", "fully compensated", "partially compensated", "uncompensated"]},
+  {"id": "lungs-kidneys", "title": "What the lungs manage and what the kidneys manage", "where": "Table 15.5a, the PaCO2 and HCO3 descriptions", "passages": [[52, 56], [65, 69]], "said": ["lungs or kidneys", "respiratory component", "metabolic component", "which organ", "managed by the lungs", "managed by the kidneys"]}
  ]
 }

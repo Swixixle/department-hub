@@ -12,6 +12,8 @@ const { JSDOM } = require('jsdom');
 (async () => {
   const root = process.cwd(), load = file => import(pathToFileURL(path.join(root, file)));
   // The library is built before any browser globals exist, so the reader runs as it does in the Node tests.
+  const witnessKit = await load('tests/witness-kit.mjs');
+  globalThis.departmentHubCaptureShots = async () => witnessKit.held().shots;
   const kit = await load('tests/protocol-kit.mjs'), protocols = await load('src/protocols.js'), audit = await load('src/audit.js'), model = await load('src/model.js');
   const seeded = (await kit.carryThrough(protocols.emptyLibrary(), 1, { upTo: 'added', who: 'Jordan' })).library;
   const ONE = kit.DIGESTS['rt-train-014-rev1.pdf'], revisionId = seeded.revisions[0].id;
@@ -183,39 +185,32 @@ const { JSDOM } = require('jsdom');
   await click('close');
   await actor('Jordan');
 
-  // Reference knowledge: cards rest on a held Blinders capture, arrive unchecked, answer only after a person records the check.
+  // Reference knowledge: cards in the source's own words, added only when every line is found on the page's
+  // screenshots. jsdom has no text reader, so the readings recorded from the app's reader in a real browser stand in
+  // for it (the walk runs the real reader). A non-keeper cannot add them; nobody is asked to vouch for a card.
   await click('tab', 'protocols'); await click('protocol-home');
   assert.match(content(), /Reference knowledge[\s\S]*No reference cards are held\./);
-  await click('knowledge-add');
-  assert.equal(types().at(-1), 'Reference cards added');
-  assert.equal(document.querySelectorAll('[data-action="knowledge-check"]').length, 12);
-  assert.match(content(), /0 of 12 cards checked[\s\S]*Reference knowledge\. It is not your hospital’s protocol and not an order for any patient\./);
-  assert.equal(document.querySelector('.knowledge-source a.link-button').href, 'https://wtcs.pressbooks.pub/nursingfundamentals/chapter/15-5-acid-base-balance/');
-  assert.equal(document.querySelector('.knowledge-source .digest').textContent, 'cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7');
-  assert.equal(read().events.at(-1).details.sha256, 'cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7', 'the page the built app held is the captured page');
-  assert.ok([...document.querySelectorAll('[data-card="paco2"] .source-quote')].some(quote => quote.textContent.includes('\t35–45 mmHg\tLess than 25 mmHg.')), 'the card is shown over the captured row');
-  reply = await ask('What is a normal PaCO2?');
-  assert.match(reply, /A reference card on this is held and has not been checked against its source/);
-  assert.ok(!/35-45/.test(reply), 'an unchecked card showed its figure');
-  await click('close');
   await actor('Avery'); await click('tab', 'protocols');
-  assert.equal(find('knowledge-check'), undefined, 'a non-keeper is not offered the check');
-  const beforeCard = localStorage.getItem(key), forgedCard = document.createElement('button'); forgedCard.dataset.action = 'knowledge-check'; forgedCard.dataset.value = 'paco2'; document.querySelector('#app').append(forgedCard); forgedCard.click(); await settle();
-  assert.match(document.querySelector('.content > .notice').textContent, /Only a record keeper can change the protocols held here\./);
-  assert.equal(localStorage.getItem(key), beforeCard);
+  assert.equal(find('knowledge-add'), undefined, 'a non-keeper is not offered the cards');
   await actor('Jordan'); await click('tab', 'protocols');
-  await click('knowledge-check', 'paco2');
-  assert.deepEqual([types().at(-1), read().events.at(-1).details.card, read().events.at(-1).details.where], ['Reference card checked', 'PaCO2', 'Table 15.5a, PaCO2 row']);
-  assert.match(content(), /1 of 12 cards checked/);
+  await click('knowledge-add'); await waitFor(() => document.querySelector('[data-card="paco2"]'), 'cards added');
+  assert.equal(types().at(-1), 'Reference cards added');
+  assert.match(read().events.at(-1).details.found, /^\d+ of 1100 words, every number$/);
+  assert.equal(read().events.at(-1).details.sha256, 'cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7', 'the page the built app held is the captured page');
+  assert.equal(find('knowledge-check'), undefined, 'nobody is asked to vouch for a card');
+  assert.match(content(), /12 of 12 cards answering[\s\S]*Reference knowledge\. It is not your hospital’s protocol and not an order for any patient\./);
+  assert.equal(document.querySelector('.knowledge-source .digest').textContent, 'cf48652c3a646897627597f3827d14b412a963bc7e354604b4c9524071cde3e7');
+  assert.ok([...document.querySelectorAll('[data-card="paco2"] .source-quote')].some(quote => quote.textContent.includes('\t35–45 mmHg\tLess than 25 mmHg.')), 'the card shows the captured row');
+  const pictured = document.querySelector('[data-card="paco2"] .capture-picture image').getAttribute('href');
+  assert.ok(fs.existsSync(path.join('dist/assets', path.basename(pictured))), 'the screenshot a card shows ships with the app: ' + pictured);
   reply = await ask('whats the normal range for PaCO2');
-  assert.match(reply, /Understood as: reference knowledge: paco2\.[\s\S]*Adult normal PaCO2 is 35-45 mmHg\. The source lists a PaCO2 less than 25 mmHg or greater than 60 mmHg as critical,[\s\S]*Reference knowledge\. It is not your hospital’s protocol and not an order for any patient\./);
+  assert.match(reply, /Understood as: reference knowledge: paco2: normal and critical values\.[\s\S]*From the source: PaCO2: normal and critical values[\s\S]*Reference knowledge\. It is not your hospital’s protocol and not an order for any patient\./);
   const cited = document.querySelector('.ask-answer .ask-item a.link-button');
   assert.deepEqual([cited.href, cited.target, cited.rel], ['https://wtcs.pressbooks.pub/nursingfundamentals/chapter/15-5-acid-base-balance/', '_blank', 'noopener noreferrer']);
   assert.ok([...document.querySelectorAll('.ask-answer .source-quote')].some(quote => quote.textContent.includes('\t35–45 mmHg\tLess than 25 mmHg.')), 'the answer shows the source’s own words');
-  assert.match(reply, /exact text captured with Blinders on 2026-11-12, SHA-256 cf48652c…cde3e7/);
+  assert.ok(document.querySelectorAll('.ask-answer .capture-picture rect').length >= 3, 'the answer outlines the row on its screenshot');
+  assert.match(reply, /exact text captured with Blinders on 2026-11-12, SHA-256 cf48652c…cde3e7 · found on the page’s screenshots: \d+ of \d+ words, every number/);
   assert.equal(find('ask-yes'), undefined, 'a reference card offers no Yes or No');
-  reply = await ask('What is a normal pH?');
-  assert.match(reply, /has not been checked against its source/, 'checking one card does not check another');
   reply = await ask('What is a normal SpO2?');
   assert.ok(!/reference knowledge/i.test(reply), 'the arterial-saturation card answered a pulse-oximetry question');
   await click('close');
@@ -269,7 +264,7 @@ const { JSDOM } = require('jsdom');
   assert.ok(JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(name => [name, localStorage.getItem(name)]))).includes('WakeMed Pathology Laboratories'), 'the captured page is held in storage');
   for (const typed of ['Blue Trainer drill at', 'amber seal lamp serviced', 'swallow screen before', 'suction', 'normal range for PaCO2', 'normal SpO2']) assert.ok(!kept.includes(typed), 'storage holds what was typed: ' + typed);
   assert.deepEqual(types().slice(receiptsAtStart), ['Protocol reading confirmed', 'Protocol answers mapped', ...Array(6).fill('Protocol answer reviewed'), 'Protocol answers reviewed', 'Protocol revision made active',
-    'Reference cards added', 'Reference card checked', 'Protocol revision withdrawn']);
+    'Reference cards added', 'Protocol revision withdrawn']);
   assert.deepEqual(read().events[0], stored.events[0], 'the receipt from before protocols is untouched');
   assert.equal((await audit.verifyReceipts(read().events)).ok, true);
   assert.equal(read().documents[0].text, stored.documents[0].text);

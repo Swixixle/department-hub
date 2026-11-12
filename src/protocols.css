@@ -80,3 +80,13 @@
 .source-quote{margin:6px 0 0;padding:8px 10px;border-left:3px solid var(--line);background:#fff;border-radius:0 6px 6px 0;white-space:pre-wrap;tab-size:3;overflow-wrap:anywhere;font-size:.9375rem;width:100%;box-sizing:border-box}
 .ask-item .source-quote{font-weight:400}
 .record .digest{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8125rem;overflow-wrap:anywhere}
+/* Where a passage was found on a screenshot of the page: the screenshot cropped to it, each found line outlined. */
+.capture-picture{margin:6px 0 0;width:100%}
+.capture-frame{overflow-x:auto;max-width:100%;border:1px solid var(--line);border-radius:6px;background:#fff}
+.capture-picture svg{display:block;height:auto;max-width:none}
+.capture-picture rect{fill:none;stroke:#c2410c;stroke-width:4}
+.capture-picture figcaption{font-size:.8125rem;color:var(--muted);margin-top:2px}
+.bundle{grid-template-columns:minmax(0,1fr)}
+.capture-picture{min-width:0;max-width:100%}
+.ask-item>div{min-width:0}
+.ask-answer{grid-template-columns:minmax(0,1fr)}

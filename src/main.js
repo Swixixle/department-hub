@@ -15,8 +15,8 @@ import { readPdf } from './pdftext.js';
 import { emptyLibrary, prepareLibrary, addRevision, checkExtraction, supplyText, markFigure, activate, withdraw, toggleMark, revisionOf, searchLibrary } from './protocols.js';
 import { addMapping, reviewBundle, markMappingsReviewed } from './bundles.js';
 import { protocolTopics } from './pathways.js';
-import { libraryView, familyView, addDialog, landingRevision, referencesView, knowledgeView } from './protocol-view.js';
-import { addSet, reviewCard, withdrawSet } from './facts.js';
+import { libraryView, familyView, addDialog, landingRevision, referencesView, knowledgeView, pictureOf } from './protocol-view.js';
+import { addSet, withdrawSet } from './facts.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
 const publicDemo = __PUBLIC_DEMO__;
@@ -556,7 +556,27 @@ const loadPdfjs = () => pdfjsReady ||= (async () => {
   pdfjs.GlobalWorkerOptions.workerSrc = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
   return pdfjs;
 })();
-const viewTools = { h, button, valueAttr };
+// The held Blinders screenshots, by capture id. Shown cropped under a reference answer; read once when cards are added.
+const SHOT_URLS = Object.fromEntries(Object.entries(import.meta.glob('./reference/sources/*.png', { query: '?url', import: 'default', eager: true }))
+  .map(([file, url]) => [file.match(/blinders-([0-9a-f-]{36})\.png$/)?.[1], url]).filter(([id]) => id));
+const shotUrl = id => SHOT_URLS[id] || null;
+const viewTools = { h, button, valueAttr, shotUrl };
+// Each screenshot's bytes, size and the reader's readings of it, for adding cards. A test can stand in for the reader.
+async function captureShots(set, onProgress) {
+  if (typeof globalThis.departmentHubCaptureShots === 'function') return globalThis.departmentHubCaptureShots(set);
+  const shots = [];
+  for (const receipt of set.source.screenshots) {
+    const url = shotUrl(receipt.id);
+    if (!url) throw new Error('Screenshot ' + receipt.id.slice(0, 8) + ' of the page is missing from this copy of the app.');
+    const blob = await fetch(url).then(response => { if (!response.ok) throw new Error('Screenshot ' + receipt.id.slice(0, 8) + ' could not be opened.'); return response.blob(); });
+    const bitmap = await createImageBitmap(blob);
+    shots.push({ id: receipt.id, blob, bytes: new Uint8Array(await blob.arrayBuffer()), width: bitmap.width, height: bitmap.height });
+    bitmap.close();
+  }
+  const { readShots } = await import('./capture-reader.js');
+  const readings = await readShots(shots.map(shot => shot.blob), onProgress);
+  return shots.map((shot, index) => ({ id: shot.id, bytes: shot.bytes, width: shot.width, height: shot.height, readings: readings[index] }));
+}
 // Professional references: titles and links only, shipped with the app and loaded after it starts. No text of any guideline is held.
 let referenceList = null;
 const loadReferences = () => import('./reference/respiratory-sources.json').then(module => { referenceList = module.default; if (ui.tab === 'protocols') render(); }).catch(() => {});
@@ -567,7 +587,7 @@ function protocolsScreen() {
   if (view.shelf === 'references' && referenceList) return referencesView({ list:referenceList, query:view.refQuery, section:view.refSection, retired:view.refRetired, today }, viewTools);
   if (!view.family) return libraryView({ library:state.protocols, today, documents:state.documents, query:view.query, results:view.query ? searchLibrary(state.protocols, view.query, today) : [], keeper:isKeeper(), demo:publicDemo,
     sampleNext:['1', '2'].find(label => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + label + '.pdf')) || null, references:referenceList,
-    cardSetOffered:!(state.protocols.knowledge || []).some(set => set.id === 'blood-gases-adult-captured' && !set.withdrawn) }, viewTools);
+    cardSetOffered:!(state.protocols.knowledge || []).some(set => set.id === 'blood-gases-adult-witnessed' && !set.withdrawn) }, viewTools);
   const revision = shownRevision();
   return familyView({ library:state.protocols, today, familyId:view.family, revisionId:revision?.id, pane:view.pane, cite:view.cite, keeper:isKeeper(), held:revision ? originals.get(revision.digest) : undefined,
     sampleMapping:Boolean(revision && SAMPLE_PROTOCOL.test(revision.file.name)), withdrawing:view.withdrawing, fromAsk:view.fromAsk && Boolean(ui.lastAsk),
@@ -1018,7 +1038,7 @@ function dialogMarkup() {
     const result = q ? currentAsk() : null;
     const canRemember = result?.taught || (ui.dialog.opened?.startsWith('doc|') && result?.items.some(entry => entry.go === ui.dialog.opened));
     const item = entry => '<div class="ask-item' + (entry.branch && !entry.go ? ' branch' : '') + '"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h((entry.go?.startsWith('doc|') ? 'Legacy document, not a reviewed protocol · ' : '') + entry.sub) + '</small>' : '') +
-      (entry.quote ? entry.quote.map(text => '<blockquote class="source-quote">' + h(text) + '</blockquote>').join('') : '') + '</div>' +
+      (entry.quote ? entry.quote.map((text, index) => '<blockquote class="source-quote">' + h(text) + '</blockquote>' + (entry.pictures || []).filter(picture => picture.passage === index).map(picture => pictureOf(picture, shotUrl(picture.shot), h)).join('')).join('') : '') + '</div>' +
       (entry.href ? '<a class="secondary link-button" href="' + h(entry.href) + '" target="_blank" rel="noopener noreferrer">Open official source ↗</a>' : entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
     return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
       '<div class="actions inline"><button class="primary">Ask</button></div></form>' +
@@ -1028,7 +1048,7 @@ function dialogMarkup() {
         (result.next?.length ? '<div class="chip-list"><span class="subtle">Next</span><div>' + result.next.map((text, index) => button(h(text), 'ask-next', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' : '') +
         (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' :
           // A protocol answer is not open to a vote. Nothing a reader presses here can change it.
-          result.kind === 'fact' ? '<p class="subtle">A reference card answers only after someone here has checked it against its source. “Yes”, repeated questions and search cannot change one. If it looks wrong, open the page and tell a record keeper.</p><div class="actions wrap">' +
+          result.kind === 'fact' ? '<p class="subtle">A reference card answers only in its source’s words, and only lines found on the page’s screenshots. “Yes”, repeated questions and search cannot change one. If it looks wrong, open the page and tell a record keeper.</p><div class="actions wrap">' +
             button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + '</div>' :
           result.kind === 'protocol' ? '<p class="subtle">A protocol answer comes only from a reviewed mapping. “Yes”, repeated questions and search cannot change it. If it looks wrong, open the original and tell a record keeper.</p><div class="actions wrap">' +
             button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + '</div>' : result.empty ? '<div class="actions wrap">' + button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
@@ -1413,11 +1433,13 @@ async function act({action, value, kind}) {
       keeperOnly();
       const [set, text, licence] = (await Promise.all([import('./reference/cards-blood-gases.json'), import('./reference/sources/blinders-cef48181-5ed3-4ff5-b07d-382304cdcf95.txt?raw'),
         import('./reference/sources/blinders-b0473561-e3f8-41c7-bb7f-0f8267669a62.txt?raw')])).map(module => module.default);
-      await protocolStep(await addSet(state.protocols, set, { text, licence }, state.actor, new Date().toISOString()), 'Reference cards added, unchecked. The captured page matched its receipt. None answers until it has been compared with its passages.');
+      ui.notice = 'Reading the page’s screenshots on this device…'; render();
+      const shots = await captureShots(set, (done, total) => { ui.notice = 'Reading the page’s screenshots on this device: ' + done + ' of ' + total + ' readings.'; render(); });
+      ui.notice = '';
+      await protocolStep(await addSet(state.protocols, set, { text, licence, shots }, state.actor, new Date().toISOString()), 'Reference cards added. The page and its screenshots matched their receipts, and every line the cards show was found on the screenshots.');
       ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'knowledge:' + set.id, withdrawing:false };
       break;
     }
-    case 'knowledge-check': keeperOnly(); await protocolStep(reviewCard(state.protocols, ui.protocols.shelf.slice(10), value, state.actor, new Date().toISOString())); break;
     case 'reference-shelf': ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'references' }; ui.scrollTo = '.content'; break;
     case 'protocol-open': ui.protocols = { ...ui.protocols, family:value, revision:landingRevision(state.protocols, value, localToday())?.id || null, cite:null, withdrawing:false, fromAsk:false }; ui.scrollTo = '.content'; break;
     case 'protocol-revision': ui.protocols = { ...ui.protocols, revision:value, cite:null, withdrawing:false }; break;
