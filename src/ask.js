@@ -427,7 +427,7 @@ function lookup(question, world) {
   // A comparison question is read into a plan (src/plan.js) and executed separately (src/measure.js), rather than
   // dispatched on whichever keyword happens to match. A follow-up edits the plan already answered instead of
   // starting again, which is what makes "same thing for nights" and "no, include Avery this time" work.
-  const repairedPlan = last?.plan ? repairPlan(last.plan, { text: tidy.text, said: question, names, when }) : null;
+  const repairedPlan = last?.plan ? repairPlan(last.plan, { text: tidy.text, said: question, names, when, actor }) : null;
   const plan = repairedPlan || readPlan({ text: tidy.text, names, people: others, when, actor, last });
   if (plan) kind = plan.op;
 

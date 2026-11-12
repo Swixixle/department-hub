@@ -1,7 +1,6 @@
 # Protocols: source-backed answers from the department's own documents
 
-Recorded 2026-11-12. The owner marked this "very, very important", so it is written down as direction rather than
-left in a conversation.
+Recorded 2026-11-12. Product direction; implementation status is listed below.
 
 ## What the owner has decided
 
@@ -28,7 +27,7 @@ What the code does today, read rather than assumed:
 
 - A document is pasted text or a `.txt`/`.md` file, with a title, a kind (Policy, Procedure, Protocol, Manual, Other)
   and an optional effective date. There is no PDF import, no page reference, no table or flowchart.
-- A document has no identifier, revision, issuing authority or current/replaced status. Replacing one means removing
+- A document has an internal record ID, but no issuing organization's protocol identifier, revision, issuing authority or current/replaced controls in the library. Replacing one means removing
   it and adding another; the old text is gone, not retired.
 - Ask splits each document into paragraphs and ranks them independently. It returns up to three passages and links
   each to its place in the document.
@@ -75,15 +74,17 @@ the owner pays for and be readable by every member. Whether the hospital permits
 personal app at all, and onto that server in particular, is the owner's question to put to whoever owns the
 protocols. The software cannot answer it and should not be built as though it were answered.
 
-**Reference, not instruction, especially when time is short.** The review cited FDA's clinical decision support
-guidance for the principle that a clinician must be able to inspect the basis of an answer. That is right as far as
-it goes. The same guidance, revised 6 January 2026, also takes the position that software intended for
-time-critical decisions may not let a clinician independently review the basis in time, and so falls outside the
-exemption for non-device decision support. That reading comes from a law-firm summary, not from FDA's text, and it
-is not legal advice. The design consequence does not depend on the legal answer: this is a way to find and read the
-protocol faster, with the source in front of the person, for the questions a supervisor would answer by looking it
-up. It is not something to consult in place of the protocol in the middle of an emergency, and it never issues a
-directive of its own.
+**Intended use and clinical review.** The current [FDA CDS guidance](https://www.fda.gov/media/109618/download),
+issued January 29, 2026, supersedes January 6. Section IV(4), printed pages 14–16, discusses independent review,
+automation and urgency. Neither a source link nor a quick response establishes a regulatory classification;
+the actual intended use and implementation need assessment before clinical deployment.
+
+Build source-linked protocol explanations with the applicable conditions, exceptions and escalation route visible.
+Do not invent instructions or orders. Fast access to the original protocol remains part of the goal; do not turn a
+secondhand regulatory summary into a blanket ban on useful reference access. The synthetic milestone establishes
+software behavior, not clinical validation or hospital approval. A designated clinical reviewer and document owner
+must assess real content and its intended use before a clinical pilot. These review requirements do not block
+building and testing the invented-protocol milestone.
 
 ## The first milestone
 
@@ -91,6 +92,9 @@ directive of its own.
 direct questions, the difficult branches, the exceptions, and replacement by a newer version. Done with an invented
 protocol in the repository so the whole path can be tested in public, and repeatable with a real one on the owner's
 own device.
+
+The concrete implementation brief is [PROTOCOL-MILESTONE-1.md](PROTOCOL-MILESTONE-1.md). It does not enable a
+clinical deployment, select email's purpose or deploy the shared backend.
 
 It is done when, for that one protocol:
 

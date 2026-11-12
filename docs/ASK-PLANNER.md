@@ -83,6 +83,13 @@ the evaluation sets rather than by thinking about it harder.
 A threshold reports the mark's own figure alongside the names. A list of people who beat Casey, without the number
 they had to beat, is not an answer.
 
+Integration review additionally checks the returned figures, not just plan labels. “Behind” selects fewer,
+an unknown reference cannot be replaced by a later excluded name, and a ranking limit is executed with its ties.
+An explicit “no, fewer than Casey” changes the reference while retaining the other fields. This version supports
+one strict person reference. Multiple references/boundaries and a negated threshold are recognized as unsupported;
+they ask for clarification instead of dropping a condition. A shift-only follow-up cannot erase that unresolved
+condition. Numerical thresholds and compound comparisons are not claimed as implemented.
+
 ## Metrics that are not the same question
 
 Three of these are routinely confused, so each is counted separately and the answer says which one it used.

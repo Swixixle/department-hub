@@ -118,8 +118,11 @@ export function runPlan(plan, world) {
     const mark = rows.find(row => key(row.person) === key(plan.than));
     if (!mark) return { status: 'empty', period, rows: eligible, winners: [], missing: [plan.than], mark: null };
     const past = eligible.filter(row => key(row.person) !== key(plan.than)
-      && (plan.direction === 'lowest' ? row.value < mark.value : row.value > mark.value));
-    return { status: 'ok', period, rows: eligible, winners: past, missing: [], mark };
+      && (plan.direction === 'lowest' ? row.value < mark.value : row.value > mark.value))
+      .sort((a,b)=>plan.direction === 'lowest' ? a.value-b.value || a.person.localeCompare(b.person) : b.value-a.value || a.person.localeCompare(b.person));
+    const cut = plan.limit && past.length ? past[Math.min(plan.limit,past.length)-1].value : null;
+    const winners = cut === null ? past : past.filter(row=>plan.direction === 'lowest' ? row.value <= cut : row.value >= cut);
+    return { status: 'ok', period, rows: eligible, winners, missing: [], mark };
   }
 
   if (plan.op === 'compare') {
