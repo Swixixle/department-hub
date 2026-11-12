@@ -256,6 +256,20 @@ const { JSDOM } = require('jsdom');
   assert.ok(!/mk\/min/.test(reply));
   await click('close');
 
+  // Your links: kept in this browser only, outside the workspace, its backups and its receipts.
+  const workspaceBefore = localStorage.getItem(key);
+  await click('my-links');
+  await submit('form[data-form="my-link"]', { name: 'Chia Learning Rooms', url: 'javascript:alert(1)' });
+  assert.match(document.querySelector('dialog .flash').textContent, /starts with http:\/\/ or https:\/\//, 'a script address is refused');
+  await submit('form[data-form="my-link"]', { name: 'Chia Learning Rooms', url: 'http://127.0.0.1:8770/' });
+  const mine = document.querySelector('aside a.my-link');
+  assert.deepEqual([mine.textContent.replace('↗', ''), mine.getAttribute('href'), mine.target, mine.rel], ['Chia Learning Rooms', 'http://127.0.0.1:8770/', '_blank', 'noopener noreferrer']);
+  assert.deepEqual(JSON.parse(localStorage.getItem(key + '-my-links')), [{ name: 'Chia Learning Rooms', url: 'http://127.0.0.1:8770/' }]);
+  assert.equal(localStorage.getItem(key), workspaceBefore, 'the link is not in the workspace, its backups or receipts');
+  await click('my-link-remove', '0');
+  assert.equal(document.querySelector('aside a.my-link'), null);
+  await click('close');
+
   // What was kept, and what was not.
   // The captured textbook page is held on purpose, and it contains ordinary words such as "suction". It is set aside
   // here so that the check is of what was typed, not of what the page says.
