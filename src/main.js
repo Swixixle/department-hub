@@ -169,7 +169,7 @@ async function askAndLog(q) {
   ui.lastAsk = ui.dialog = dialog;
   await commit(result.kind === 'blocked' ? 'Question blocked by text screen' : 'Question asked', {
     ...(result.kind === 'blocked' ? {} : { fingerprint:await sha256(q.trim().toLowerCase()) }),
-    engine:'ask-13-partial-scope-1', build:BUILD, kind:result.kind, answered:!result.empty, ...(result.corrected ? { correction:result.corrected.id } : {}),
+    engine:'ask-13-weekday-scope-1', build:BUILD, kind:result.kind, answered:!result.empty, ...(result.corrected ? { correction:result.corrected.id } : {}),
     resolved:result.context?.when || null,
     sources:result.items.map(item => ({ reference:item.go || 'note',
       ...(item.go?.startsWith('doc|') ? { version:sourceVersions[item.go.split('|')[1]] } : {}) })),

@@ -113,9 +113,10 @@ export function parseWhen(text, today, rules = {}) {
   if (/\b(this|my) week\b/.test(q)) return span(start, addDays(start, 6), 'this week');
   const day = DAYS.findIndex(name => new RegExp('\\b' + name.slice(0, 3) + '(' + name.slice(3) + ')?s?\\b').test(q));
   if (day >= 0) {
-    let offset = (day - weekday(today) + 7) % 7;
-    if (offset === 0 && /\bnext\b/.test(q)) offset = 7;
-    return { ...one(addDays(today, offset)), weekday: true };
+    const name = DAYS[day], scope = q.match(new RegExp('\\b(this|next)\\s+' + name.slice(0, 3) + '(' + name.slice(3) + ')?s?\\b'))?.[1];
+    const date = scope ? addDays(start, day + (scope === 'next' ? 7 : 0)) : addDays(today, (day - weekday(today) + 7) % 7);
+    // Only a bare weekday can mean the next such shift the person works; an explicit week must stay fixed.
+    return { ...one(date), weekday: !scope };
   }
   return shift ? { from: today, to: today, shift, label: 'today', bare: true } : null;      // a shift was named and no day
 }
