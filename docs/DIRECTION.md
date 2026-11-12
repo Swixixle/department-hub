@@ -370,6 +370,12 @@ The shared permission contract now seeds explicitly shared, explicitly withheld,
 
 Validation: 124 existing app tests plus five harness checks pass, along with the two launcher tests, both builds, artifact verification and the simulated interface check. The new phone assertion is checked against raw, formatted, encoded and header disclosures. The real backend permission/phone-consent suite remains blocked, so these results do not establish enforced contact privacy or working passwordless sign-in. No Mac update is needed.
 
+## Remote enrollment and routine recovery requirements
+
+Administrator-assisted lost-phone recovery is the operational baseline; optional backup passkeys remain useful but are not assumed or required for joining. At least two administrators must each be able to confirm and recover a member remotely before the pilot. First enrollment and recovery both use an expiring pending claim plus independent known-channel person confirmation, with the claim matched to the new credential. A forwarded link or urgent incoming text is not enough. No simultaneous two-administrator approval or shared-shift requirement is introduced.
+
+The implementation must preserve the same member and phone-consent settings, revoke replaced credentials/sessions, recheck current roles and prevent a lost administrator from approving their own unauthenticated recovery. Session tokens and unused invitation/recovery links are both bearer secrets. The stable owner-controlled RP domain must be selected before real enrollment. `docs/SIGN-IN.md` records these requirements and the still-missing tests and service. This is documentation only; no backend, recovery mechanism, new test result or Mac update is claimed.
+
 ## Operational display ideas, backlog only
 
 - A roster-wide summary of listed staffing gaps on import/view load. Per-shift indicators already exist; distinguish missing/incomplete schedule evidence from a known listed shortfall.
