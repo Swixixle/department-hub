@@ -354,6 +354,14 @@ The standalone updater verifies a complete staged release and activates it by re
 
 Validation: 124 app tests, two launcher tests, both builds, manifest verification and the simulated production interface pass. A normal production build also succeeds with no Python on PATH and produces the same artifact bytes. Tests cover clean, modified and unknown source revisions, hash-covered provenance, retained legacy receipts, and replacing a stale standalone app while preserving its complete old directory and unrelated files. Real photos and physical phones were not rechecked here.
 
+## Shared milestone: permission contract before visible account and sync work
+
+The shared milestone is defined by access boundaries as well as successful synchronization. Tests now specify two synthetic departments, live authenticated session controls, cross-department read/search/write/download denial, private conversation and attachment participation, custodian-only named fairness/exports, resistance to client-supplied identity hints, and immediate membership/role revocation. `docs/SHARED-CONTRACT.md` defines the real HTTP contract. With no shared backend or fixture seeder available, `npm run test:shared` exits nonzero as blocked. Passing harness checks is not a passing backend gate.
+
+Invite-based enrollment and sign-in are separate. The existing description included personal email/password accounts as well as invite links; the plan retains that direction while keeping provider selection and credential-storage implementation unbuilt. The permission suite uses authenticated fixture sessions without selecting an account provider. No device-only identity model was silently selected, and no Mac update or runtime feature change is part of this work.
+
+Validation: the 124 existing app tests plus four harness checks pass, as do the two launcher tests, both builds, artifact verification and the simulated interface check. Harness checks prove that a missing backend exits blocked and a live deny-everything HTTP server fails its legitimate-access controls. These are checks of the harness and the existing app, not a passing authorization suite. The real shared gate remains blocked, and the required backend CI job is still unbuilt.
+
 ## Earlier open import issues
 
 - Matches that are blocked are hidden with no reason given.

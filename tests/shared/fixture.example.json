@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "synthetic": true,
+  "runId": "test-example-replace-with-fresh-run",
+  "baseUrl": "http://127.0.0.1:18080",
+  "sessions": {
+    "member": { "personId": "test-ari", "membershipId": "test-ma", "departmentId": "test-elm", "headers": { "Authorization": "Bearer REPLACE_WITH_REAL_TEST_SESSION_ARI" } },
+    "partner": { "personId": "test-bex", "membershipId": "test-mb", "departmentId": "test-elm", "headers": { "Authorization": "Bearer REPLACE_WITH_REAL_TEST_SESSION_BEX" } },
+    "outsider": { "personId": "test-cy", "membershipId": "test-mc", "departmentId": "test-elm", "headers": { "Authorization": "Bearer REPLACE_WITH_REAL_TEST_SESSION_CY" } },
+    "keeper": { "personId": "test-dev", "membershipId": "test-md", "departmentId": "test-elm", "headers": { "Authorization": "Bearer REPLACE_WITH_REAL_TEST_SESSION_DEV" } },
+    "admin": { "personId": "test-eli", "membershipId": "test-me", "departmentId": "test-elm", "headers": { "Authorization": "Bearer REPLACE_WITH_REAL_TEST_SESSION_ELI" } },
+    "foreign": { "personId": "test-fox", "membershipId": "test-mf", "departmentId": "test-oak", "headers": { "Authorization": "Bearer REPLACE_WITH_REAL_TEST_SESSION_FOX" } },
+    "revocable": { "personId": "test-glen", "membershipId": "test-mg", "departmentId": "test-elm", "headers": { "Authorization": "Bearer REPLACE_WITH_REAL_TEST_SESSION_GLEN_1" } },
+    "revocableSecond": { "personId": "test-glen", "membershipId": "test-mg", "departmentId": "test-elm", "headers": { "Authorization": "Bearer REPLACE_WITH_REAL_TEST_SESSION_GLEN_2" } }
+  },
+  "records": {
+    "post": { "id": "test-post-a", "marker": "test-example-replace-with-fresh-run-public-post" },
+    "document": { "id": "test-doc-a", "marker": "test-example-replace-with-fresh-run-public-document" },
+    "file": { "id": "test-file-a", "marker": "test-example-replace-with-fresh-run-file-bytes" },
+    "privateFile": { "id": "test-private-file-a", "marker": "test-example-replace-with-fresh-run-private-file-bytes" },
+    "conversation": { "id": "test-thread-a", "exchangeId": "test-exchange-a", "marker": "test-example-replace-with-fresh-run-private-conversation" },
+    "foreignPost": { "id": "test-post-b", "marker": "test-example-replace-with-fresh-run-foreign-post" },
+    "foreignDocument": { "id": "test-doc-b", "marker": "test-example-replace-with-fresh-run-foreign-document" },
+    "foreignFile": { "id": "test-file-b", "marker": "test-example-replace-with-fresh-run-foreign-file-bytes" }
+  },
+  "fairness": { "memberWeekendTurns": 0, "partnerWeekendTurns": 1 }
+}

@@ -16,7 +16,15 @@ Information ordinarily sent by email should be easier to notice and consume here
 
 Build and test locally using synthetic records, two isolated test departments and separate authenticated test users. Keep the existing local app and fictional public demo usable. Do not silently upload the owner's browser workspace when shared mode becomes available.
 
+### Definition of done: access boundaries first
+
+The first shared milestone is defined by denied access as well as legitimate access. A member must not read, search, change, export or download another department's records by changing an ID. A nonparticipant must not retrieve a trade conversation or its attachments. A membership administrator is not automatically a fairness custodian or conversation participant. Only the subject and an authorized custodian may retrieve a named fairness sheet. Revoking membership must reject existing sessions on their next request, and removing the custodian role must immediately remove that privilege.
+
+Write the synthetic permission contract before account screens or synchronization. `docs/SHARED-CONTRACT.md` specifies the HTTP contract and `npm run test:shared` runs it against a supplied backend fixture. This is a separate launch gate: without a backend it exits nonzero as blocked. Passing the local-app or harness tests does not pass it. A post appearing on another phone remains a useful synchronization check after the access gate; it is not sufficient for launch.
+
 ### Membership and accounts
+
+Enrollment and sign-in are separate. The existing direction combines a personal invite link with each member's own email/password account; the earlier description explicitly included email and a password. "Invite link" does not by itself select email-free device enrollment. The permission contract accepts authenticated fixture sessions without choosing an authentication provider or building credential storage. A change to device-only sign-in is a separate product decision.
 
 The recommended enrollment flow is an administrator's single-use, expiring invitation bound to an intended email and department, verified email, then the member's own password and session. An invitation enrolls someone; it is not a reusable permanent login link. Use a maintained authentication implementation rather than custom password cryptography.
 
@@ -76,7 +84,8 @@ Prepare backups and tested restore of structured data and attachment bytes, rete
 
 | Stage | Prepare | Evidence before enabling |
 | --- | --- | --- |
-| Accounts and boundaries | Invitations, email/password/session recovery, roles and scoped APIs | Two departments cannot read, search, change or download each other's data; revoked users lose server access; custodian-only data remains restricted |
+| Permission contract first | Synthetic departments, principals, role and resource boundaries, HTTP tests before account screens or sync | Real backend passes `npm run test:shared`, including allowed controls, cross-department denials, private threads/files, custodian restrictions and immediate revocation; no backend means blocked, not passed |
+| Accounts and sessions | Invitations, email/password/session recovery and chosen authentication integration | Rerun the same access gate with sessions from the actual sign-in implementation; distinct identities, invitation/recovery and revocation checks also pass |
 | Shared consumption | Versioned roster, feed, dated/pinned posts, personal unread state and directory self-entry | Another signed-in phone receives a post and schedule correction; failure and stale states are accurate |
 | Conversations and exchanges | Private messages, request threads, immutable proposals and atomic agreement | Only participants can read messages; distinct accounts accept; competing trades cannot double-commit |
 | Reliable pilot | Notifications, reporting/removal, reviewed corrections, backups and checkpoints | Actual-phone checks, successful restore including media, failure tests and a short member-facing privacy explanation |
