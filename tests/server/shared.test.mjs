@@ -66,6 +66,7 @@ before(async () => {
 after(() => h?.stop());
 
 const boardFor = (who, overrides = {}) => sharedBoard({ baseUrl: h.url, departmentId: dept, token: who.token, ...overrides });
+const future = days => new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
 
 describe('two signed-in members, one department board', { concurrency: false }, () => {
   test('one member publishes and the other receives it', async () => {
@@ -213,8 +214,13 @@ describe('attachments go through the authorized path', { concurrency: false }, (
 describe('an exchange commits once or not at all', { concurrency: false }, () => {
   let exchangeId, shiftId, people;
   before(() => {
-    // Three people, a three-way move, checked against the roster revision it was built on.
+    // Three people, a three-way move, checked against the department's current records and rules.
     const db = open(h.dbPath);
+    // Qualifications are real inputs now: a night shift cannot be handed to somebody with no recorded night
+    // qualification who is on no night shift either. Record them, as a department would.
+    for (const person of [member.personId, mate.personId, admin.personId])
+      db.prepare(`INSERT INTO profiles (person_id, status, skills) VALUES (?,?,?)
+        ON CONFLICT(person_id) DO UPDATE SET status = excluded.status, skills = excluded.skills`).run(person, 'Staff', JSON.stringify(['D', 'N']));
     people = [member.personId, admin.personId];
     const extra = db.prepare('SELECT person_id FROM memberships WHERE department_id = ? AND revoked_at IS NULL AND activated_at IS NOT NULL AND person_id NOT IN (?,?)')
       .get(dept, member.personId, admin.personId);
@@ -222,10 +228,10 @@ describe('an exchange commits once or not at all', { concurrency: false }, () =>
     const at = new Date().toISOString();
     shiftId = 'shared-shift-1';
     db.prepare('INSERT INTO assignments (id, department_id, date, shift, person_id, revision) VALUES (?,?,?,?,?,1)')
-      .run(shiftId, dept, '2026-12-04', 'N', member.personId);
+      .run(shiftId, dept, future(30), 'N', member.personId);
     exchangeId = 'shared-exchange-1';
     db.prepare('INSERT INTO exchanges (id, department_id, moves, basis, status, created_at) VALUES (?,?,?,?,?,?)')
-      .run(exchangeId, dept, JSON.stringify([{ assignmentId: shiftId, fromPersonId: member.personId, toPersonId: admin.personId, date: '2026-12-04', shift: 'N' }]),
+      .run(exchangeId, dept, JSON.stringify([{ assignmentId: shiftId, fromPersonId: member.personId, toPersonId: admin.personId, date: future(30), shift: 'N' }]),
         JSON.stringify({ assignments: { [shiftId]: 1 }, rulesRevision: 'pilot-3', proposedBy: member.personId }), 'Waiting', at);
     for (const person of people) db.prepare('INSERT INTO exchange_people (exchange_id, person_id) VALUES (?,?)').run(exchangeId, person);
     db.close();
@@ -258,9 +264,9 @@ describe('an exchange commits once or not at all', { concurrency: false }, () =>
     const db = open(h.dbPath);
     const at = new Date().toISOString();
     db.prepare('INSERT INTO assignments (id, department_id, date, shift, person_id, revision) VALUES (?,?,?,?,?,1)')
-      .run('shared-shift-2', dept, '2026-12-11', 'N', member.personId);
+      .run('shared-shift-2', dept, future(37), 'N', member.personId);
     db.prepare('INSERT INTO exchanges (id, department_id, moves, basis, status, created_at) VALUES (?,?,?,?,?,?)')
-      .run('shared-exchange-2', dept, JSON.stringify([{ assignmentId: 'shared-shift-2', fromPersonId: member.personId, toPersonId: admin.personId, date: '2026-12-11', shift: 'N' }]),
+      .run('shared-exchange-2', dept, JSON.stringify([{ assignmentId: 'shared-shift-2', fromPersonId: member.personId, toPersonId: admin.personId, date: future(37), shift: 'N' }]),
         JSON.stringify({ assignments: { 'shared-shift-2': 1 }, rulesRevision: 'pilot-3' }), 'Waiting', at);
     db.prepare('INSERT INTO exchange_people (exchange_id, person_id) VALUES (?,?)').run('shared-exchange-2', member.personId);
     db.close();
@@ -278,7 +284,7 @@ describe('an exchange commits once or not at all', { concurrency: false }, () =>
     const db = open(h.dbPath);
     const at = new Date().toISOString();
     db.prepare('INSERT INTO assignments (id, department_id, date, shift, person_id, revision) VALUES (?,?,?,?,?,1)')
-      .run('shared-shift-3', dept, '2026-12-18', 'N', member.personId);
+      .run('shared-shift-3', dept, future(44), 'N', member.personId);
     db.prepare('INSERT INTO exchanges (id, department_id, moves, basis, status, created_at) VALUES (?,?,?,?,?,?)')
       .run('shared-exchange-3', dept, JSON.stringify([{ assignmentId: 'shared-shift-3', fromPersonId: member.personId, toPersonId: admin.personId }]),
         JSON.stringify({ assignments: { 'shared-shift-3': 0 }, rulesRevision: 'pilot-3' }), 'Waiting', at);

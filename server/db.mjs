@@ -20,7 +20,10 @@ CREATE TABLE IF NOT EXISTS departments (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   -- Bumped whenever the trade rules change, so a proposal checked against the old ones is recognisably stale.
-  rules_revision TEXT NOT NULL DEFAULT 'pilot-3'
+  rules_revision TEXT NOT NULL DEFAULT 'pilot-3',
+  -- The department's trade rules, as JSON. The real inputs the scheduling checks need, not a flag saying a
+  -- proposal passed once: rest minimums, hour limits, who may trade. Empty means the built-in defaults.
+  policy TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS people (
@@ -63,7 +66,12 @@ CREATE INDEX IF NOT EXISTS tokens_person ON tokens (person_id, purpose);
 CREATE TABLE IF NOT EXISTS profiles (
   person_id TEXT PRIMARY KEY REFERENCES people(id),
   phone TEXT,
-  share_phone INTEGER NOT NULL DEFAULT 0
+  share_phone INTEGER NOT NULL DEFAULT 0,
+  -- Employment status and recorded qualifications, which the trade rules need. Null status and an empty skill list
+  -- mean nothing is recorded, and the checks then fall back to the kinds of shift the schedule already lists the
+  -- person on — the same rule the local app uses. They are not a substitute for the department's own records.
+  status TEXT,
+  skills TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS posts (
@@ -169,9 +177,15 @@ CREATE TABLE IF NOT EXISTS fairness (
 );
 
 -- Hash-linked receipts for state changes, as in the local app. Raw secrets never go in here.
+--
+-- seq, not the timestamp, is what orders a department's chain. Two receipts written in the same millisecond are
+-- ordinary — a single request writes several — and a clock can go backwards, so ordering by time and breaking ties
+-- on a random ID picks an arbitrary predecessor and forks the chain. The unique index makes a duplicate position an
+-- error rather than a silent fork.
 CREATE TABLE IF NOT EXISTS receipts (
   id TEXT PRIMARY KEY,
   department_id TEXT NOT NULL REFERENCES departments(id),
+  seq INTEGER NOT NULL,
   actor_id TEXT,
   type TEXT NOT NULL,
   details TEXT NOT NULL DEFAULT '{}',
@@ -180,6 +194,7 @@ CREATE TABLE IF NOT EXISTS receipts (
   build TEXT,
   at TEXT NOT NULL
 );
+CREATE UNIQUE INDEX IF NOT EXISTS receipts_chain ON receipts (department_id, seq);
 CREATE INDEX IF NOT EXISTS receipts_department ON receipts (department_id, at);
 
 CREATE TABLE IF NOT EXISTS credentials (
@@ -247,12 +262,35 @@ export function transact(db, work) {
 }
 
 // Receipts chain within a department, as they do in the local workspace.
+//
+// The predecessor is the highest seq in this department, not the latest timestamp: see the note on the table. Call
+// this inside a transaction, as every caller here does — the read of MAX(seq) and the insert that depends on it have
+// to be one operation, and the unique index turns a missed transaction into a failure rather than a quiet fork.
+export const receiptBody = row => JSON.stringify({ id: row.id, departmentId: row.department_id ?? row.departmentId,
+  seq: row.seq, actorId: row.actor_id ?? row.actorId, type: row.type,
+  details: typeof row.details === 'string' ? JSON.parse(row.details) : row.details,
+  previousHash: row.previous_hash ?? row.previousHash ?? null, at: row.at, build: row.build ?? null });
+
 export function recordReceipt(db, { departmentId, actorId, type, details = {}, build = null }) {
-  const previous = db.prepare('SELECT hash FROM receipts WHERE department_id = ? ORDER BY at DESC, id DESC LIMIT 1').get(departmentId);
-  const at = now(), id = newId('receipt');
-  const body = JSON.stringify({ id, departmentId, actorId, type, details, previousHash: previous?.hash ?? null, at, build });
-  const hash = sha256(body);
-  db.prepare('INSERT INTO receipts (id, department_id, actor_id, type, details, previous_hash, hash, build, at) VALUES (?,?,?,?,?,?,?,?,?)')
-    .run(id, departmentId, actorId, type, JSON.stringify(details), previous?.hash ?? null, hash, build, at);
-  return { id, hash, at };
+  const head = db.prepare('SELECT seq, hash FROM receipts WHERE department_id = ? ORDER BY seq DESC LIMIT 1').get(departmentId);
+  const seq = (head?.seq ?? 0) + 1, at = now(), id = newId('receipt');
+  const hash = sha256(receiptBody({ id, departmentId, seq, actorId, type, details, previousHash: head?.hash ?? null, at, build }));
+  db.prepare('INSERT INTO receipts (id, department_id, seq, actor_id, type, details, previous_hash, hash, build, at) VALUES (?,?,?,?,?,?,?,?,?,?)')
+    .run(id, departmentId, seq, actorId, type, JSON.stringify(details), head?.hash ?? null, hash, build, at);
+  return { id, seq, hash, at };
+}
+
+// Recomputes every hash and every link, in chain order. Returns { ok, checked, broken: [{ seq, why }] }.
+export function verifyReceipts(db, departmentId) {
+  const rows = db.prepare('SELECT * FROM receipts WHERE department_id = ? ORDER BY seq').all(departmentId);
+  const broken = [];
+  let previous = null, expected = 1;
+  for (const row of rows) {
+    if (row.seq !== expected) broken.push({ seq: row.seq, why: 'out of sequence, expected ' + expected });
+    if (row.previous_hash !== previous) broken.push({ seq: row.seq, why: 'points at the wrong receipt' });
+    if (row.hash !== sha256(receiptBody(row))) broken.push({ seq: row.seq, why: 'does not hash to its stored hash' });
+    previous = row.hash;
+    expected = row.seq + 1;
+  }
+  return { ok: broken.length === 0, checked: rows.length, broken };
 }

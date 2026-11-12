@@ -144,16 +144,40 @@ describe('shared permission launch gate: real backend, synthetic records', {conc
     denied(await request(s.member,route(a,'fairness',s.partner.personId),{headers}));
     denied(await request(s.member,route(b,'posts',r.foreignPost.id),{headers}),foreignNeedles);
     denied(await request(s.member,route(a,'fairness',s.partner.personId)+'?keeper=true&actor='+encodeURIComponent(s.keeper.personId)));
-    const forged=await request(s.member,route(a,'posts'),{method:'POST',body:{body:'fixture-signal forged identity '+f.runId,authorId:s.foreign.personId,departmentId:b}});
+    const marker='fixture-signal forged identity '+f.runId;
+    const forged=await request(s.member,route(a,'posts'),{method:'POST',body:{body:marker,authorId:s.foreign.personId,departmentId:b}});
     if(forged.status===201) {
       const post=JSON.parse(forged.text); assert.equal(post.authorId,s.member.personId); assert.equal(post.departmentId,a);
       denied(await request(s.member,route(b,'posts',post.id)));
       const removed=await request(s.member,route(a,'posts',post.id),{method:'DELETE'}); assert.ok([200,204].includes(removed.status));
-    } else assert.ok([400,403].includes(forged.status),'Reject forged ownership or ignore it and use the authenticated principal');
+    } else {
+      assert.ok([400,403].includes(forged.status),'Reject forged ownership or ignore it and use the authenticated principal');
+      // A refused write leaves nothing behind. Reading the status is not reading the record.
+      const board=await request(s.member,route(a,'posts')); allowed(board);
+      assert.equal(board.text.includes(marker),false,'A refused create must not have saved the row');
+      const foreignBoard=await request(s.foreign,route(b,'posts')); allowed(foreignBoard);
+      assert.equal(foreignBoard.text.includes(marker),false,'and not in the department it named either');
+    }
+    // Authorship forged in a header, not only in the body.
+    const byHeader=await request(s.member,route(a,'posts'),{method:'POST',body:{body:'fixture-signal header identity '+f.runId},
+      headers:{'X-Actor':s.partner.personId,'X-Author-Id':s.partner.personId,'X-On-Behalf-Of':s.keeper.personId,'X-Department-ID':b}});
+    if(byHeader.status===201) {
+      const post=JSON.parse(byHeader.text);
+      assert.equal(post.authorId,s.member.personId,'Authorship comes from the session, not from a header');
+      assert.equal(post.departmentId,a);
+      const removed=await request(s.member,route(a,'posts',post.id),{method:'DELETE'}); assert.ok([200,204].includes(removed.status));
+    } else assert.ok([400,403].includes(byHeader.status));
   });
 
   test('a participant acceptance is attributed to the authenticated participant only',async()=>{
     const path=route(a,'exchanges',r.conversation.exchangeId);
+    // A participant naming the other participant. Refusing the request or ignoring the name are both acceptable;
+    // recording the named person's agreement is not.
+    const named=await request(s.member,path+'/accept',{method:'POST',body:{personId:s.partner.personId}});
+    if(named.status===200) assert.equal(JSON.parse(named.text).acceptedBy.includes(s.partner.personId),false,'One participant cannot agree on another\u2019s behalf');
+    else assert.ok([400,403,409].includes(named.status),'Refuse a named acceptance or ignore the name; got '+named.status);
+    const before=await request(s.member,path); allowed(before);
+    assert.equal(JSON.parse(before.text).acceptedBy.includes(s.partner.personId),false);
     const accepted=await request(s.partner,path+'/accept',{method:'POST',body:{}}); allowed(accepted);
     const saved=await request(s.member,path); allowed(saved);
     const exchange=JSON.parse(saved.text);
@@ -208,6 +232,18 @@ describe('shared permission launch gate: real backend, synthetic records', {conc
     const withdrawn=await request(s.partner,path,{method:'PATCH',body:{sharePhone:false}}); allowed(withdrawn); assert.equal(json(withdrawn).sharePhone,false);
     for(const viewer of [s.member,s.outsider,s.keeper,s.admin]) await withheld(viewer,contact);
     assert.ok(hasPhone(await profile(s.partner),contact.phone),'Withholding sharing does not erase the owner’s number');
+  });
+
+  test('membership administration requires the administrator role',async()=>{
+    const path=route(a,'memberships',s.keeper.membershipId);
+    for(const viewer of [s.member,s.partner,s.outsider,s.keeper]) {
+      denied(await request(viewer,path,{method:'PATCH',body:{roles:['member','admin']}}));
+      denied(await request(viewer,path,{method:'DELETE'}));
+    }
+    // Nothing happened: the custodian still has the role, and still has a session.
+    allowed(await request(s.keeper,'/api/session'));
+    allowed(await request(s.keeper,route(a,'fairness',s.partner.personId)));
+    allowed(await request(s.keeper,route(a,'exports/fairness')));
   });
 
   test('removing the custodian role takes effect for an existing session',async()=>{

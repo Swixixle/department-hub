@@ -85,7 +85,9 @@ describe('an acceptance belongs to whoever sent it', { concurrency: false }, () 
 
   test('each person’s own acceptance is recorded, and the shift moves only when both have agreed', async () => {
     const path = route(a, 'exchanges', h.r.conversation.exchangeId);
-    const shift = (await h.request(h.s.member, route(a, 'assignments'))).json.find(row => row.date === '2026-11-13' && row.shift === 'N');
+    // The fixture dates its shifts from today, so read the offered one from the proposal rather than naming a date.
+    const offered = (await h.request(h.s.member, path)).json.moves[0];
+    const shift = (await h.request(h.s.member, route(a, 'assignments'))).json.find(row => row.id === offered.assignmentId);
     assert.equal(shift.personId, h.s.member.personId);
     const first = await h.request(h.s.member, path + '/accept', { method: 'POST', body: {} });
     assert.equal(first.status, 200);

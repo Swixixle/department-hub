@@ -8,10 +8,11 @@
 // Nothing in a request body or query string decides who the caller is. An authorId, departmentId, personId, keeper
 // flag or X-Actor header in a request is either refused or ignored; the server uses the session.
 import { ask } from '../src/ask.js';
-import { newId, now, recordReceipt, transact } from './db.mjs';
+import { newId, now, recordReceipt, transact, verifyReceipts } from './db.mjs';
 import { canAdministerMembership, canExportNamedRecords, canReadNamedFairness, directoryPerson, phoneFor } from './visibility.mjs';
 import { revokeSessionsFor } from './auth.mjs';
 import { askWorld, search, sourcesFor } from './world.mjs';
+import { checkExchange, movesFor, tradeWorld } from './trades.mjs';
 
 // A refusal carries no detail about the thing refused.
 export class Refused extends Error {
@@ -229,30 +230,54 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
       const updated = transact(db, () => {
         const fresh = db.prepare('SELECT * FROM exchanges WHERE id = ?').get(row.id);
         if (fresh.committed_at) throw new Refused(409, 'already settled');
-        // Everything the proposal was built on is rechecked here, before this person's agreement is recorded, so a
-        // stale proposal is refused rather than quietly collecting acceptances it will never be able to honour.
-        // The check is per shift: a trade elsewhere in the department does not invalidate this one, but any change
-        // to one of these shifts does.
-        const basis = JSON.parse(fresh.basis), moves = JSON.parse(fresh.moves);
+        const basis = JSON.parse(fresh.basis), stored = JSON.parse(fresh.moves);
+
+        // 1. Every required participant, not only the caller. A trade with somebody who is no longer in the
+        //    department cannot be honoured, so no acceptance is recorded for it.
+        const required = db.prepare('SELECT person_id FROM exchange_people WHERE exchange_id = ?').all(fresh.id);
+        for (const entry of required) {
+          const theirs = db.prepare('SELECT * FROM memberships WHERE department_id = ? AND person_id = ? AND revoked_at IS NULL AND activated_at IS NOT NULL').get(dept, entry.person_id);
+          if (!theirs) throw new Refused(409, 'somebody in this exchange is no longer a member of this department');
+        }
+
+        // 2. The cheap, specific checks, which give a clearer message than a general refusal.
         const department = db.prepare('SELECT * FROM departments WHERE id = ?').get(dept);
         if (basis.rulesRevision !== undefined && basis.rulesRevision !== department.rules_revision)
           throw new Refused(409, 'the trade rules changed since this was proposed');
-        for (const move of moves) {
+        for (const move of stored) {
           const assignment = db.prepare('SELECT * FROM assignments WHERE id = ? AND department_id = ?').get(move.assignmentId, dept);
           if (!assignment) throw new Refused(409, 'a shift in this exchange is no longer on the schedule');
           if (assignment.person_id !== move.fromPersonId) throw new Refused(409, 'a shift has changed hands since this was proposed');
           const expected = basis.assignments?.[move.assignmentId];
           if (expected !== undefined && assignment.revision !== expected) throw new Refused(409, 'a shift in this exchange changed since this was proposed');
         }
+
+        // 3. The whole exchange against the department's current records and rules, using the same arithmetic the
+        //    phone uses. This is what catches a participant picking up an unrelated shift after the proposal was
+        //    made: the shift being moved is untouched, but the person receiving it would now be on two at once.
+        //    The stored trade basis covers the participants' own schedules, qualifications and the rules, so an
+        //    unrelated person's trade elsewhere in the department does not invalidate this proposal.
+        const world = tradeWorld(db, dept, { now: now() });
+        const moves = movesFor(stored, world.names);
+        const checked = checkExchange({ moves, ...world, ...(basis.trade ? { basis: basis.trade } : {}) });
+        if (checked.status === 'blocked') throw new Refused(409, checked.problems.join(' '));
+
         db.prepare('UPDATE exchange_people SET accepted_at = ? WHERE exchange_id = ? AND person_id = ? AND accepted_at IS NULL').run(now(), fresh.id, session.personId);
         const people = db.prepare('SELECT * FROM exchange_people WHERE exchange_id = ?').all(fresh.id);
         const settled = people.length > 0 && people.every(entry => entry.accepted_at);
         if (settled) {
+          // 4. Checked again for the settlement itself. Inside this one transaction nothing can have changed since
+          //    step 3, so no test can tell this check from its absence — removing it fails nothing, which is
+          //    stated here rather than left for somebody to discover. It is kept because the two checks answer
+          //    different questions (may this person agree / may these shifts move) and because a later
+          //    restructuring that separates them would otherwise lose the second one silently.
+          const finalCheck = checkExchange({ moves, ...tradeWorld(db, dept, { now: now() }), ...(basis.trade ? { basis: basis.trade } : {}) });
+          if (finalCheck.status === 'blocked') throw new Refused(409, finalCheck.problems.join(' '));
           db.prepare("UPDATE exchanges SET status = 'Agreed', committed_at = ? WHERE id = ?").run(now(), fresh.id);
-          for (const move of moves) db.prepare('UPDATE assignments SET person_id = ?, revision = revision + 1 WHERE id = ?').run(move.toPersonId, move.assignmentId);
+          for (const move of stored) db.prepare('UPDATE assignments SET person_id = ?, revision = revision + 1 WHERE id = ?').run(move.toPersonId, move.assignmentId);
         }
         recordReceipt(db, { departmentId: dept, actorId: session.personId, type: settled ? 'Exchange agreed' : 'Exchange acceptance recorded',
-          details: { id: fresh.id, by: session.personId, settled }, build });
+          details: { id: fresh.id, by: session.personId, settled, cautions: checked.cautions }, build });
         return db.prepare('SELECT * FROM exchanges WHERE id = ?').get(fresh.id);
       });
       return json(exchangeJson(db, updated));
@@ -332,8 +357,12 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
   }
 
   if (kind === 'receipts') {
-    return json(db.prepare('SELECT * FROM receipts WHERE department_id = ? ORDER BY at, id').all(dept)
-      .map(row => ({ id: row.id, type: row.type, actorId: row.actor_id, details: JSON.parse(row.details), previousHash: row.previous_hash, hash: row.hash, build: row.build, at: row.at })));
+    // Chain order, which is seq. Reading them back in any other order and then checking the links would be checking
+    // the wrong thing, which is how the ordering bug survived.
+    if (first === 'verify') return json(verifyReceipts(db, dept));
+    return json(db.prepare('SELECT * FROM receipts WHERE department_id = ? ORDER BY seq').all(dept)
+      .map(row => ({ id: row.id, seq: row.seq, type: row.type, actorId: row.actor_id, details: JSON.parse(row.details),
+        previousHash: row.previous_hash, hash: row.hash, build: row.build, at: row.at })));
   }
 
   notFound();

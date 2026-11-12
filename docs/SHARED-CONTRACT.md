@@ -53,23 +53,25 @@ Source kinds are `post`, `document`, `file`, `conversation`, `fairness`, `schedu
 
 Phone controls prove an explicitly shared number is returned through directory list/detail, name search, the named-number Ask question and directory export. Private-number checks then exercise those same routes across coworkers, administrators and custodians. The phone assertion checks raw, formatted and encoded numbers in content and headers. Sharing-withdrawal checks first warm every route with a real shared result, then require the same existing session to stop receiving it on the next request. Search sources may still identify the coworker; their name is not treated as a private phone number. Consent applies to the structured contact record, not a promise to erase screenshots, previously downloaded copies or independently authored text.
 
-## Four faults this contract does not catch
+## Four faults this contract used to miss, now covered
 
-Found by running the contract against deliberately broken copies of the server, one fault at a time. Each was caught
-only by the server's own tests, so the gate alone would have passed a backend with it:
+Found by running the contract against deliberately broken copies of the server, one fault at a time. Each was
+originally caught only by the server's own tests, so the gate alone would have passed a backend with it:
 
-1. A create refused with 400 or 403 is never read back, so a server that saves the row and then returns the refusal
-   passes. The contract checks this only for the revoked member's write.
-2. No non-administrator ever attempts `PATCH` or `DELETE` on `/memberships/:id`, so a server that lets any member
-   revoke anyone passes.
-3. A legitimate participant naming the other participant in an accept body is never sent, so a server that records
-   one person's acceptance as the other's passes. Only the outsider's attempt is tested, and that is refused earlier
-   for not being a participant at all.
-4. Authorship forged in a request *header* is never sent, only in the body, so a server that trusts `X-Actor` for
-   authorship passes.
+1. A create refused with 400 or 403 was never read back, so a server that saves the row and then returns the refusal
+   passed.
+2. No non-administrator ever attempted `PATCH` or `DELETE` on `/memberships/:id`, so a server that let any member
+   revoke anyone passed.
+3. A legitimate participant naming the other participant in an accept body was never sent, so a server that records
+   one person's acceptance as the other's passed. Only the outsider's attempt was tested, and that is refused
+   earlier for not being a participant at all.
+4. Authorship forged in a request *header* was never sent, only in the body, so a server that trusts `X-Actor` for
+   authorship passed.
 
-`tests/server/backend.test.mjs` covers all four. Whether the reviewed contract should be widened to include them is
-a decision for whoever maintains it; it has not been changed here.
+All four are now explicit checks here: the first and fourth in "client role, actor and department hints do not grant
+authority", the second in "membership administration requires the administrator role", the third in "a participant
+acceptance is attributed to the authenticated participant only". Each was re-verified by breaking the server in that
+one way and confirming this contract alone fails. `tests/server/backend.test.mjs` keeps its own versions as well.
 
 ## What still remains
 

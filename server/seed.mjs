@@ -12,6 +12,8 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { newId, now, open, secret, sha256, transact } from './db.mjs';
+import { exchangeBasis } from '../src/trades.js';
+import { POLICY } from '../src/model.js';
 
 const TABLES = ['exchange_people', 'exchanges', 'messages', 'conversation_people', 'conversations', 'files', 'documents', 'posts',
   'assignments', 'fairness', 'receipts', 'challenges', 'claims', 'credentials', 'tokens', 'profiles', 'memberships', 'people', 'departments'];
@@ -52,8 +54,10 @@ export function seed({ dbPath, baseUrl, runId = 'test-' + Date.now().toString(36
         .run(membershipId, person.id, dept, JSON.stringify([...person.roles].sort()), at, at);
       membershipOf[person.key] = membershipId;
       // sharing off by default: the outsider's row is inserted with no sharing flag chosen at all.
-      db.prepare('INSERT INTO profiles (person_id, phone, share_phone) VALUES (?,?,?)')
-        .run(person.id, person.phone, person.share === true ? 1 : 0);
+      // Status and qualifications are the real inputs the trade rules read. Everyone here is staff listed on both
+      // kinds of shift, which is what makes the seeded exchange legitimate under the current checks.
+      db.prepare('INSERT INTO profiles (person_id, phone, share_phone, status, skills) VALUES (?,?,?,?,?)')
+        .run(person.id, person.phone, person.share === true ? 1 : 0, 'Staff', JSON.stringify(['D', 'N']));
       sessions[person.key] = { personId: person.id, membershipId, departmentId: dept };
     }
 
@@ -89,29 +93,41 @@ export function seed({ dbPath, baseUrl, runId = 'test-' + Date.now().toString(36
     records.conversation = { id: thread, marker: mark('private-conversation') };
     records.privateFile = { id: file('test-private-file-a', departments.a, 'trade-note.txt', 'fixture-signal ' + mark('private-file-bytes'), thread), marker: mark('private-file-bytes') };
 
-    // A few invented shifts. The schedule gives the Ask engine its names and makes the exchange a real move.
+    // A few invented shifts, dated from today rather than written into the file. A fixture with fixed dates stops
+    // being a fixture the moment those dates pass: a shift in the past cannot be traded, so a hardcoded one would
+    // have made the seeded exchange illegitimate a day later and the failure would have looked like a code change.
+    const day = offset => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10);
     const shifts = [
-      ['2026-11-12', 'D', 'test-arden'], ['2026-11-12', 'N', 'test-bexley'],
-      ['2026-11-13', 'N', 'test-arden'], ['2026-11-13', 'D', 'test-cypress'],
-      ['2026-11-14', 'N', 'test-bexley'], ['2026-11-14', 'D', 'test-devon'],
-      ['2026-11-15', 'D', 'test-ellis'], ['2026-11-15', 'N', 'test-glenna'],
-      ['2026-11-16', 'D', 'test-arden'], ['2026-11-16', 'N', 'test-cypress']
+      [1, 'D', 'test-arden'], [1, 'N', 'test-bexley'],
+      [2, 'N', 'test-arden'], [2, 'D', 'test-cypress'],
+      [3, 'N', 'test-bexley'], [3, 'D', 'test-devon'],
+      [4, 'D', 'test-ellis'], [4, 'N', 'test-glenna'],
+      [5, 'D', 'test-arden'], [5, 'N', 'test-cypress']
     ];
     const assignmentIds = {};
-    for (const [date, shift, person] of shifts) {
-      const id = 'test-shift-' + date.replaceAll('-', '') + '-' + shift;
-      db.prepare('INSERT INTO assignments (id, department_id, date, shift, person_id, revision) VALUES (?,?,?,?,?,1)').run(id, departments.a, date, shift, person);
-      assignmentIds[date + shift] = id;
+    for (const [offset, shift, person] of shifts) {
+      const id = 'test-shift-' + offset + '-' + shift;
+      db.prepare('INSERT INTO assignments (id, department_id, date, shift, person_id, revision) VALUES (?,?,?,?,?,1)').run(id, departments.a, day(offset), shift, person);
+      assignmentIds[offset + shift] = id;
     }
     db.prepare('INSERT INTO assignments (id, department_id, date, shift, person_id, revision) VALUES (?,?,?,?,?,1)')
-      .run('test-shift-oak', departments.b, '2026-11-13', 'D', 'test-foster');
+      .run('test-shift-oak', departments.b, day(2), 'D', 'test-foster');
 
-    // A pending exchange between the two people in the thread, checked against the roster revision it was built on.
+    // A pending exchange between the two people in the thread. The basis binds the plan, those two people's own
+    // shifts and qualifications, and the rules — so a change to either participant's schedule invalidates it while
+    // an unrelated person's trade does not.
     const exchange = 'test-exchange-a';
-    const moves = [{ assignmentId: assignmentIds['2026-11-13N'], fromPersonId: 'test-arden', toPersonId: 'test-bexley', date: '2026-11-13', shift: 'N' }];
+    const offeredId = assignmentIds['2N'];
+    const moves = [{ assignmentId: offeredId, fromPersonId: 'test-arden', toPersonId: 'test-bexley', date: day(2), shift: 'N' }];
+    const roster = db.prepare('SELECT * FROM assignments WHERE department_id = ?').all(departments.a)
+      .map(row => ({ key: row.id, date: row.date, shift: row.shift, person: PEOPLE.find(person => person.id === row.person_id)?.name || row.person_id,
+        ...(row.role ? { role: row.role } : {}), ...(row.hours ? { hours: row.hours } : {}) }));
+    const directory = Object.fromEntries(PEOPLE.filter(person => !person.department)
+      .map(person => [person.name.toLowerCase(), { person: person.name, status: 'Staff', skills: ['D', 'N'] }]));
+    const trade = exchangeBasis({ roster, directory, policy: POLICY }, [{ key: offeredId, to: 'Bexley' }]);
     db.prepare('INSERT INTO exchanges (id, department_id, conversation_id, moves, basis, status, created_at) VALUES (?,?,?,?,?,?,?)')
       .run(exchange, departments.a, thread, JSON.stringify(moves),
-        JSON.stringify({ assignments: { [moves[0].assignmentId]: 1 }, rulesRevision: 'pilot-3', proposedBy: 'test-arden' }), 'Waiting', at);
+        JSON.stringify({ assignments: { [offeredId]: 1 }, rulesRevision: 'pilot-3', proposedBy: 'test-arden', trade }), 'Waiting', at);
     for (const person of ['test-arden', 'test-bexley']) db.prepare('INSERT INTO exchange_people (exchange_id, person_id) VALUES (?,?)').run(exchange, person);
     records.conversation.exchangeId = exchange;
 
