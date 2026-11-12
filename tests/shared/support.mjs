@@ -25,6 +25,13 @@ export function loadFixture(path) {
   assert.equal(fixture.sessions.revocable.membershipId,fixture.sessions.revocableSecond.membershipId);
   for(const name of ['member','partner','outsider','keeper','admin','revocable','revocableSecond']) assert.equal(fixture.sessions[name].departmentId,fixture.sessions.member.departmentId);
   assert.ok(Number.isInteger(fixture.fairness.memberWeekendTurns) && Number.isInteger(fixture.fairness.partnerWeekendTurns));
+  for(const [name,session] of [['shared','member'],['private','partner'],['defaultPrivate','outsider'],['newPrivate','keeper']]) {
+    const contact=fixture.contacts[name];
+    assert.equal(contact.personId,fixture.sessions[session].personId);
+    assert.ok(contact.name,name+' requires a fixture display name');
+    assert.match(contact.phone,/^\d{3}55501\d{2}$/,name+' must use fictional 555-01xx numbers');
+  }
+  assert.equal(new Set(Object.values(fixture.contacts).map(contact=>contact.phone)).size,4);
   return fixture;
 }
 
@@ -58,4 +65,25 @@ export function noPrivateSources(result,restricted) {
     assert.ok(['post','document','file','conversation','fairness','schedule','person'].includes(source.kind),'New source kinds require an explicit permission-contract update');
     assert.ok(!restricted.some(item=>item.kind===source.kind && item.id===source.id),'A restricted record reached search or Ask');
   }
+}
+
+function visibleValues(result) {
+  const values=Object.values(result.headers||{});
+  const visit=value=>{
+    if(typeof value==='string' || typeof value==='number') values.push(String(value));
+    else if(Array.isArray(value)) value.forEach(visit);
+    else if(value && typeof value==='object') Object.values(value).forEach(visit);
+  };
+  try { visit(JSON.parse(result.text)); } catch { values.push(result.text); }
+  return values.flatMap(value=>{
+    try { return [value,decodeURIComponent(value)]; } catch { return [value]; }
+  });
+}
+
+export function hasPhone(result,phone) {
+  return visibleValues(result).some(value=>value.replace(/\D/g,'').includes(phone));
+}
+
+export function phoneHidden(result,phone) {
+  assert.equal(hasPhone(result,phone),false,'An unshared phone number appeared in content or headers');
 }

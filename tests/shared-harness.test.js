@@ -6,7 +6,7 @@ import { once } from 'node:events';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { allowed, denied, noPrivateSources } from './shared/support.mjs';
+import { allowed, denied, hasPhone, noPrivateSources, phoneHidden } from './shared/support.mjs';
 
 test('permission assertions reject deny-everything controls, successful leaks, redirects and server errors',()=>{
   assert.throws(()=>allowed({status:403,text:''},'seeded record'));
@@ -22,6 +22,18 @@ test('search and Ask source checks reject hidden restricted references',()=>{
   assert.throws(()=>noPrivateSources({status:200,text:JSON.stringify({sources:hidden})},hidden));
   assert.throws(()=>noPrivateSources({status:200,text:'{}'},hidden));
   noPrivateSources({status:200,text:JSON.stringify({sources:[{kind:'post',id:'public-test'}]})},hidden);
+});
+
+test('phone checks catch formatted, encoded and header disclosures while allowing redacted fields',()=>{
+  const phone='3175550102';
+  for(const result of [
+    {text:'{"phone":"3175550102"}',headers:{}},
+    {text:'{"answer":"Call (317) 555-0102"}',headers:{}},
+    {text:'{"href":"tel%3A3175550102"}',headers:{}},
+    {text:'{"phone":"\\u0033175550102"}',headers:{}},
+    {text:'{}',headers:{location:'tel:317-555-0102'}}
+  ]) { assert.ok(hasPhone(result,phone)); assert.throws(()=>phoneHidden(result,phone)); }
+  phoneHidden({text:'{"personId":"test-bex","phone":null}',headers:{}},phone);
 });
 
 test('the unconfigured shared gate fails explicitly instead of skipping or passing',()=>{

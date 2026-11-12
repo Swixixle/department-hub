@@ -1,0 +1,15 @@
+# Joining and signing in
+
+Decision: Department Hub must not require an email address or its own password. Join through a personal invitation. The owner suggested a PIN and optional facial recognition. The earlier email/password plan is superseded.
+
+Proposed implementation, not a built feature: passkeys with the device's existing unlock method. The intended flow is **Open invitation → Join department → confirm with Face ID, fingerprint or device PIN/passcode**. On later sign-ins the device offers its supported method. Do not require biometrics when a supported PIN/passcode method is available, and do not show a Face ID-only button on other devices. Normal app navigation does not run a new sign-in ceremony on every tap.
+
+The PIN here is the existing device unlock method, not a new four-digit password submitted to the department server. An app-specific PIN scheme has not been selected. The app does not capture or store face images, fingerprint templates or that device PIN. Its server holds an opaque member ID, credential IDs/public keys and sessions. Display names can identify the staff member without collecting an email address. A passkey unlock identifies the registered credential; department membership and resource permissions still decide what it may access.
+
+Issue a single-use, expiring invite bound to the intended department member. Consuming it enrolls a credential for that identity. Selecting a coworker's name cannot claim their identity, and the link cannot be reused after consumption. Choose a stable HTTPS origin/RP ID before real enrollment and use a maintained WebAuthn server implementation with verified challenges, origin/RP checks and user verification.
+
+Passkeys may be synced by the user's device provider, so another device may use an existing credential. Additional credentials belong to the same member identity. If the person loses every usable credential, an administrator verifies the person and issues a new enrollment invitation for that existing identity. The recovery flow must support revoking old credentials/sessions and must not silently restore revoked membership or custodian privileges. No email address or phone number is required for recovery. Keep a second administrator able to recover the department.
+
+Implementation is still missing: credential registration/authentication, session handling, invite consumption, member recovery, server authorization and device/browser verification. Before shared rollout, test replayed/expired invitations, wrong origin/challenge, cancelled/failed local unlock, two people and multiple sessions, member removal, lost-device recovery and unsupported-device handling. Run the shared permission suite using the actual sign-in implementation. No change to the installed Mac app is made by this document.
+
+Primary references: [FIDO passkeys](https://fidoalliance.org/passkeys/), [Apple passkeys](https://developer.apple.com/passkeys/), and [WebAuthn](https://www.w3.org/TR/webauthn/). FIDO describes biometric/PIN unlock and synced versus device-bound credentials. WebAuthn specifies opaque user handles and local user verification; the app does not receive biometric data.
