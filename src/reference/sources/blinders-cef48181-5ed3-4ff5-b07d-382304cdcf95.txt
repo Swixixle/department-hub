@@ -1,0 +1,260 @@
+15.5 Acid-Base Balance
+
+As with electrolytes, correct balance of acids and bases in the body is essential to proper body functioning. Even a slight variance outside of normal can be life-threatening, so it is important to understand normal acid-base values, as well as their causes and how to correct them. The kidneys and lungs work together to correct slight imbalances as they occur. As a result, the kidneys compensate for shortcomings of the lungs, and the lungs compensate for shortcomings of the kidneys.
+
+Arterial Blood Gases
+
+Arterial blood gases (ABG) are measured by collecting blood from an artery, rather than a vein, and are most commonly collected via the radial artery. ABGs measure the pH level of the blood, the partial pressure of arterial oxygen (PaO2), the partial pressure of arterial carbon dioxide (PaCO2), the bicarbonate level (HCO3), and the oxygen saturation level (SaO2).
+
+Prior to collecting blood gases, it is important to ensure the client has appropriate arterial blood flow to the hand. This is done by performing the Allen test. When performing the Allen test, pressure is held on both the radial and ulnar artery below the wrist. Pressure is released from the ulnar artery to check if blood flow is adequate. If arterial blood flow is adequate, warmth and color should return to the hand.
+
+pH
+
+pH is a scale from 0-14 used to determine the acidity or alkalinity of a substance. A neutral pH is 7, which is the same pH as water. Normally, the blood has a pH between 7.35 and 7.45. A blood pH of less than 7.35 is considered acidic, and a blood pH of more than 7.45 is considered alkaline.
+
+The pH of blood is a measure of hydrogen ion concentration. A low pH, less than 7.35, occurs in acidosis when the blood has a high hydrogen ion concentration. A high pH, greater than 7.45, occurs in alkalosis when the blood has a low hydrogen ion concentration. Hydrogen ions are by-products of the metabolism of substances such as proteins, fats, and carbohydrates. These by-products create extra hydrogen ions (H+) in the blood that need to be balanced and kept within normal range as described earlier.
+
+The body has several mechanisms for maintaining blood pH. The lungs are essential for maintaining pH, and the kidneys also play a role. For example, when the pH is too low (i.e., during acidosis), the respiratory rate quickly increases to eliminate acid in the form of carbon dioxide (CO2). The kidneys excrete additional hydrogen ions (acid) in the urine and retain bicarbonate (base). Conversely, when the pH is too high (i.e., during alkalosis), the respiratory rate decreases to retain acid in the form of CO2. The kidneys excrete bicarbonate (base) in the urine and retain hydrogen ions (acid).
+
+PaCO2
+
+PaCO2 is the partial pressure of arterial carbon dioxide in the blood. The normal PaCO2 level is 35-45 mmHg. CO2 forms an acid in the blood that is regulated by the lungs by changing the rate or depth of respirations.
+
+As the respiratory rate increases or becomes deeper, additional CO2 is removed, causing decreased acid (H+) levels in the blood and increased pH (i.e., the blood becomes more alkaline). As the respiratory rate decreases or becomes shallower, less CO2 is removed, causing increased acid (H+) levels in the blood and decreased pH (i.e., the blood becomes more acidic).
+
+Generally, the lungs work quickly to regulate the PaCO2 levels and cause a quick change in the pH. Therefore, an acid-base problem caused by hypoventilation can be quickly corrected by increasing ventilation, and a problem caused by hyperventilation can be quickly corrected by decreasing ventilation. For example, if an anxious client is hyperventilating, they may be asked to breathe into a paper bag to rebreathe some of the CO2 they are blowing off. Conversely, a postoperative client who is experiencing hypoventilation due to the sedative effects of receiving morphine is asked to cough and deep breathe to blow off more CO2.
+
+HCO3
+
+HCO3 is the bicarbonate level of the blood and the normal range is 22-26. HCO3 is a base managed by the kidneys and helps to make the blood more alkaline. The kidneys take longer than the lungs to adjust the acidity or alkalinity of the blood, and the response is not visible upon assessment. As the kidneys sense an alteration in pH, they begin to retain or excrete HCO3, depending on what is needed. If the pH becomes acidic, the kidneys retain HCO3 to increase the amount of bases present in the blood to increase the pH (i.e., the blood becomes alkaline). Conversely, if the pH becomes alkalotic, the kidneys excrete more HCO3, causing the pH to decrease (i.e., the blood becomes more acidic).
+
+PaO2
+
+PaO2 is the partial pressure of arterial oxygen in the blood. It more accurately measures a client’s oxygenation status than SaO2 (the measurement of hemoglobin saturation with oxygen). Therefore, ABG results are also used to manage clients in respiratory distress.
+
+See Table 15.5a for a review of ABG components, normal values, and key critical values. A critical ABG value means there is a greater risk of serious complications and even death if not corrected rapidly. For example, a pH of 7.10, a shift of only 0.25 below normal, is often fatal because this level of acidosis can cause cardiac or respiratory arrest or significant hyperkalemia.[1] As you can see, failure to recognize ABG abnormalities can have serious consequences for your clients.
+
+Table 15.5a ABG Components, Descriptions, Adult Normal Values, and Critical Values[2]
+ABG Component	Description	Adult Normal Value	Critical Value
+pH	Acidity, <7.35, or alkalinity, >7.45, of blood.
+
+Measure of H+ ions, or acids.
+
+Affected by the lungs via hypo- or hyperventilation or the kidneys through bicarbonate retention.
+
+	7.35–7.45	Less than 7.25.
+
+Greater than 7.60.
+
+
+PaO2	Pressure of oxygen in the blood.	80–100 mmHg	Less than 60 mmHg.
+PaCO2	Pressure of carbon dioxide in the blood.
+
+CO2 is an acid managed by the lungs.
+
+As PaCO2 increases, the blood becomes more acidic and the pH decreases.
+
+As PaCO2 decreases, the blood becomes less acidic and more alkaline as the pH increases.
+
+	35–45 mmHg	Less than 25 mmHg.
+
+Greater than 60 mmHg.
+
+
+HCO3	Bicarbonate level in the blood.
+
+HCO3 is a base managed by the kidneys.
+
+As HCO3 increases, the blood becomes more alkaline and the pH increases.
+
+As HCO3 decreases, the blood becomes more acidic and the pH decreases.
+
+	22–26 mEq/L	Less than 10 mEq/L.
+
+Greater than 40 mEq/L.
+
+
+SaO2	Oxygen saturation in the blood.	95–100%	Less than 88%.
+Video
+
+Watch the video “Chvostek’s and Trousseau’s Signs” below to observe two clinical signs associated with hypocalcemia and increased neuromuscular excitability.[3]
+
+Interpreting Arterial Blood Gases
+
+After the ABG results are received, it is important to understand how to interpret them. A variety of respiratory, metabolic, electrolyte, or circulatory problems can cause acid-base imbalances. Correct interpretation helps the nurse and other health care providers determine the appropriate treatment and evaluate the effectiveness of interventions.
+
+Arterial blood gasses can be interpreted as one of four conditions: respiratory acidosis, respiratory alkalosis, metabolic acidosis, or metabolic alkalosis. Once this interpretation is made, conditions can further be classified as compensated, partially compensated, or uncompensated. A simple way to remember how to interpret ABGs is by using the ROME method of interpretation, which stands for Respiratory Opposite, Metabolic Equal. This means that the respiratory component (PaCO2) moves in the opposite direction of the pH if the respiratory system is causing the imbalance. If the metabolic system is causing the imbalance, the metabolic component (HCO3) moves in the same direction as the pH. Some nurses find the Tic-Tac-Toe method of interpretation helpful. If you would like to learn more about this method, watch the video below.
+
+Video
+
+Watch the video “ABGs Made Easy for Nurses” below to review how to interpret arterial blood gases using the tic-tac-toe method.[4]
+
+Respiratory Acidosis
+
+Respiratory acidosis develops when carbon dioxide (CO2) builds up in the body (referred to as hypercapnia), causing the blood to become increasingly acidic. Respiratory acidosis is identified when reviewing ABGs and the pH level is below 7.35 and the PaCO2 level is above 45, indicating the cause of the acidosis is respiratory. Note that in respiratory acidosis, as the PaCO2 level increases, the pH level decreases. Respiratory acidosis is typically caused by a medical condition that decreases the exchange of oxygen and carbon dioxide at the alveolar level, such as an acute asthma exacerbation, chronic obstructive pulmonary disease (COPD), or an acute heart failure exacerbation causing pulmonary edema. It can also be caused by decreased ventilation from anesthesia, alcohol, or administration of medications such as opioids and sedatives.
+
+Chronic respiratory diseases, such as COPD, often cause chronic respiratory acidosis that is fully compensated by the kidneys retaining HCO3. Because the carbon dioxide levels build up over time, the body adapts to elevated PaCO2 levels, so they are better tolerated. However, in acute respiratory acidosis, the body has not had time to adapt to elevated carbon dioxide levels, causing mental status changes associated with hypercapnia. Acute respiratory acidosis is caused by acute respiratory conditions, such as an asthma attack or heart failure exacerbation with pulmonary edema when the lungs suddenly are not able to ventilate adequately. As breathing slows and respirations become shallow, less CO2 is excreted by the lungs and PaCO2 levels quickly rise.
+
+Signs of symptoms of hypercapnia vary depending upon the level and rate of CO2 accumulation in arterial blood:
+
+Clients with mild to moderate hypercapnia may be anxious and/or complain of mild dyspnea, daytime sluggishness, headaches, or hypersomnolence.
+Clients with higher levels of CO2 or rapidly developing hypercapnia develop delirium, paranoia, depression, confusion, or decreased level of consciousness that can progress to seizures and coma as levels continue to rise.
+
+Individuals with normal lung function typically exhibit a depressed level of consciousness when the PaCO2 is greater than 75 to 80 mmHg, whereas clients with chronic hypercapnia may not develop symptoms until the PaCO2 rises above 90 to 100 mmHg.[5]
+
+When a client demonstrates signs of potential hypercapnia, the nurse should assess airway, breathing, and circulation. It is important to note that SaO2 levels may be normal with hypercapnia, and as such should not be the determining factor in further assessing acid-base issues. Urgent assistance should be sought, especially if the client is in respiratory distress. The provider will order an ABG and prescribe treatments based on assessment findings and potential causes. Treatment for respiratory acidosis typically involves improving ventilation and respiration by removing airway restrictions, reversing oversedation, administering nebulizer treatments, or increasing the rate and depth of respiration by using a BiPAP or CPAP devices. BiPAP and CPAP devices provide noninvasive positive pressure ventilation to increase the depth of respirations, remove carbon dioxide, and oxygenate the client. If these noninvasive interventions are not successful, the client will need to be intubated and placed on mechanical ventilation.[6],[7]
+
+Read more details about oxygenation equipment in “Oxygen Therapy” in Open RN Nursing Skills.
+
+Respiratory Alkalosis
+
+Respiratory alkalosis develops when the body removes too much carbon dioxide through respiration, resulting in increased pH and an alkalotic state. When reviewing ABGs, respiratory alkalosis is identified when pH levels are above 7.45 and the PaCO2 level is below 35. With respiratory alkalosis, notice that as the PaCO2 level decreases, the pH level increases.
+
+Respiratory alkalosis is caused by hyperventilation that can occur due to anxiety, panic attacks, pain, fear, head injuries, or mechanical ventilation. Overdoses of salicylates and other toxins can also cause respiratory alkalosis initially and then often progress to metabolic acidosis in later stages. Acute asthma exacerbations, pulmonary embolisms, or other respiratory disorders can initially cause respiratory alkalosis as the lungs breathe faster in an attempt to increase oxygenation, which decreases the PaCO2. After a while, however, these hypoxic disorders cause respiratory acidosis as respiratory muscles tire, breathing slows, and CO2 builds up in the blood.
+
+Clients experiencing respiratory alkalosis often report feelings of shortness of breath, dizziness or light-headedness, chest pain or tightness, paresthesias, and palpitations as a result of decreased carbon dioxide levels.[8] Respiratory alkalosis is not fatal, but it is important to recognize that underlying conditions such as an asthma exacerbation or pulmonary embolism can be life-threatening, so treatment of these underlying conditions is essential. As the pH level increases, the kidneys will attempt to compensate for the shortage of H+ ions by reabsorbing HCO3 before it can be excreted in the urine. This is a slow process, so additional treatment may be necessary.
+
+Treatment of respiratory alkalosis involves treating the underlying cause of the hyperventilation. Acute management of clients who are hyperventilating should focus on client reassurance, an explanation of the symptoms the client is experiencing, removal of any stressors, and initiation of breathing retraining. Breathing retraining attempts to focus the client on abdominal (diaphragmatic) breathing. Read more about breathing retraining in the following box.
+
+Breathing Retraining
+
+While sitting or lying supine, the client should place one hand on their abdomen and the other on the chest, and then be asked to observe which hand moves with greater excursion. In hyperventilating clients, this will almost always be the hand on the chest. Ask the client to adjust their breathing so that the hand on the abdomen moves with greater excursion and the hand on the chest barely moves at all. Assure the client that this is hard to learn and will take some practice to fully master. Ask the client to breathe in slowly over four seconds, pause for a few seconds, and then breathe out over a period of eight seconds. After 5 to 10 such breathing cycles, the client should begin to feel a sense of calmness with a reduction in anxiety and an improvement in hyperventilation. Symptoms should ideally resolve with continuation of this breathing exercise.
+
+If the breathing retraining technique is not successful in resolving a hyperventilation episode and severe symptoms persist, the client may be prescribed a small dose of a short-acting benzodiazepine (e.g., lorazepam 0.5 to 1 mg orally or 0.5 to 1 mg intravenously). Current research indicates that instructing clients who are hyperventilating to rebreathe carbon dioxide (CO2) by breathing into a paper bag can cause significant hypoxemia with significant complications, so this intervention is no longer recommended. If rebreathing is used, oxygen saturation levels should be continuously monitored.[9]
+
+Metabolic Acidosis
+
+Metabolic acidosis occurs when there is an accumulation of acids (hydrogen ions) and not enough bases (HCO3) in the body. Under normal conditions, the kidneys work to excrete acids through urine and neutralize excess acids by increasing bicarbonate (HCO3) reabsorption from the urine to maintain a normal pH. When the kidneys are not able to perform this buffering function to the level required to excrete and neutralize the excess acid, metabolic acidosis results.
+
+Metabolic acidosis is characterized by a pH level below 7.35 and an HCO3 level below 22 when reviewing ABGs. It is important to notice that both the pH and HCO3 decrease with metabolic acidosis (i.e., the pH and HCO3 move in the same downward direction). A common cause of metabolic acidosis is diabetic ketoacidosis, where acids called ketones build up in the blood when blood sugar is extremely elevated. Another common cause of metabolic acidosis in hospitalized clients is lactic acidosis, which can be caused by impaired tissue oxygenation. Metabolic acidosis can also be caused by increased loss of bicarbonate due to severe diarrhea or from renal disease that causes decreased acid elimination. Additionally, toxins such as salicylate excess can cause metabolic acidosis.[10]
+
+Nurses may first suspect that a client has metabolic acidosis due to rapid breathing that occurs as the lungs try to remove excess CO2 in an attempt to resolve the acidosis. Other symptoms of metabolic acidosis include confusion, decreased level of consciousness, hypotension, and electrolyte disturbances that can progress to circulatory collapse and death if not treated promptly. It is important to quickly notify the provider of suspected metabolic acidosis so that an ABG can be drawn, and treatment prescribed (based on the cause of the metabolic acidosis) to allow acid levels to improve. Treatment includes IV fluids to improve hydration status, glucose management, and circulatory support. When pH drops below 7.1, IV sodium bicarbonate is often prescribed to help neutralize the acids in the blood.[11],[12]
+
+Metabolic Alkalosis
+
+Metabolic alkalosis occurs when there is too much bicarbonate (HCO3) in the body or an excessive loss of acid (H+ ions). Metabolic alkalosis is defined by a pH above 7.45 and an HCO3 level above 26 on ABG results. Note that both pH and HCO3 are elevated in metabolic alkalosis.
+
+Metabolic alkalosis can be caused by gastrointestinal loss of hydrogen ions, excessive urine loss, excessive levels of bicarbonate, or a shift of hydrogen ions from the bloodstream into cells.
+
+Prolonged vomiting or nasogastric suctioning can also cause metabolic alkalosis. Gastric secretions have high levels of hydrogen ions (H+), so as acid is lost, the pH level of the bloodstream increases.
+
+Excessive urinary loss (due to diuretics or excessive mineralocorticoids) can cause metabolic alkalosis due to loss of hydrogen ions in the urine. Intravenous administration of sodium bicarbonate can also cause metabolic alkalosis due to increased levels of bases introduced into the body. Although it was once thought that excessive intake of calcium antacids could cause metabolic alkalosis, it has been found that this only occurs if they are administered concurrently with Kayexelate.[13]
+
+Hydrogen ions may shift into cells due to hypokalemia, causing metabolic alkalosis. When hypokalemia occurs (i.e., low levels of potassium in the bloodstream), potassium shifts out of cells and into the bloodstream in an attempt to maintain a normal level of serum potassium for optimal cardiac function. However, as the potassium (K+) molecules move out of the cells, hydrogen (H+) ions then move into the cells from the bloodstream to maintain electrical neutrality. This transfer of ions causes the pH in the bloodstream to drop, causing metabolic alkalosis.[14]
+
+A nurse may first suspect that a client has metabolic alkalosis due to a decreased respiratory rate (as the lungs try to retain additional CO2 to increase the acidity of the blood and resolve the alkalosis). The client may also be confused due to the altered pH level. The nurse should report signs of suspected metabolic alkalosis because uncorrected metabolic alkalosis can result in hypotension and cardiac dysfunction.[15]
+
+Treatment is prescribed based on the ABG results and the suspected cause. For example, treat the cause of the vomiting, stop the gastrointestinal suctioning, or stop the administration of diuretics. If hypokalemia is present, it should be treated. If bicarbonate is being administered, it should be stopped. Clients with kidney disease may require dialysis.[16]
+
+Analyzing ABG Results
+
+Now that we’ve discussed the differences between the various acid-base imbalances, let’s review the steps to systematically interpret ABG results. Table 15.5b outlines the steps of ABG interpretation.
+
+Table 15.5b Analyzing ABG Results[17],[18]
+Step	Action
+Step 1: pH, normal 7.35–7.45	If pH is out of range, determine if it is acidosis or alkalosis:
+
+pH <7.35 is acidosis.
+
+pH >7.45 is alkalosis.
+
+
+Step 2: PaCO2, normal 35–45 mmHg	Is the PaCO2 normal?
+
+PaCO2 <35 is considered alkalotic.
+
+PaCO2 >45 is considered acidotic.
+
+If the PaCO2 is abnormal, determine if this is caused by a respiratory problem. Recall that if the imbalance is caused by a respiratory problem, the PaCO2 moves in the opposite direction of the pH:
+
+If the pH is <7.35, or acidosis, and the PaCO2 is >45, or acidotic, this is respiratory acidosis.
+
+If the pH is >7.45, or alkalosis, and the PaCO2 is <35, or alkalotic, this is respiratory alkalosis.
+
+If the imbalance does not appear to be caused by a respiratory problem, move on to evaluate the HCO3.
+
+
+Step 3: HCO3, normal 22–26	Is the HCO3 normal?
+
+HCO3 <22 is considered acidotic.
+
+HCO3 >26 is considered alkalotic.
+
+If the HCO3 is abnormal, determine if this is caused by a metabolic problem. Recall that the HCO3 moves in the same direction as the pH if the imbalance is caused by a metabolic problem:
+
+If pH is <7.35, or acidosis, and the HCO3 is <22, or acidotic, this is metabolic acidosis.
+
+If the pH is >7.45, or alkalosis, and the HCO3 is >26, or alkalotic, this is metabolic alkalosis.
+
+
+Step 4: Determine level of compensation	After determining the cause of the pH imbalance, determine if compensation is occurring.
+
+Fully compensated = the body has fixed the imbalance by bringing the pH back to normal:
+
+pH is normal, 7.35–7.45.
+
+PaCO2 and HCO3 are both out of range.
+
+The cause of the disorder is out of range, and the other value is significantly out of range, indicating compensation is occurring.
+
+Recall the respiratory rate quickly compensates for metabolic disorders, and the kidneys take longer to compensate for respiratory disorders.
+
+Partially compensated = the body is working to fix the imbalance but hasn’t yet brought the pH back to normal:
+
+pH is abnormal, <7.35 or >7.45.
+
+PaCO2 and HCO3 are abnormal.
+
+The cause of the disorder is out of range and the other value is moving out of range, indicating compensation is occurring.
+
+Uncompensated = the body is not yet working to bring the pH back to normal:
+
+pH is abnormal, <7.35 or >7.45.
+
+PaCO2 or HCO3 is abnormal, but not both.
+
+The cause of the disorder is out of range but the other value is not yet out of range, indicating compensation is not yet occurring.
+
+Mitchel, J. H., Wildenthal, K., & Johnson Jr., R. L. (1972). The effects of acid-base disturbances on cardiovascular and pulmonary function. Kidney International, 1, 375-389. https://www.kidney-international.org/article/S0085-2538(15)31047-4/pdf
+(opens in new tab)
+ ↵
+WakeMed Pathology Laboratories. (2016). Critical values. ↵
+New England Journal of Medicine. (2012, September 13). Chvostek's and Trousseau's signs [Video]. YouTube. All rights reserved. https://www.youtube.com/watch?v=kvmwsTU0InQ ↵
+RegisteredNurseRN. (2015, May 6). ABGs made easy for nurses w/ tic tac toe method for arterial blood gas interpretation [Video]. YouTube. All rights reserved. https://www.youtube.com/watch?v=URCS4t9aM5o ↵
+Feller-Kopman, D. J., & Schwartzstein, R. M. (2020). The evaluation, diagnosis, and treatment of the adult patient with acute hypercapnic respiratory failure. UpToDate. https://www.uptodate.com/contents/the-evaluation-diagnosis-and-treatment-of-the-adult-patient-with-acute-hypercapnic-respiratory-failure
+(opens in new tab)
+ ↵
+U.S. National Library of Medicine. (2022). Respiratory acidosis: Medlineplus medical encyclopedia. MedlinePlus. https://medlineplus.gov/ency/article/000092.htm
+(opens in new tab)
+ ↵
+Feller-Kopman, D. J., & Schwartzstein, R. M. (2020). The evaluation, diagnosis, and treatment of the adult patient with acute hypercapnic respiratory failure. UpToDate. https://www.uptodate.com/contents/the-evaluation-diagnosis-and-treatment-of-the-adult-patient-with-acute-hypercapnic-respiratory-failure
+(opens in new tab)
+ ↵
+Schwartzstein, R. M., Richards, J., Edlow, J. A., & Roy-Byrne, P. P. (2020). Hyperventilation syndrome in adults. UpToDate. https://www.uptodate.com/contents/hyperventilation-syndrome-in-adults
+(opens in new tab)
+ ↵
+Schwartzstein, R. M., Richards, J., Edlow, J. A., & Roy-Byrne, P. P. (2020). Hyperventilation syndrome in adults. UpToDate. https://www.uptodate.com/contents/hyperventilation-syndrome-in-adults
+(opens in new tab)
+ ↵
+Emmett, M., & Szerlip, H. (2020). Approach to the adult with metabolic acidosis. UpToDate. https://www.uptodate.com/contents/approach-to-the-adult-with-metabolic-acidosis
+(opens in new tab)
+ ↵
+U.S. National Library of Medicine. (2023). Metabolic acidosis: MedlinePlus Medical Encyclopedia. MedlinePlus. https://medlineplus.gov/ency/article/000335.htm
+(opens in new tab)
+ ↵
+Emmett, M., & Szerlip, H. (2020). Approach to the adult with metabolic acidosis. UpToDate. https://www.uptodate.com/contents/approach-to-the-adult-with-metabolic-acidosis
+(opens in new tab)
+ ↵
+Emmett, M., & Szerlip, H. (2020). Causes of metabolic alkalosis. UpToDate. https://www.uptodate.com/contents/causes-of-metabolic-alkalosis
+(opens in new tab)
+ ↵
+Emmett, M., & Szerlip, H. (2020). Causes of metabolic alkalosis. UpToDate. https://www.uptodate.com/contents/causes-of-metabolic-alkalosis
+(opens in new tab)
+ ↵
+Brinkman, J. E. (2023). Physiology, metabolic alkalosis. StatPearls [Internet]. https://www.ncbi.nlm.nih.gov/books/NBK482291/
+(opens in new tab)
+ ↵
+Emmett, M., & Szerlip, H. (2020). Causes of metabolic alkalosis. UpToDate. https://www.uptodate.com/contents/causes-of-metabolic-alkalosis ↵
+Castro, D. (2024). Arterial blood gas. StatPearls [Internet]. ↵
+Woodruff, D. W. (2012). 6 easy steps to ABG analysis. Ed4Nurses, Inc. ↵
+definition

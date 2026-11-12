@@ -23,6 +23,11 @@ This is direction. Nothing in this file is built beyond what the next section li
 | Protocol library | A basic Documents list inside the Ask dialog |
 | Protocol answers | Finds and quotes matching passages; no clinical interpretation is validated |
 
+Since then, on branch `claude/protocol-milestone-1` (not merged when this line was written): a Protocols screen that
+holds a protocol as versioned PDF originals with a checked reading, and reviewed whole-rule answers in Ask, built and
+tested with one invented protocol only. The table above still describes main. See
+[PROTOCOL-MILESTONE-1-REPORT.md](PROTOCOL-MILESTONE-1-REPORT.md) for what that does and does not establish.
+
 What the code does today, read rather than assumed:
 
 - A document is pasted text or a `.txt`/`.md` file, with a title, a kind (Policy, Procedure, Protocol, Manual, Other)

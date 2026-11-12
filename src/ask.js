@@ -6,6 +6,9 @@
 // A hosted model can be added later by handing it the records this module finds. It should never be handed more than
 // the person asking is allowed to see, which is why the filtering happens here, before anything else.
 import { holidays, isWeekendTurn, staffing, statSheet } from './fairness.js';
+import { protocolAnswer } from './pathways.js';
+import { factAnswer } from './facts.js';
+import { namesAReference, referenceAnswer } from './references.js';
 import { addDays, minutesByWeek, normalizeName, payWeekStart, shiftInterval, shiftTimes, weekStart } from './model.js';
 import { expand, isThanks, keywords, nearest, qualifiers, readWorkPhrases, stem, tidyQuestion } from './words.js';
 import { checkExchange, describe, findOptions, shiftName, weekChanges } from './trades.js';
@@ -273,6 +276,22 @@ const snippet = (text, words, length = 260) => {
 // world: { today, now, actor, assignments, directory, people, links, posts, documents, releases, rules, keeper, seen,
 //          published, requests }. Returns { title, lines, items: [{ text, sub, go }], source, empty }.
 export function ask(question, world) {
+  // A question about a held protocol is answered from a reviewed mapping or not at all. It never reaches the word search.
+  const fromProtocol = world.protocols ? protocolAnswer(question, world) : null;
+  if (fromProtocol) return fromProtocol;
+  // General reference knowledge (a normal range, a definition) comes from a checked card that cites its page.
+  const fromCard = world.protocols ? factAnswer(question, world) : null;
+  if (fromCard) return fromCard;
+  // A question that names AARC, NBRC or a practice guideline is pointed at the published original when the reference
+  // list has a title for it. Nothing is answered from a reference: the list holds titles and links, not text.
+  const listed = world.references?.length > 0;
+  if (listed && namesAReference(question)) { const pointed = referenceAnswer(question, world); if (pointed?.reference.ids.length || pointed?.reference.retired) return pointed; }
+  const result = fromRecords(question, world);
+  // Only when the department's own records had nothing is a reference offered, and then only as a pointer.
+  return listed && result.empty && ['look', 'unknown'].includes(result.kind) ? referenceAnswer(question, world, { fallback: true }) || result : result;
+}
+
+function fromRecords(question, world) {
   const result = lookup(question, world);
   // This is a disclosure for explicitly joined, recognized dates, not an uncertainty score or a new date parser.
   // Keep the existing lookup and expose its actual scope beside the answer when the question names several scopes.
@@ -887,7 +906,7 @@ function lookup(question, world) {
         ...found.map(passage => ({ text: snippet(passage.text, [...passage.hits, ...passage.also]), sub: [passage.doc.title, passage.heading, passage.doc.kind, passage.doc.effective ? 'effective ' + passage.doc.effective : 'no effective date given',
           passage.chosen ? 'chosen for this question by ' + fix.by + ', as record keeper' : ''].filter(Boolean).join(' · '), go: 'doc|' + passage.doc.id + '|' + passage.offset })),
         ...mentions.map(post => ({ ...postItem(post), sub: 'A post on the board by ' + post.author + ', not policy' }))
-      ], found.length ? 'Quoted from the document as added. Check its date, and ask the person responsible if it does not settle the question.' : 'The board. Posts are from coworkers and are not policy.',
+      ], found.length ? 'Quoted from the document as added. Check its date, and ask the person responsible if it does not settle the question. A pasted document is searched by its words; it is not a reviewed protocol.' : 'The board. Posts are from coworkers and are not policy.',
         chosen ? { corrected: { id: fix.id, kind: 'passage', by: fix.by, at: fix.at } } : {});
     }
     // A document search finding nothing does not establish that the question was understood. Say which it was.
