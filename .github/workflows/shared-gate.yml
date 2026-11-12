@@ -1,0 +1,54 @@
+# The shared permission launch gate. A separate required job on purpose: the local-app checks in check.yml say
+# nothing about whether the server enforces anything, and a green "npm test" is not this.
+#
+# It starts the real service, seeds a fresh isolated synthetic fixture and runs the HTTP permission contract. A
+# missing route, a rejected credential or a failed assertion fails the job. Nothing here is skipped or marked
+# expected-to-fail, and the fixture is never reused: the contract changes the records it tests.
+name: Shared permission gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Permission contract against the real server and a fresh seeder
+        run: npm run gate:shared
+
+      - name: The server's own implementation tests
+        run: npm run test:server
+
+      # Proof that the gate is load-bearing rather than merely green: with the phone-sharing filter removed, the
+      # contract must fail. A gate that passes a server with no access control is not a gate.
+      - name: The gate catches a server with the phone filter removed
+        run: |
+          cp server/visibility.mjs "$RUNNER_TEMP/visibility.mjs"
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('server/visibility.mjs'); s = p.read_text()
+          old = "  return person.share_phone ? (person.phone ?? null) : null;"
+          assert s.count(old) == 1, 'the line the check depends on has moved; update this step'
+          p.write_text(s.replace(old, "  return person.phone ?? null;"))
+          PY
+          if npm run gate:shared; then
+            cp "$RUNNER_TEMP/visibility.mjs" server/visibility.mjs
+            echo "The gate passed a server that hands out withheld phone numbers. The gate is broken."
+            exit 1
+          fi
+          cp "$RUNNER_TEMP/visibility.mjs" server/visibility.mjs
+          echo "The gate failed it, as it must."
+
+      - name: The working tree is back as it was
+        run: git diff --exit-code

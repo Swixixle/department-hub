@@ -22,10 +22,15 @@ the plan for those.
 
 ```sh
 npm run gate:shared     # start the server, seed a fresh synthetic fixture, run the permission contract, exit with its status
-npm run test:server     # the server's own implementation tests
+npm run test:server     # the server's own implementation tests: permissions, passkeys, and the shared board
 npm run server          # run it to talk to by hand: DEPARTMENT_HUB_DB=./local-data/hub.sqlite npm run server -- --port 18080
 npm run seed:shared     # write a synthetic fixture and its manifest into local-data/
+npm run bootstrap:admin # the department's first administrator and their one-time passkey link
 ```
+
+`.github/workflows/shared-gate.yml` runs the first two on every pull request, and then does one more thing: it
+removes the phone-sharing filter from the server and requires the gate to fail. A gate that would pass a backend
+with no access control is not a gate, so the job proves it is load-bearing rather than merely green.
 
 Routine technical choices, and why:
 
@@ -61,6 +66,41 @@ against `localhost` would prove nothing about a production relying party.
 ## What can be prepared before hosting
 
 Build and test locally using synthetic records, two isolated test departments and separate authenticated test users. Keep the existing local app and fictional public demo usable. Do not silently upload the owner's browser workspace when shared mode becomes available.
+
+### What the app does with any of this: nothing yet
+
+The adapter is written and tested; no screen calls it. `src/backend.js` now has `sharedBoard` beside `localBoard`,
+offering the same six functions over HTTP, so nothing above that line has to know which one is in use. What differs
+is visible on purpose:
+
+- `where` says the department rather than this browser.
+- `state` is `ready`, `stale`, `failed`, `sending` or `unsent`, and the difference between the last few matters. A
+  dropped connection keeps the posts already on screen and marks them old. A refusal — a revoked membership, a
+  department that is not yours — throws the local copy away, because somebody who has been removed should not keep
+  reading the board from a cached copy, even one labelled stale.
+- A post carries an id the phone made before sending. A retry after a dropped connection carries the same one and
+  the server returns the post that is already there, so a flaky signal does not post twice.
+- `clear()` does nothing at all. A member wiping their own device must not empty the department.
+- Attachments go up as their own bytes rather than inflated through JSON, belong to nobody's post until a post names
+  them, and can only be named by whoever uploaded them. Removing a post removes its own attachments and nothing
+  else.
+
+`tests/server/shared.test.mjs` runs that adapter against the real server with two members who each signed in with
+their own passkey: one publishes, the other receives, a member of the other department gets nothing by board,
+search, Ask or file download, and a revoked member stops receiving on the next read. It also covers the stale and
+unsent states, the duplicate-free retry, attachment bytes round-tripping through the authorized path, and that
+reading, searching and asking add no receipt, keep no question text and keep no question fingerprint.
+
+An exchange is rechecked at every acceptance, before that person's agreement is recorded: each shift in it still
+exists, is still held by the person the proposal says holds it, and is still at the revision the proposal was built
+against; and the department's trade rules have not changed. The check is per shift, so a trade elsewhere in the
+department does not invalidate this one. All of it happens in one database transaction, and the shifts move only
+when the last person has agreed.
+
+**Two caveats, stated rather than buried.** The concurrency test runs in one process against one SQLite file, where
+writes serialize anyway: it shows the transaction holds and the second request is refused, not that a
+multi-process deployment is safe. And a two-session exercise is not a two-phone exercise — there is no phone,
+browser, Face ID or fingerprint reader anywhere in these tests, and the relying party is localhost.
 
 ### Definition of done: access boundaries first
 

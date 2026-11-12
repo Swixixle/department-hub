@@ -110,7 +110,8 @@ export function seed({ dbPath, baseUrl, runId = 'test-' + Date.now().toString(36
     const exchange = 'test-exchange-a';
     const moves = [{ assignmentId: assignmentIds['2026-11-13N'], fromPersonId: 'test-arden', toPersonId: 'test-bexley', date: '2026-11-13', shift: 'N' }];
     db.prepare('INSERT INTO exchanges (id, department_id, conversation_id, moves, basis, status, created_at) VALUES (?,?,?,?,?,?,?)')
-      .run(exchange, departments.a, thread, JSON.stringify(moves), JSON.stringify({ rosterRevision: 1, rulesRevision: 'pilot-3', proposedBy: 'test-arden' }), 'Waiting', at);
+      .run(exchange, departments.a, thread, JSON.stringify(moves),
+        JSON.stringify({ assignments: { [moves[0].assignmentId]: 1 }, rulesRevision: 'pilot-3', proposedBy: 'test-arden' }), 'Waiting', at);
     for (const person of ['test-arden', 'test-bexley']) db.prepare('INSERT INTO exchange_people (exchange_id, person_id) VALUES (?,?)').run(exchange, person);
     records.conversation.exchangeId = exchange;
 

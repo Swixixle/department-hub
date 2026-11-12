@@ -18,7 +18,9 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS departments (
   id TEXT PRIMARY KEY,
-  name TEXT NOT NULL
+  name TEXT NOT NULL,
+  -- Bumped whenever the trade rules change, so a proposal checked against the old ones is recognisably stale.
+  rules_revision TEXT NOT NULL DEFAULT 'pilot-3'
 );
 
 CREATE TABLE IF NOT EXISTS people (
@@ -69,11 +71,15 @@ CREATE TABLE IF NOT EXISTS posts (
   department_id TEXT NOT NULL REFERENCES departments(id),
   author_id TEXT NOT NULL REFERENCES people(id),
   body TEXT NOT NULL,
+  -- The id the phone made before it sent anything. A retry after a dropped connection carries the same one, so the
+  -- second attempt returns the post that is already there instead of posting it twice.
+  client_id TEXT,
   created_at TEXT NOT NULL,
   edited_at TEXT,
   deleted_at TEXT
 );
 CREATE INDEX IF NOT EXISTS posts_department ON posts (department_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS posts_client_id ON posts (department_id, client_id) WHERE client_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS documents (
   id TEXT PRIMARY KEY,
@@ -112,6 +118,8 @@ CREATE TABLE IF NOT EXISTS files (
   id TEXT PRIMARY KEY,
   department_id TEXT NOT NULL REFERENCES departments(id),
   conversation_id TEXT REFERENCES conversations(id),
+  post_id TEXT REFERENCES posts(id),
+  author_id TEXT REFERENCES people(id),
   name TEXT NOT NULL,
   content_type TEXT NOT NULL DEFAULT 'application/octet-stream',
   bytes BLOB NOT NULL,

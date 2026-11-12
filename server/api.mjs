@@ -21,7 +21,9 @@ const notFound = () => { throw new Refused(404, 'not found'); };
 const forbidden = () => { throw new Refused(403, 'not permitted'); };
 const badRequest = message => { throw new Refused(400, message); };
 
-const postJson = row => ({ id: row.id, departmentId: row.department_id, authorId: row.author_id, body: row.body, createdAt: row.created_at, editedAt: row.edited_at ?? null });
+const postJson = (row, media = []) => ({ id: row.id, departmentId: row.department_id, authorId: row.author_id, body: row.body,
+  clientId: row.client_id ?? null, createdAt: row.created_at, editedAt: row.edited_at ?? null,
+  media: media.map(file => ({ id: file.id, name: file.name, contentType: file.content_type, bytes: file.bytes?.length ?? file.size ?? null })) });
 const messageJson = row => ({ id: row.id, conversationId: row.conversation_id, authorId: row.author_id, body: row.body, createdAt: row.created_at });
 
 function member(db, departmentId, personId) {
@@ -49,9 +51,12 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
   const dept = departmentId;
   const json = value => ({ status: 200, body: value });
 
+  const mediaOf = postId => db.prepare('SELECT id, name, content_type, LENGTH(bytes) AS size FROM files WHERE post_id = ? ORDER BY created_at').all(postId);
+
   if (kind === 'posts') {
     if (!first) {
-      if (method === 'GET') return json(db.prepare('SELECT * FROM posts WHERE department_id = ? AND deleted_at IS NULL ORDER BY created_at').all(dept).map(postJson));
+      if (method === 'GET') return json(db.prepare('SELECT * FROM posts WHERE department_id = ? AND deleted_at IS NULL ORDER BY created_at').all(dept)
+        .map(row => postJson(row, mediaOf(row.id))));
       if (method === 'POST') {
         const text = String(body?.body ?? '').trim();
         if (!text) badRequest('a post needs words');
@@ -59,19 +64,34 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
         // discover that forging one is merely ineffective.
         if (body.authorId && body.authorId !== session.personId) badRequest('authorship comes from the session');
         if (body.departmentId && body.departmentId !== dept) badRequest('the department comes from the session');
+        const clientId = body.clientId === undefined || body.clientId === null ? null : String(body.clientId);
+        if (clientId !== null && !/^[A-Za-z0-9_.:-]{1,128}$/.test(clientId)) badRequest('clientId is a short plain identifier');
+        // A retry of a post that already arrived returns the post, not a second one.
+        if (clientId !== null) {
+          const already = db.prepare('SELECT * FROM posts WHERE department_id = ? AND client_id = ?').get(dept, clientId);
+          if (already) return { status: 200, body: { ...postJson(already, mediaOf(already.id)), duplicate: true } };
+        }
+        const media = Array.isArray(body.media) ? body.media.map(String) : [];
         const row = transact(db, () => {
           const id = newId('post'), at = now();
-          db.prepare('INSERT INTO posts (id, department_id, author_id, body, created_at) VALUES (?,?,?,?,?)').run(id, dept, session.personId, text, at);
-          recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Board update', details: { id, length: text.length }, build });
+          db.prepare('INSERT INTO posts (id, department_id, author_id, body, client_id, created_at) VALUES (?,?,?,?,?,?)').run(id, dept, session.personId, text, clientId, at);
+          for (const mediaId of media) {
+            // Only this person's own just-uploaded attachments, from this department, not yet on another post.
+            const file = db.prepare('SELECT * FROM files WHERE id = ? AND department_id = ? AND post_id IS NULL AND conversation_id IS NULL').get(mediaId, dept);
+            if (!file) throw new Refused(400, 'one of those attachments is not available to attach');
+            if (file.author_id !== session.personId) throw new Refused(403, 'an attachment is attached by whoever uploaded it');
+            db.prepare('UPDATE files SET post_id = ? WHERE id = ?').run(id, mediaId);
+          }
+          recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Board update', details: { id, length: text.length, attachments: media.length }, build });
           return db.prepare('SELECT * FROM posts WHERE id = ?').get(id);
         });
-        return { status: 201, body: postJson(row) };
+        return { status: 201, body: postJson(row, mediaOf(row.id)) };
       }
       forbidden();
     }
     const row = db.prepare('SELECT * FROM posts WHERE id = ?').get(first);
     if (!row || row.department_id !== dept || row.deleted_at) notFound();
-    if (method === 'GET') return json(postJson(row));
+    if (method === 'GET') return json(postJson(row, mediaOf(row.id)));
     if (row.author_id !== session.personId) forbidden();
     if (method === 'PATCH') {
       const text = String(body?.body ?? '').trim();
@@ -81,12 +101,15 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
         recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Board post edited', details: { id: row.id }, build });
         return db.prepare('SELECT * FROM posts WHERE id = ?').get(row.id);
       });
-      return json(postJson(updated));
+      return json(postJson(updated, mediaOf(updated.id)));
     }
     if (method === 'DELETE') {
       transact(db, () => {
+        const attached = mediaOf(row.id);
         db.prepare('UPDATE posts SET deleted_at = ? WHERE id = ?').run(now(), row.id);
-        recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Board post removed', details: { id: row.id }, build });
+        // The post's own attachments go with it. Nothing else is touched.
+        db.prepare('DELETE FROM files WHERE post_id = ?').run(row.id);
+        recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Board post removed', details: { id: row.id, attachments: attached.length }, build });
       });
       return { status: 204, body: null };
     }
@@ -143,10 +166,26 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
   }
 
   if (kind === 'files') {
+    if (!first && method === 'POST') {
+      // An attachment arrives as raw bytes, so nothing is base64-inflated through JSON. It belongs to nobody's post
+      // until a post names it, and only its uploader can name it.
+      if (!body?.bytes) badRequest('send the attachment as the request body');
+      const id = newId('file'), name = String(query.name || 'attachment');
+      const contentType = String(query.contentType || body.contentType || 'application/octet-stream');
+      transact(db, () => db.prepare('INSERT INTO files (id, department_id, author_id, name, content_type, bytes, created_at) VALUES (?,?,?,?,?,?,?)')
+        .run(id, dept, session.personId, name, contentType, body.bytes, now()));
+      return { status: 201, body: { id, name, contentType, bytes: body.bytes.length } };
+    }
     if (!first) notFound();
     const row = db.prepare('SELECT * FROM files WHERE id = ?').get(first);
     if (!row || row.department_id !== dept) notFound();
     if (row.conversation_id && !participates(db, row.conversation_id, session.personId)) notFound();
+    if (method === 'DELETE') {
+      // Only the uploader, and only while it is not on a post yet.
+      if (row.author_id !== session.personId || row.post_id) forbidden();
+      transact(db, () => db.prepare('DELETE FROM files WHERE id = ?').run(row.id));
+      return { status: 204, body: null };
+    }
     return { status: 200, bytes: Buffer.from(row.bytes), contentType: row.content_type, name: row.name };
   }
 
@@ -190,22 +229,27 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
       const updated = transact(db, () => {
         const fresh = db.prepare('SELECT * FROM exchanges WHERE id = ?').get(row.id);
         if (fresh.committed_at) throw new Refused(409, 'already settled');
-        // The proposal was checked against a roster and rule revision. If either has moved, it is stale and the
-        // acceptance is refused rather than committed on facts that no longer hold.
-        const basis = JSON.parse(fresh.basis);
-        const revision = db.prepare('SELECT COALESCE(MAX(revision),0) AS revision FROM assignments WHERE department_id = ?').get(dept).revision;
-        if (basis.rosterRevision !== undefined && basis.rosterRevision !== revision) throw new Refused(409, 'the schedule changed since this was proposed');
+        // Everything the proposal was built on is rechecked here, before this person's agreement is recorded, so a
+        // stale proposal is refused rather than quietly collecting acceptances it will never be able to honour.
+        // The check is per shift: a trade elsewhere in the department does not invalidate this one, but any change
+        // to one of these shifts does.
+        const basis = JSON.parse(fresh.basis), moves = JSON.parse(fresh.moves);
+        const department = db.prepare('SELECT * FROM departments WHERE id = ?').get(dept);
+        if (basis.rulesRevision !== undefined && basis.rulesRevision !== department.rules_revision)
+          throw new Refused(409, 'the trade rules changed since this was proposed');
+        for (const move of moves) {
+          const assignment = db.prepare('SELECT * FROM assignments WHERE id = ? AND department_id = ?').get(move.assignmentId, dept);
+          if (!assignment) throw new Refused(409, 'a shift in this exchange is no longer on the schedule');
+          if (assignment.person_id !== move.fromPersonId) throw new Refused(409, 'a shift has changed hands since this was proposed');
+          const expected = basis.assignments?.[move.assignmentId];
+          if (expected !== undefined && assignment.revision !== expected) throw new Refused(409, 'a shift in this exchange changed since this was proposed');
+        }
         db.prepare('UPDATE exchange_people SET accepted_at = ? WHERE exchange_id = ? AND person_id = ? AND accepted_at IS NULL').run(now(), fresh.id, session.personId);
         const people = db.prepare('SELECT * FROM exchange_people WHERE exchange_id = ?').all(fresh.id);
         const settled = people.length > 0 && people.every(entry => entry.accepted_at);
         if (settled) {
           db.prepare("UPDATE exchanges SET status = 'Agreed', committed_at = ? WHERE id = ?").run(now(), fresh.id);
-          for (const move of JSON.parse(fresh.moves)) {
-            const assignment = db.prepare('SELECT * FROM assignments WHERE id = ? AND department_id = ?').get(move.assignmentId, dept);
-            if (!assignment) throw new Refused(409, 'the shift in this exchange is no longer on the schedule');
-            if (assignment.person_id !== move.fromPersonId) throw new Refused(409, 'the shift has changed hands since this was proposed');
-            db.prepare('UPDATE assignments SET person_id = ?, revision = revision + 1 WHERE id = ?').run(move.toPersonId, assignment.id);
-          }
+          for (const move of moves) db.prepare('UPDATE assignments SET person_id = ?, revision = revision + 1 WHERE id = ?').run(move.toPersonId, move.assignmentId);
         }
         recordReceipt(db, { departmentId: dept, actorId: session.personId, type: settled ? 'Exchange agreed' : 'Exchange acceptance recorded',
           details: { id: fresh.id, by: session.personId, settled }, build });

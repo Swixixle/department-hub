@@ -32,18 +32,24 @@ export const config = () => ({
   rpOrigin: process.env.DEPARTMENT_HUB_RP_ORIGIN || 'http://localhost:5173'
 });
 
-const MAX_BODY = 2 * 1024 * 1024;
+const MAX_BODY = 2 * 1024 * 1024;              // a request that is only words or ids
+const MAX_UPLOAD = 25 * 1024 * 1024;           // an attachment, sent as its own bytes rather than inflated into JSON
 async function readBody(request) {
+  const limit = /^application\/json\b/.test(request.headers['content-type'] || '') ? MAX_BODY : MAX_UPLOAD;
   const chunks = [];
   let size = 0;
   for await (const chunk of request) {
     size += chunk.length;
-    if (size > MAX_BODY) throw new Refused(413, 'too large');
+    if (size > limit) throw new Refused(413, 'too large');
     chunks.push(chunk);
   }
   if (!chunks.length) return undefined;
-  const text = Buffer.concat(chunks).toString('utf8');
-  try { return JSON.parse(text); } catch { throw new Refused(400, 'expected JSON'); }
+  const bytes = Buffer.concat(chunks);
+  if (/^application\/json\b/.test(request.headers['content-type'] || '')) {
+    try { return JSON.parse(bytes.toString('utf8')); } catch { throw new Refused(400, 'expected JSON'); }
+  }
+  // Anything else is treated as the bytes it is, for an upload. Nothing inspects what is inside them.
+  return { bytes, contentType: String(request.headers['content-type'] || 'application/octet-stream') };
 }
 
 export function createApp(db, settings) {
