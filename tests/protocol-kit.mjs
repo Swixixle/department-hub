@@ -43,3 +43,23 @@ export async function activeLibrary(today = '2026-11-11') {
   step = ok(activate(step.library, id, 'Avery Stone', '2026-11-10T09:15:00.000Z', today));
   return { library: step.library, id };
 }
+
+// Mapped answers, as committed. Each test gets its own copy.
+export const mappingFor = number => JSON.parse(readFileSync(fixturePath('rt-train-014-rev' + number + '.mapping.json'), 'utf8'));
+// Takes one revision through every step a person takes in the app: confirm the reading, add the mapping, review each
+// answer one at a time, mark the answers reviewed, make it active. `upTo` stops early to leave it unfinished.
+export async function carryThrough(library, number, { overrides = {}, mapping = mappingFor(number), upTo = 'active', today = '2026-11-11', who = 'Avery Stone' } = {}) {
+  const { addMapping, reviewBundle, markMappingsReviewed: markAll } = await import('../src/bundles.js');
+  let step = ok(await addFixture(library, number, overrides));
+  const id = step.revision.id, at = '2026-11-10T1' + number + ':00:00.000Z';
+  if (upTo === 'added') return { library: step.library, id };
+  step = ok(checkExtraction(step.library, id, who, at));
+  if (upTo === 'checked') return { library: step.library, id };
+  step = ok(addMapping(step.library, id, mapping, who, at));
+  if (upTo === 'mapped') return { library: step.library, id };
+  for (const topic of mapping.topics) for (const bundle of topic.bundles) step = ok(reviewBundle(step.library, id, bundle.id, who, at));
+  step = ok(markAll(step.library, id, who, at));
+  if (upTo === 'reviewed') return { library: step.library, id };
+  step = ok(activate(step.library, id, who, at, today));
+  return { library: step.library, id };
+}

@@ -17,6 +17,7 @@
     "server": "node server/index.mjs",
     "seed:shared": "node server/seed.mjs",
     "gate:shared": "node scripts/shared-gate.mjs",
+    "gate:protocols": "node scripts/protocol-faults.mjs",
     "test:server": "node --test --test-concurrency=1 tests/server/*.test.mjs",
     "bootstrap:admin": "node server/bootstrap.mjs",
     "eval:ask": "node scripts/eval-ask.mjs"

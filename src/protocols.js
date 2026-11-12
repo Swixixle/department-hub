@@ -108,8 +108,9 @@ export function sealOf(value) {
   return (b >>> 0).toString(16).padStart(8, '0') + (a >>> 0).toString(16).padStart(8, '0') + ':' + text.length;
 }
 export const bundlesOf = revision => (revision?.topics || []).flatMap(topic => topic.bundles.map(bundle => ({ topic, bundle })));
-// Whether the mapping as it stands now is the one a person reviewed. Overridden with the full check in bundles.js.
-export const reviewHolds = (revision, topic, bundle) => Boolean(bundle.review) && bundle.review.seal === sealOf({ digest: revision.digest, facts: revision.facts, topic: { ...topic, bundles: undefined }, bundle });
+// The least that "reviewed" can mean. src/bundles.js passes the full check: the review must still match the mapping
+// word for word, and every link must still point at the passage it was written against.
+export const reviewHolds = (revision, topic, bundle) => Boolean(bundle.review?.seal);
 
 export function markMappingsReviewed(library, id, who, at, holds = reviewHolds) {
   const revision = revisionOf(library, id);

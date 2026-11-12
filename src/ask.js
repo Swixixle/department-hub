@@ -6,6 +6,7 @@
 // A hosted model can be added later by handing it the records this module finds. It should never be handed more than
 // the person asking is allowed to see, which is why the filtering happens here, before anything else.
 import { holidays, isWeekendTurn, staffing, statSheet } from './fairness.js';
+import { protocolAnswer } from './pathways.js';
 import { addDays, minutesByWeek, normalizeName, payWeekStart, shiftInterval, shiftTimes, weekStart } from './model.js';
 import { expand, isThanks, keywords, nearest, qualifiers, readWorkPhrases, stem, tidyQuestion } from './words.js';
 import { checkExchange, describe, findOptions, shiftName, weekChanges } from './trades.js';
@@ -273,6 +274,9 @@ const snippet = (text, words, length = 260) => {
 // world: { today, now, actor, assignments, directory, people, links, posts, documents, releases, rules, keeper, seen,
 //          published, requests }. Returns { title, lines, items: [{ text, sub, go }], source, empty }.
 export function ask(question, world) {
+  // A question about a held protocol is answered from a reviewed mapping or not at all. It never reaches the word search.
+  const fromProtocol = world.protocols ? protocolAnswer(question, world) : null;
+  if (fromProtocol) return fromProtocol;
   const result = lookup(question, world);
   // This is a disclosure for explicitly joined, recognized dates, not an uncertainty score or a new date parser.
   // Keep the existing lookup and expose its actual scope beside the answer when the question names several scopes.
