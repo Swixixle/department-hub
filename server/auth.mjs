@@ -32,7 +32,8 @@ export function resolveSession(db, headers) {
   const row = liveTokenRow(db, presentedToken(headers), 'session');
   if (!row) return null;
   const membership = db.prepare('SELECT * FROM memberships WHERE id = ?').get(row.membership_id);
-  if (!membership || membership.revoked_at) return null;
+  // Revoked, or invited but never confirmed: either way there is no caller here.
+  if (!membership || membership.revoked_at || !membership.activated_at) return null;
   if (membership.person_id !== row.person_id || membership.department_id !== row.department_id) return null;
   let roles = [];
   try { roles = JSON.parse(membership.roles); } catch { roles = []; }

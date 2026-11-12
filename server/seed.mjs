@@ -48,8 +48,8 @@ export function seed({ dbPath, baseUrl, runId = 'test-' + Date.now().toString(36
       const dept = departments[person.department || 'a'];
       db.prepare('INSERT INTO people (id, name) VALUES (?,?)').run(person.id, person.name);
       const membershipId = 'test-m-' + person.key;
-      db.prepare('INSERT INTO memberships (id, person_id, department_id, roles, joined_at) VALUES (?,?,?,?,?)')
-        .run(membershipId, person.id, dept, JSON.stringify([...person.roles].sort()), at);
+      db.prepare('INSERT INTO memberships (id, person_id, department_id, roles, joined_at, activated_at) VALUES (?,?,?,?,?,?)')
+        .run(membershipId, person.id, dept, JSON.stringify([...person.roles].sort()), at, at);
       membershipOf[person.key] = membershipId;
       // sharing off by default: the outsider's row is inserted with no sharing flag chosen at all.
       db.prepare('INSERT INTO profiles (person_id, phone, share_phone) VALUES (?,?,?)')

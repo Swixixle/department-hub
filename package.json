@@ -16,9 +16,11 @@
     "server": "node server/index.mjs",
     "seed:shared": "node server/seed.mjs",
     "gate:shared": "node scripts/shared-gate.mjs",
-    "test:server": "node --test --test-concurrency=1 tests/server/*.test.mjs"
+    "test:server": "node --test --test-concurrency=1 tests/server/*.test.mjs",
+    "bootstrap:admin": "node server/bootstrap.mjs"
   },
   "dependencies": {
+    "@simplewebauthn/server": "^14.1.0",
     "@tesseract.js-data/eng": "1.0.0",
     "tesseract.js": "7.0.0"
   },

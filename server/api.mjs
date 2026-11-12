@@ -25,7 +25,7 @@ const postJson = row => ({ id: row.id, departmentId: row.department_id, authorId
 const messageJson = row => ({ id: row.id, conversationId: row.conversation_id, authorId: row.author_id, body: row.body, createdAt: row.created_at });
 
 function member(db, departmentId, personId) {
-  return db.prepare('SELECT * FROM memberships WHERE department_id = ? AND person_id = ? AND revoked_at IS NULL').get(departmentId, personId);
+  return db.prepare('SELECT * FROM memberships WHERE department_id = ? AND person_id = ? AND revoked_at IS NULL AND activated_at IS NOT NULL').get(departmentId, personId);
 }
 function personRow(db, departmentId, personId) {
   if (!member(db, departmentId, personId)) return null;
@@ -104,7 +104,7 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
   if (kind === 'directory') {
     const rows = db.prepare(`SELECT p.id, p.id AS person_id, p.name, pr.phone, pr.share_phone
       FROM memberships m JOIN people p ON p.id = m.person_id LEFT JOIN profiles pr ON pr.person_id = p.id
-      WHERE m.department_id = ? AND m.revoked_at IS NULL ORDER BY p.name`).all(dept);
+      WHERE m.department_id = ? AND m.revoked_at IS NULL AND m.activated_at IS NOT NULL ORDER BY p.name`).all(dept);
     if (!first) return json(rows.map(row => directoryPerson(session, row)));
     const one = rows.find(row => row.person_id === first);
     if (!one) notFound();
@@ -237,7 +237,7 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
   if (kind === 'exports' && first === 'directory') {
     const rows = db.prepare(`SELECT p.id, p.id AS person_id, p.name, pr.phone, pr.share_phone
       FROM memberships m JOIN people p ON p.id = m.person_id LEFT JOIN profiles pr ON pr.person_id = p.id
-      WHERE m.department_id = ? AND m.revoked_at IS NULL ORDER BY p.name`).all(dept);
+      WHERE m.department_id = ? AND m.revoked_at IS NULL AND m.activated_at IS NOT NULL ORDER BY p.name`).all(dept);
     recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Directory exported', details: { people: rows.length }, build });
     return json({ departmentId: dept, generatedAt: now(), by: session.personId,
       people: rows.map(row => ({ personId: row.person_id, name: row.name, phone: phoneFor(session, row) })) });
@@ -260,7 +260,7 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
     if (!first) notFound();
     if (!canAdministerMembership(session)) forbidden();
     const row = db.prepare('SELECT * FROM memberships WHERE id = ?').get(first);
-    if (!row || row.department_id !== dept || row.revoked_at) notFound();
+    if (!row || row.department_id !== dept || row.revoked_at || !row.activated_at) notFound();
     if (method === 'PATCH') {
       const roles = Array.isArray(body?.roles) ? [...new Set(body.roles.map(String))] : null;
       if (!roles || !roles.length) badRequest('roles is a list');

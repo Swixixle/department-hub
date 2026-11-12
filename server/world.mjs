@@ -17,7 +17,7 @@ export function visibleRecords(db, session) {
   const dept = session.departmentId;
   const people = db.prepare(`SELECT p.id, p.name, pr.phone, pr.share_phone
     FROM memberships m JOIN people p ON p.id = m.person_id LEFT JOIN profiles pr ON pr.person_id = p.id
-    WHERE m.department_id = ? AND m.revoked_at IS NULL ORDER BY p.name`).all(dept)
+    WHERE m.department_id = ? AND m.revoked_at IS NULL AND m.activated_at IS NOT NULL ORDER BY p.name`).all(dept)
     .map(row => ({ ...row, person_id: row.id }));
   const posts = db.prepare('SELECT * FROM posts WHERE department_id = ? AND deleted_at IS NULL ORDER BY created_at').all(dept);
   const documents = db.prepare('SELECT * FROM documents WHERE department_id = ? ORDER BY added_at').all(dept);

@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS memberships (
   department_id TEXT NOT NULL REFERENCES departments(id),
   roles TEXT NOT NULL DEFAULT '["member"]',
   joined_at TEXT NOT NULL,
+  -- A membership invited but not yet confirmed has no activated_at and grants nothing at all.
+  activated_at TEXT,
   revoked_at TEXT,
   UNIQUE (person_id, department_id)
 );
