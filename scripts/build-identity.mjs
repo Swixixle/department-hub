@@ -5,7 +5,8 @@ import { join } from 'node:path';
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const marker = '<meta name="department-hub-build" content="">';
 export const normalizeBuildHtml = html => html.replace(/<meta name="department-hub-build" content="[a-f0-9]{64}">/, marker);
-export const manifestFingerprint = manifest => digest(JSON.stringify({ format:manifest.format, mode:manifest.mode, files:manifest.files }));
+export const manifestFingerprint = manifest => digest(JSON.stringify({ format:manifest.format, mode:manifest.mode,
+  ...(manifest.format === 'department-hub-build-v2' ? { source:manifest.source } : {}), files:manifest.files }));
 const canonicalHtml = html => {
   const normalized = normalizeBuildHtml(html);
   return normalized.includes(marker) ? normalized : normalized.replace('</head>', marker + '\n</head>');
@@ -24,12 +25,12 @@ async function releaseFiles(root, prefix = '') {
   return result;
 }
 
-export async function identifyBuild(directory, mode) {
-  const manifest = { format:'department-hub-build-v1', mode, files:(await releaseFiles(directory)).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0) };
+export async function identifyBuild(directory, mode, source = { commit:null, dirty:null }) {
+  const manifest = { format:'department-hub-build-v2', mode, source, files:(await releaseFiles(directory)).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0) };
   return { ...manifest, fingerprint:manifestFingerprint(manifest) };
 }
 
-export function buildIdentity() {
+export function buildIdentity(source = { commit:null, dirty:null }) {
   let config;
   return {
     name:'department-hub-build-identity', apply:'build', enforce:'post',
@@ -40,7 +41,7 @@ export function buildIdentity() {
         if (!options.dir) throw new Error('Missing build output directory');
         // Read finished files: Vite can still change chunks after generateBundle hooks.
         // Only the HTML's identity value is blanked; the manifest cannot hash itself.
-        const manifest = await identifyBuild(options.dir, config.mode);
+        const manifest = await identifyBuild(options.dir, config.mode, source);
         const html = canonicalHtml(await readFile(join(options.dir, 'index.html'), 'utf8'));
         await writeFile(join(options.dir, 'index.html'), html.replace(marker,
           marker.replace('content=""', 'content="' + manifest.fingerprint + '"')));

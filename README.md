@@ -54,7 +54,7 @@ Controls are sized for phones: 60 px for a main action, 48 px for any other cont
 
 ## Work on the source
 
-Use Node 22 or later and Python 3 with Pillow and DejaVu Sans installed.
+Use Node 24 to match CI. Normal builds use the checked-in fictional fixture files and need no Python, Pillow or fonts. Python 3 is needed only to run the standalone launcher and its tests. Deliberately regenerating fixtures with `npm run fixtures:regenerate` additionally requires Pillow and DejaVu Sans; review and commit those changed files before a release.
 
 ```sh
 npm ci
@@ -69,6 +69,17 @@ For simulated interface checks, run `npm run build`, install `jsdom@26.1.0` into
 An exported receipt history can be checked independently with `node scripts/verify-receipts.mjs EXPORT.json FULL_CHECKPOINT_HASH`. The optional checkpoint must come from a separately retained trusted copy. Without one, the check establishes internal consistency only. It does not authenticate a person, establish a trusted time or prove factual correctness.
 
 The normal build creates `dist/`. The public demo build creates `dist-demo/` and disables the private file input. The GitHub Actions workflow builds and deploys only `dist-demo/`. Set the repository's Pages source to GitHub Actions. Source and demo fixtures are synthetic. Keep employer screenshots and all private imports out of Git, issue attachments, and Pages.
+
+Version 15 shows the source commit beside the artifact fingerprint and carries both in new receipts and `build-info.json`. A modified checkout is labelled **modified**; a build without its Git repository says **source unknown**. The source commit identifies the code revision. The fingerprint identifies the exact built files and mode. Local and demo are intentionally different modes and need not share a fingerprint. Fixed fixture inputs remove font/Pillow rendering differences from normal builds; matching other build tools and dependencies still matters for byte-for-byte reproduction.
+
+To update an existing standalone folder, run this from the maintained source checkout:
+
+```sh
+npm run build
+node scripts/install-local.mjs --target "$HOME/Downloads/Department-Hub-5"
+```
+
+The installer verifies the build, stages a complete copy, and renames the previous `app/` to an `app-before-update-…` sibling before activating the new copy. It never overlays old assets or deletes the old directory. Files outside `app/`, an existing `serve.py`, and browser storage are preserved. The installed `app/` can be checked with `node scripts/check-build.mjs "$HOME/Downloads/Department-Hub-5/app"`. Keep the same browser and address to reuse the workspace.
 
 OCR runs in a browser worker. The worker, core binaries, and English data are bundled and served from the same origin. The local release has no OCR service to configure. Stencil, Blinders, and Deflate are optional external tools and the import path has no dependency on them.
 

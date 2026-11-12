@@ -344,6 +344,16 @@ The text screen still creates no named blocked-save receipt. A fixed anonymous c
 
 Validation: 121 app tests, two launcher tests, both builds and the production-bundle interface check pass. The build verifier checks all 44 files in each output against its manifest. Regression checks cover build identities on new receipts and exports, unchanged old checkpoints, counter increments without named receipts, footer/data identity and the existing Ask/correction/exchange flows. These are synthetic and simulated checks, not real-photo replay or physical-phone testing.
 
+## Version 15: source provenance and fixed release inputs
+
+Fictional fixture images and their truth manifests are now versioned and reused during normal builds. Python/Pillow/font rendering is a deliberate regeneration step only; it is no longer part of either normal build. The public deployment no longer installs Python or Pillow. The launcher still needs Python's standard library.
+
+The footer, workspace-data screen, build manifest and new receipts now carry the actual Git source commit in addition to Version 15, mode and artifact fingerprint. Modified working copies and builds without a source repository are labelled explicitly. A source commit identifies the revision; the fingerprint identifies the exact built copy. Demo and local builds deliberately differ, including their entry JavaScript, and are not expected to share a fingerprint. Matching build tools and dependencies remains relevant to reproducibility.
+
+The standalone updater verifies a complete staged release and activates it by renaming directories. It preserves the entire previous app beside the new one instead of overlaying assets or deleting old files. Browser data, the port and other files in the standalone folder remain untouched. This prepares an update mechanism; it does not update the owner's Mac from this environment.
+
+Validation: 124 app tests, two launcher tests, both builds, manifest verification and the simulated production interface pass. A normal production build also succeeds with no Python on PATH and produces the same artifact bytes. Tests cover clean, modified and unknown source revisions, hash-covered provenance, retained legacy receipts, and replacing a stale standalone app while preserving its complete old directory and unrelated files. Real photos and physical phones were not rechecked here.
+
 ## Earlier open import issues
 
 - Matches that are blocked are hidden with no reason given.

@@ -75,30 +75,29 @@ The implementation has no native iOS or Android project yet. Capacitor was discu
 - `src/importer.js` owns browser OCR, source hashing, page layout parsing, flags, and batch import.
 - `src/storage.js` owns source-image IndexedDB operations and local state persistence.
 - `src/style.css` owns the visual layout.
-- `scripts/prepare-assets.mjs` copies OCR assets and generates sample images.
+- `scripts/prepare-assets.mjs` copies locked OCR assets and checks for versioned fixture inputs.
 - `scripts/make-fixtures.py` generates ten overlapping fictional schedule screenshots and the expected 217-assignment truth set.
 - `scripts/serve.py` is copied to the standalone release root and serves the adjacent `app/` directory on loopback.
 - `tests/model.test.js` contains seven existing regression checks.
 - `.github/workflows/pages.yml` builds and publishes the fictional demo.
 
-Generated `public/ocr/`, `public/fixtures/`, `dist/`, and `dist-demo/` are ignored and recreated by the build.
+Generated `public/ocr/`, `dist/`, and `dist-demo/` are ignored and recreated by the build. Fictional `public/fixtures/` images and truth manifests are checked in and reused byte-for-byte. Regeneration is a deliberate maintenance action, not a normal build step.
 
 ## Setup
 
-Use Node 24 to match GitHub Actions. Python 3 and Pillow are required for fixture generation. The generator tries DejaVu Sans by a Linux path and then by font name. On a Mac, check font availability or make this small portability improvement before changing OCR logic.
+Use Node 24 to match GitHub Actions. Normal builds need no Python, Pillow or fonts. Python 3 is required for the standalone launcher and launcher tests. Deliberate fixture regeneration needs Pillow and DejaVu Sans; review and commit the resulting files before releasing them.
 
 ```sh
 git clone https://github.com/Swixixle/department-hub.git
 cd department-hub
 npm ci
-python3 -m pip install Pillow
 npm test
 npm run build
 npm run build:demo
 npm run dev
 ```
 
-Use a Python virtual environment if the host requires one. The normal build is `dist/`, and the public demo is `dist-demo/`. The relative Vite base supports the GitHub Pages repository path. Test both outputs when changing asset paths or import handling.
+The normal build is `dist/`, and the public demo is `dist-demo/`. The relative Vite base supports the GitHub Pages repository path. Test both outputs when changing asset paths or import handling. Version 15 records the actual Git commit and modified/unknown source status alongside the per-mode artifact fingerprint. To update a standalone folder without accumulating obsolete scripts, use `node scripts/install-local.mjs --target PATH_TO_STANDALONE_FOLDER` after building. It keeps the complete old `app/` as a sibling backup; do not copy over the old assets directory.
 
 The downloadable local release already supplied to the owner is `Department-Hub-Local.zip`. It contains a prebuilt `app/` directory and a root-level `serve.py`. After extraction, `python3 serve.py` opens a loopback server at `http://127.0.0.1:8769`. Keep the same origin and browser profile to reuse its stored data. The release ZIP is a build artifact. Its source is this repository.
 

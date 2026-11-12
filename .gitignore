@@ -2,7 +2,6 @@ node_modules/
 dist/
 dist-demo/
 public/ocr/
-public/fixtures/
 coverage/
 local-data/
 *.sqlite*

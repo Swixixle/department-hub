@@ -15,10 +15,11 @@ import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, v
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
 const draftKey = storageKey + '-draft';
-const BUILD = 14;
+const BUILD = 15;
 const fingerprint = document.querySelector('meta[name="department-hub-build"]')?.content || '';
-const BUILD_INFO = Object.freeze({ version:BUILD, fingerprint:/^[a-f0-9]{64}$/.test(fingerprint) ? fingerprint : null, mode:__BUILD_MODE__ });
-const BUILD_LABEL = 'Version ' + BUILD + ' · ' + (BUILD_INFO.fingerprint?.slice(0,12) || (__BUILD_MODE__ === 'development' ? 'development' : 'unidentified build'));
+const BUILD_INFO = Object.freeze({ version:BUILD, fingerprint:/^[a-f0-9]{64}$/.test(fingerprint) ? fingerprint : null, mode:__BUILD_MODE__, source:__SOURCE_REVISION__ });
+const SOURCE_LABEL = BUILD_INFO.source.commit ? BUILD_INFO.source.commit.slice(0,7) + (BUILD_INFO.source.dirty ? ' modified' : '') : 'source unknown';
+const BUILD_LABEL = 'Version ' + BUILD + ' · ' + SOURCE_LABEL + ' · ' + (BUILD_INFO.fingerprint?.slice(0,12) || (__BUILD_MODE__ === 'development' ? 'development' : 'unidentified build'));
 const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
@@ -970,6 +971,7 @@ function dialogMarkup() {
     return shell('Workspace data', '<p>This workspace is kept in this browser only, at <b>' + h(location.host) + '</b>. A different browser, or a different address, starts with sample names.</p>' +
       '<p><b>' + state.assignments.length + '</b> shifts · <b>' + state.people.length + '</b> contacts · ' + h(state.mode === 'sample' ? 'sample workspace' : 'published ' + timeLabel(state.importedAt)) + ' · ' + h(BUILD_LABEL) + '</p>' +
       '<p class="subtle">Build fingerprint: ' + h(BUILD_INFO.fingerprint || 'No release fingerprint') + ' · ' + h(BUILD_INFO.mode) + '. New receipts include this build identity.</p>' +
+      '<p class="subtle">Source commit: ' + h(BUILD_INFO.source.commit || 'Unknown: built without the source repository') + (BUILD_INFO.source.dirty ? ' · modified working copy' : '') + '.</p>' +
       '<h3>Backup</h3><p class="subtle">A backup file holds the schedule, the contacts with their phone numbers, requests, history and added documents. Photos, videos and recordings are not included. Keep the file somewhere private.</p>' +
       '<p>' + button('Save a backup file', 'backup', 'class="primary"') + '</p>' +
       '<label class="drop"><b>Restore from a backup file</b><span>Choose a file saved with the button above</span><input id="backup-file" type="file" accept="application/json,.json"></label>' +

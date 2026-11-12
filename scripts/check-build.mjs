@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { manifestFingerprint, normalizeBuildHtml } from './build-identity.mjs';
 
-for (const folder of process.argv.slice(2).length ? process.argv.slice(2) : ['dist', 'dist-demo']) {
+export function checkBuild(folder) {
   const manifest = JSON.parse(readFileSync(join(folder, 'build-info.json'), 'utf8'));
-  assert.equal(manifest.format, 'department-hub-build-v1');
+  assert.ok(['department-hub-build-v1','department-hub-build-v2'].includes(manifest.format));
+  if (manifest.format === 'department-hub-build-v2') {
+    assert.ok(manifest.source.commit === null || /^[a-f0-9]{40}$/.test(manifest.source.commit));
+    assert.ok([null,true,false].includes(manifest.source.dirty));
+  }
   assert.equal(manifestFingerprint(manifest), manifest.fingerprint, 'Build manifest fingerprint');
   const actual = readdirSync(folder, { recursive:true }).filter(name => name !== 'build-info.json' && statSync(join(folder, name)).isFile()).sort();
   assert.deepEqual(manifest.files.map(([name]) => name), actual, 'All release files must be covered');
@@ -18,5 +23,12 @@ for (const folder of process.argv.slice(2).length ? process.argv.slice(2) : ['di
     }
     assert.equal(createHash('sha256').update(bytes).digest('hex'), expected, 'Release file: ' + name);
   }
-  console.log('PASS: ' + folder + ' · ' + manifest.mode + ' · ' + manifest.fingerprint + ' · ' + actual.length + ' files');
+  return manifest;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  for (const folder of process.argv.slice(2).length ? process.argv.slice(2) : ['dist', 'dist-demo']) {
+    const manifest = checkBuild(folder);
+    console.log('PASS: ' + folder + ' · ' + manifest.mode + ' · ' + manifest.fingerprint + ' · ' + manifest.files.length + ' files');
+  }
 }

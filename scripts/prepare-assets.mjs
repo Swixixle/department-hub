@@ -1,5 +1,4 @@
-import { cp, mkdir, readdir } from 'node:fs/promises';
-import { spawnSync } from 'node:child_process';
+import { access, cp, mkdir, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const here = process.cwd();
@@ -18,5 +17,5 @@ for (const [path, name] of [
 ]) {
   await cp(path, 'public/ocr/' + name).catch(error => { if (error.code !== 'ENOENT') throw error; });
 }
-const fixtures = spawnSync('python3', ['scripts/make-fixtures.py'], { stdio: 'inherit' });
-if (fixtures.status !== 0) process.exit(fixtures.status || 1);
+// These fictional fixtures are versioned inputs. Redrawing them during a build changes bytes across font/Pillow versions.
+await access('public/fixtures/manifest.json');
