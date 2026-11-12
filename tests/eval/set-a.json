@@ -173,7 +173,8 @@
    "people": [
     "Blair",
     "Jamie"
-   ]
+   ],
+   "direction": "highest"
   }
  ],
  [
@@ -185,7 +186,8 @@
    "people": [
     "Blair",
     "Casey"
-   ]
+   ],
+   "direction": "highest"
   }
  ],
  [
@@ -197,7 +199,8 @@
    "people": [
     "Morgan",
     "Jordan"
-   ]
+   ],
+   "direction": "highest"
   }
  ],
  [
@@ -208,7 +211,8 @@
    "people": [
     "Emery",
     "Indigo"
-   ]
+   ],
+   "direction": "lowest"
   }
  ],
  [
@@ -219,7 +223,8 @@
    "people": [
     "Blair",
     "Casey"
-   ]
+   ],
+   "direction": "highest"
   }
  ],
  [
@@ -230,7 +235,8 @@
    "people": [
     "Blair",
     "Jamie"
-   ]
+   ],
+   "direction": "highest"
   }
  ],
  [
@@ -539,7 +545,8 @@
    "metric": "weekend-shifts",
    "people": [
     "Blair"
-   ]
+   ],
+   "direction": "highest"
   }
  ],
  [

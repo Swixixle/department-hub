@@ -427,7 +427,7 @@ function lookup(question, world) {
   // A comparison question is read into a plan (src/plan.js) and executed separately (src/measure.js), rather than
   // dispatched on whichever keyword happens to match. A follow-up edits the plan already answered instead of
   // starting again, which is what makes "same thing for nights" and "no, include Avery this time" work.
-  const repairedPlan = last?.plan ? repairPlan(last.plan, { text: tidy.text, said: question, names, when }) : null;
+  const repairedPlan = last?.plan ? repairPlan(last.plan, { text: tidy.text, said: question, names, when, actor }) : null;
   const plan = repairedPlan || readPlan({ text: tidy.text, names, people: others, when, actor, last });
   if (plan) kind = plan.op;
 
@@ -491,9 +491,13 @@ function lookup(question, world) {
     // look like an answer and be about something else.
     // A name asked to be left out that matches nobody on the schedule. Dropping it and answering anyway would be
     // answering a different question, so it asks instead.
-    if (plan.unresolved.length) return answer('I do not have anybody on the schedule called ' + joined(plan.unresolved.map(word => word[0].toUpperCase() + word.slice(1))) + '.', [],
-      'No count was made.', { empty:false, understood:spoken + ', leaving out ' + joined(plan.unresolved),
-        lines:['The people on this schedule are ' + joined(names) + '.', 'Say which of them to leave out and I will keep the rest of the question.'] });
+    if (plan.unresolved.length) {
+      const named = joined(plan.unresolved.map(word => word[0].toUpperCase() + word.slice(1)));
+      const role = plan.op === 'threshold' ? 'to compare against' : 'to leave out';
+      return answer('I do not have anybody on the schedule called ' + named + '.', [], 'No count was made.',
+        { empty:false, understood:spoken, lines:['The people on this schedule are ' + joined(names) + '.',
+          'Say which of them ' + role + ' and I will keep the rest of the question.'] });
+    }
     if (plan.unsupported.length) return answer('I can read that question but I cannot work out ' + joined(plan.unsupported) + '.', [],
       'No count was made.', { empty:false, understood:spoken,
         lines:['What I can count: ' + Object.values(METRICS).map(item => item.label).join(', ') + ' — per person, ranked or compared, for a shift, a role, a date range, with people left out.',
@@ -502,6 +506,7 @@ function lookup(question, world) {
     // Other people's numbers are the record keeper's, as they are everywhere else in the app. Reading the question
     // correctly is not permission to answer it.
     const aboutOthers = plan.op !== 'compare' || plan.people.some(name => !same(name, actor));
+    // A threshold names somebody and lists everybody past them, so it is about other people whatever it names.
     if (aboutOthers && !world.keeper) return answer('That is kept by whoever keeps the record', [], 'Fairness',
       { empty:false, understood:spoken,
         lines:['I understood the question. You can see your own figures; other people’s are shown only to the person who keeps the record.'] });
@@ -523,6 +528,18 @@ function lookup(question, world) {
       ? 'Leaving out ' + joined(plan.exclude) + ' leaves nobody to compare.'
       : 'Nothing on the schedule gives a figure for that.', [], source,
       { empty:false, understood:spoken, lines:[line(found.missing.length ? joined(found.missing) + ' has no shifts on record for ' + where + '.' : '', counted)] });
+
+    if (plan.op === 'threshold') {
+      const mark = found.mark;
+      if (!mark) return answer(plan.than + ' has no figure on record for ' + where + ', so there is nothing to measure against.', [], source,
+        { empty:false, understood:spoken, lines:[counted] });
+      const past = found.winners;
+      const title = past.length
+        ? joined(past.map(row => row.person)) + ' ' + (past.length === 1 ? 'has' : 'have') + ' ' +
+          (plan.direction === 'lowest' ? 'fewer' : 'more') + ' than ' + plan.than + ': ' + plan.than + ' has ' + tellValue(plan, mark.value) + '.'
+        : 'Nobody has ' + (plan.direction === 'lowest' ? 'fewer' : 'more') + ' than ' + plan.than + ', who has ' + tellValue(plan, mark.value) + '.';
+      return answer(title, [...past, mark].map(item), source, { empty:false, understood:spoken, lines:[counted] });
+    }
 
     if (plan.op === 'count') {
       return answer(found.winners.slice(0, 8).map(row => row.person + ' ' + tellValue(plan, row.value)).join(', ') + '.',

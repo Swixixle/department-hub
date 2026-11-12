@@ -15,7 +15,7 @@ import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, v
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
 const draftKey = storageKey + '-draft';
-const BUILD = 16;
+const BUILD = 17;
 const fingerprint = document.querySelector('meta[name="department-hub-build"]')?.content || '';
 const BUILD_INFO = Object.freeze({ version:BUILD, fingerprint:/^[a-f0-9]{64}$/.test(fingerprint) ? fingerprint : null, mode:__BUILD_MODE__, source:__SOURCE_REVISION__ });
 const SOURCE_LABEL = BUILD_INFO.source.commit ? BUILD_INFO.source.commit.slice(0,7) + (BUILD_INFO.source.dirty ? ' modified' : '') : 'source unknown';

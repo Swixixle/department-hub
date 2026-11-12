@@ -1,0 +1,20 @@
+[
+["who has more weekend day shifts than Casey",            {"op":"threshold","metric":"weekend-shifts","direction":"highest","shift":"D","than":"Casey"}],
+["who has fewer weekend day shifts than Blair",           {"op":"threshold","metric":"weekend-shifts","direction":"lowest","shift":"D","than":"Blair"}],
+["does anyone have more weekend nights than Jordan",      {"op":"threshold","metric":"weekend-shifts","direction":"highest","shift":"N","than":"Jordan"}],
+["who beats Casey on weekend day shifts",                 {"op":"threshold","metric":"weekend-shifts","direction":"highest","shift":"D","than":"Casey"}],
+["who works more weekends than me on day shift",          {"op":"threshold","metric":"weekend-shifts","direction":"highest","shift":"D","than":"Riley"}],
+["who has more shifts than Emery",                        {"op":"threshold","metric":"shifts","direction":"highest","than":"Emery"}],
+["who is above Casey on weekend day shifts",              {"op":"threshold","metric":"weekend-shifts","direction":"highest","shift":"D","than":"Casey"}],
+["anyone with fewer weekend day shifts than Jamie",       {"op":"threshold","metric":"weekend-shifts","direction":"lowest","shift":"D","than":"Jamie"}],
+["who has more weekend day shifts than Casey in december",{"op":"threshold","metric":"weekend-shifts","direction":"highest","shift":"D","than":"Casey","period":true}],
+["who has more weekend day shifts than Casey except Avery",{"op":"threshold","metric":"weekend-shifts","direction":"highest","shift":"D","than":"Casey","exclude":["Avery"]}],
+["who has more weekend day shifts than Zephyrine",        {"unresolved":true}],
+["who has more weekend day shifts than Casey on average", {"unsupported":true}],
+["who has more weekend day shifts, Blair or Casey",       {"op":"compare","metric":"weekend-shifts","direction":"highest","shift":"D","people":["Blair","Casey"]}],
+["who has fewer weekend day shifts, Blair or Casey",      {"op":"compare","metric":"weekend-shifts","direction":"lowest","shift":"D","people":["Blair","Casey"]}],
+["who has the most weekend day shifts",                   {"op":"rank","metric":"weekend-shifts","direction":"highest","shift":"D"}],
+["is there more than one person on friday",               {"notAPlan":true}],
+["do i work more than three days next week",              {"notAPlan":true}],
+["who is on more than one shift that day",                {"notAPlan":true}]
+]

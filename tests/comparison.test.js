@@ -232,8 +232,9 @@ test('a name it does not have is reported, not quietly ignored', () => {
   const found = ask('Who has the most weekends on day shift, other than Zephyrine?', world);
   assert.match(found.title, /I do not have anybody on the schedule called Zephyrine/);
   assert.equal(found.items.length, 0);
-  assert.match(found.understood, /leaving out zephyrine/);
+  assert.equal(found.understood, 'Highest weekend shifts on day shift');
   assert.match(found.lines.join(' '), /The people on this schedule are/);
+  assert.match(found.lines.join(' '), /to leave out/);
 });
 
 test('an empty group and a period with nothing in it are told apart', () => {
@@ -307,4 +308,78 @@ test('repairPlan refuses anything that is not a continuation', () => {
     'who is on friday and what time does it start and who else is with me on it'])
     assert.equal(repairPlan(plan, { text, said: text, names, when: null }), null, text);
   assert.ok(repairPlan(plan, { text: 'same thing for nights', said: 'same thing for nights', names, when: null }));
+});
+
+// "more than <person>" is in the build brief's list of things that must never be dropped. It was: the planner did
+// not claim the question, it fell through to an ordinary lookup, and "does anyone have more weekend day shifts
+// than Blair" came back as Blair's own shifts this weekend — a confident answer to a different question.
+test('a threshold question lists everybody past one person, and says what the mark was', () => {
+  const found = ask('Who has more weekend day shifts than Casey?', world);
+  assert.equal(found.kind, 'threshold');
+  assert.equal(found.understood, 'Everybody with more weekend shifts than Casey on day shift');
+  const figures = expected({ shift: 'D' });
+  const mark = figures.find(entry => entry.person === 'Casey').value;
+  const past = figures.filter(entry => entry.value > mark && entry.person !== 'Casey').map(entry => entry.person);
+  assert.ok(past.length > 1, 'the fixture must have more than one person past Casey');
+  for (const name of past) assert.match(found.title, new RegExp(name));
+  assert.match(found.title, new RegExp('Casey has ' + mark + ' weekend shift'));
+  // Nobody at or below the mark is named as being past it.
+  for (const entry of figures.filter(item => item.value <= mark && item.person !== 'Casey'))
+    assert.doesNotMatch(found.title, new RegExp(entry.person));
+});
+
+test('a threshold the other way round, and one nobody passes', () => {
+  const fewer = ask('Who has fewer weekend day shifts than Blair?', world);
+  assert.equal(fewer.understood, 'Everybody with fewer weekend shifts than Blair on day shift');
+  const figures = expected({ shift: 'D' });
+  const mark = figures.find(entry => entry.person === 'Blair').value;
+  for (const entry of figures.filter(item => item.value < mark)) assert.match(fewer.title, new RegExp(entry.person));
+  for (const entry of figures.filter(item => item.value > mark)) assert.doesNotMatch(fewer.title, new RegExp(entry.person));
+  const top = expected({ shift: 'D' })[0].person;
+  const none = ask('Who has more weekend day shifts than ' + top + '?', world);
+  assert.match(none.title, new RegExp('^Nobody has more than ' + top));
+});
+
+test('a threshold against the asker reads the pronoun as the asker', () => {
+  const found = ask('Who works more weekend day shifts than me?', { ...world, actor: 'Casey' });
+  assert.equal(found.kind, 'threshold');
+  assert.equal(found.understood, 'Everybody with more weekend shifts than Casey on day shift');
+});
+
+test('a threshold against a name the schedule does not have is reported, not dropped', () => {
+  const found = ask('Who has more weekend day shifts than Zephyrine?', world);
+  assert.match(found.title, /I do not have anybody on the schedule called Zephyrine/);
+  assert.equal(found.items.length, 0);
+  assert.match(found.lines.join(' '), /to compare against/);
+});
+
+test('a threshold still carries its filters and exclusions, and stays with the record keeper', () => {
+  const filtered = ask('Who has more weekend shifts than Jordan on night shift?', world);
+  assert.equal(filtered.understood, 'Everybody with more weekend shifts than Jordan on night shift');
+  assert.match(filtered.title, new RegExp(expected({ shift: 'N' })[0].person));
+  const withheld = ask('Who has more weekend day shifts than Casey?', { ...world, keeper: false });
+  assert.match(withheld.title, /kept by whoever keeps the record/);
+  assert.equal(withheld.items.length, 0);
+});
+
+test('a two-person comparison is not turned into a threshold', () => {
+  const found = ask('Who has more weekend day shifts, Blair or Casey?', world);
+  assert.equal(found.kind, 'compare');
+  assert.equal(found.context.plan.than, null);
+});
+
+// The compare direction was read as "highest" whatever the question said, so "who has fewer shifts, Emery or
+// Indigo" named the one with more. My evaluation labels did not check the direction field, so the scorer passed
+// it. Both are fixed: this asserts the direction, and the sets now label it.
+test('a comparison asking for fewer names the one with fewer', () => {
+  const figures = expected({ shift: 'D' });
+  const blair = figures.find(entry => entry.person === 'Blair').value;
+  const casey = figures.find(entry => entry.person === 'Casey').value;
+  assert.notEqual(blair, casey);
+  const fewer = ask('Who has fewer weekend day shifts, Blair or Casey?', world);
+  assert.equal(fewer.context.plan.direction, 'lowest');
+  assert.match(fewer.title, new RegExp('^' + (blair < casey ? 'Blair' : 'Casey') + ' has fewer'));
+  const more = ask('Who has more weekend day shifts, Blair or Casey?', world);
+  assert.equal(more.context.plan.direction, 'highest');
+  assert.match(more.title, new RegExp('^' + (blair > casey ? 'Blair' : 'Casey') + ' has more'));
 });
