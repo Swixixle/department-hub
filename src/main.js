@@ -15,7 +15,8 @@ import { readPdf } from './pdftext.js';
 import { emptyLibrary, prepareLibrary, addRevision, checkExtraction, supplyText, markFigure, activate, withdraw, toggleMark, revisionOf, searchLibrary } from './protocols.js';
 import { addMapping, reviewBundle, markMappingsReviewed } from './bundles.js';
 import { protocolTopics } from './pathways.js';
-import { libraryView, familyView, addDialog, landingRevision, referencesView, knowledgeView, pictureOf } from './protocol-view.js';
+import { libraryView, familyView, addDialog, landingRevision, referencesView, knowledgeView, pictureOf, guidelineView } from './protocol-view.js';
+import { addGuideline, matchCopy, compareCard, withdrawGuideline } from './guidelines.js';
 import { addSet, withdrawSet } from './facts.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
@@ -159,7 +160,7 @@ const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Boar
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
   import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
   over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog',
-  'text-screen-blocked':'Text screen stops (including repeats and false alarms)', 'my-links':'Opened your links', 'my-link-remove':'Removed one of their links', 'form:my-link':'Added one of their links' };
+  'text-screen-blocked':'Text screen stops (including repeats and false alarms)', 'my-links':'Opened your links', 'guideline-open':'Opened a restated guideline', 'guideline-compare':'Compared a guideline card with their copy', 'my-link-remove':'Removed one of their links', 'form:my-link':'Added one of their links' };
 // When the board was last opened on this device, so Ask can say what is new since then.
 const seenKey = storageKey + '-seen';
 // Links a person keeps for themselves (their own study rooms, say). Kept in this browser only: not in the workspace,
@@ -591,11 +592,12 @@ const loadReferences = () => import('./reference/respiratory-sources.json').then
 const shownRevision = () => ui.protocols.family ? revisionOf(state.protocols, ui.protocols.revision) || landingRevision(state.protocols, ui.protocols.family, localToday()) : null;
 function protocolsScreen() {
   const view = ui.protocols, today = localToday();
+  if (view.shelf?.startsWith('guideline:')) return guidelineView({ set:(state.protocols.guidelines || []).find(set => set.id === view.shelf.slice(10)), actor:state.actor, keeper:isKeeper(), withdrawing:view.withdrawing }, viewTools);
   if (view.shelf?.startsWith('knowledge:')) return knowledgeView({ set:(state.protocols.knowledge || []).find(set => set.id === view.shelf.slice(10)), keeper:isKeeper(), withdrawing:view.withdrawing }, viewTools);
   if (view.shelf === 'references' && referenceList) return referencesView({ list:referenceList, query:view.refQuery, section:view.refSection, retired:view.refRetired, today }, viewTools);
   if (!view.family) return libraryView({ library:state.protocols, today, documents:state.documents, query:view.query, results:view.query ? searchLibrary(state.protocols, view.query, today) : [], keeper:isKeeper(), demo:publicDemo,
     sampleNext:['1', '2'].find(label => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + label + '.pdf')) || null, references:referenceList,
-    cardSetOffered:!(state.protocols.knowledge || []).some(set => set.id === 'blood-gases-adult-witnessed' && !set.withdrawn) }, viewTools);
+    cardSetOffered:!(state.protocols.knowledge || []).some(set => set.id === 'blood-gases-adult-witnessed' && !set.withdrawn), guidelineOffered:!(state.protocols.guidelines || []).some(set => set.id === 'aarc-2024-sbt' && !set.withdrawn) }, viewTools);
   const revision = shownRevision();
   return familyView({ library:state.protocols, today, familyId:view.family, revisionId:revision?.id, pane:view.pane, cite:view.cite, keeper:isKeeper(), held:revision ? originals.get(revision.digest) : undefined,
     sampleMapping:Boolean(revision && SAMPLE_PROTOCOL.test(revision.file.name)), withdrawing:view.withdrawing, fromAsk:view.fromAsk && Boolean(ui.lastAsk),
@@ -1056,6 +1058,8 @@ function dialogMarkup() {
         (result.next?.length ? '<div class="chip-list"><span class="subtle">Next</span><div>' + result.next.map((text, index) => button(h(text), 'ask-next', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' : '') +
         (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' :
           // A protocol answer is not open to a vote. Nothing a reader presses here can change it.
+          result.kind === 'guideline' ? '<p class="subtle">A guideline card is the guideline restated in fixed wording, its numbers checked against an exact copy. Read the recommendation itself in your own copy before acting on it.</p><div class="actions wrap">' +
+            button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + '</div>' :
           result.kind === 'fact' ? '<p class="subtle">A reference card answers only in its source’s words, and only lines found on the page’s screenshots. “Yes”, repeated questions and search cannot change one. If it looks wrong, open the page and tell a record keeper.</p><div class="actions wrap">' +
             button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + '</div>' :
           result.kind === 'protocol' ? '<p class="subtle">A protocol answer comes only from a reviewed mapping. “Yes”, repeated questions and search cannot change it. If it looks wrong, open the original and tell a record keeper.</p><div class="actions wrap">' +
@@ -1300,12 +1304,20 @@ app.addEventListener('change', event => {
   }
   if (event.target.id === 'photos') void importFiles([...event.target.files]).catch(fail);
   if (event.target.id === 'backup-file' && event.target.files[0]) void readBackup(event.target.files[0]).catch(fail);
+  if (event.target.id === 'guideline-copy' && event.target.files[0]) void readGuidelineCopy(event.target.files[0]).catch(fail);
   // The collection and the retired box take effect at once, with whatever is typed in the search box.
   if (event.target.id === 'reference-section' || event.target.id === 'reference-retired') { const form = event.target.closest('form'), data = Object.fromEntries(new FormData(form));
     ui.protocols = { ...ui.protocols, refQuery:(data.q || '').trim().slice(0, 120), refSection:data.section || '', refRetired:Boolean(data.retired) }; render(); }
   if (event.target.id === 'protocol-mapping-file' && event.target.files[0]) void addMappingFile(event.target.files[0]).then(render).catch(fail);
   if (event.target.id === 'protocol-original-file' && event.target.files[0]) void restoreOriginal(event.target.files[0]).then(render).catch(fail);
 });
+// A member's own Blinders capture of a guideline. Read here, searched for each card's passage, and not kept.
+async function readGuidelineCopy(file) {
+  if (file.size > 4 * 1024 * 1024) throw new Error('That file is too large to be a capture of one guideline.');
+  const text = await file.text(), result = await matchCopy(state.protocols, ui.protocols.shelf.slice(10), text, state.actor, new Date().toISOString());
+  await protocolStep(result, result.ok ? 'Found ' + result.found.length + ' of ' + (result.found.length + result.missing.length) + ' cards’ passages in your copy, every number the same. Your copy was not kept. Read each one in your copy, then record it below.' : '');
+  render();
+}
 // A backup file made by this app, or a bare workspace. Nothing is replaced until the person confirms.
 async function readBackup(file) {
   if (file.size > 30 * 1024 * 1024) throw new Error('That file is too large to be a Department Hub backup.');
@@ -1422,6 +1434,7 @@ async function act({action, value, kind}) {
       if (ui.dialog?.type === 'ask' && ui.lastAsk) ui.lastAsk = { ...ui.lastAsk, opened:value };      // the one they chose to read is the one a yes is about
       if (kind === 'doc') { ui.dialog = { type:'doc', id:first, at:Number(second) }; ui.scrollTo = '#doc-mark'; break; }
       if (kind === 'note') { ui.dialog = { type:'note', id:first }; break; }
+      if (kind === 'guideline') { ui.dialog = null; ui.tab = 'protocols'; ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'guideline:' + first, withdrawing:false, fromAsk:false }; ui.scrollTo = '.content'; break; }
       if (kind === 'knowledge') { ui.dialog = null; ui.tab = 'protocols'; ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'knowledge:' + first, withdrawing:false, fromAsk:false }; ui.scrollTo = '.content'; break; }
       if (kind === 'refs') { ui.dialog = null; ui.tab = 'protocols'; ui.protocols = { ...ui.protocols, shelf:'references', refQuery:decodeURIComponent(first || ''), refSection:'', refRetired:second === 'retired', fromAsk:false }; ui.scrollTo = '.content'; break; }
       // The exact revision cited, at the cited place, even when a later revision has since replaced it.
@@ -1442,6 +1455,16 @@ async function act({action, value, kind}) {
     }
     case 'protocol-home': ui.protocols = { ...ui.protocols, family:null, revision:null, cite:null, withdrawing:false, fromAsk:false, shelf:null }; break;
     case 'knowledge-open': ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'knowledge:' + value, withdrawing:false }; ui.scrollTo = '.content'; break;
+    case 'guideline-open': ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'guideline:' + value, withdrawing:false }; ui.scrollTo = '.content'; break;
+    case 'guideline-add': {
+      keeperOnly();
+      const set = (await import('./reference/guidelines/aarc-2024-sbt.json')).default;
+      await protocolStep(addGuideline(state.protocols, set, state.actor, new Date().toISOString()), 'Guideline cards added. Each of you can check them against your own copy of the guideline.');
+      ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'guideline:' + set.id, withdrawing:false };
+      break;
+    }
+    // Anyone may compare a card with their own copy; it is a check of wording, recorded under their name.
+    case 'guideline-compare': await protocolStep(compareCard(state.protocols, ui.protocols.shelf.slice(10), value, state.actor, new Date().toISOString()), 'Recorded: the card says what the passage in your copy says.'); break;
     case 'knowledge-add': {
       keeperOnly();
       const [set, text, licence] = (await Promise.all([import('./reference/cards-blood-gases.json'), import('./reference/sources/blinders-cef48181-5ed3-4ff5-b07d-382304cdcf95.txt?raw'),
@@ -1631,7 +1654,7 @@ async function act({action, value, kind}) {
       try { await navigator.clipboard.writeText(state.events.at(-1)?.hash || ''); ui.flash = 'Copied. Keep it somewhere outside this app.'; }
       catch { ui.flash = 'Copying was not allowed here. Press and hold the fingerprint to copy it.'; }
       break;
-    case 'ask-no': if (['protocol', 'fact'].includes(currentAsk()?.kind)) return; ui.lastAsk = ui.dialog = { ...ui.dialog, no:true }; break;
+    case 'ask-no': if (['protocol', 'fact', 'guideline'].includes(currentAsk()?.kind)) return; ui.lastAsk = ui.dialog = { ...ui.dialog, no:true }; break;
     case 'ask-wrong': {
       const q = (ui.dialog?.q || '').trim(), result = q ? currentAsk() : null;
       if (!result || result.kind === 'blocked') return;
@@ -1688,7 +1711,7 @@ async function act({action, value, kind}) {
       const { q } = ui.dialog, result = currentAsk(), opened = ui.dialog.opened;
       const top = result.items.some(item => item.go === opened) ? opened : '';
       if (!result || ui.dialog.yes) return;
-      if (result.kind === 'blocked' || result.kind === 'protocol' || result.kind === 'fact') return;
+      if (result.kind === 'blocked' || result.kind === 'protocol' || result.kind === 'fact' || result.kind === 'guideline') return;
       const terms = keywords(result.read || q), documentId = top.startsWith('doc|') ? top.split('|')[1] : '', sourceHash = sourceVersions[documentId];
       const same = link => link.go === top && link.terms.join(' ') === terms.join(' ') && link.sourceHash === sourceHash, asked = q.trim();
       // Two ways it learns from a yes: a confirmed passage comes first next time, and a taught answer picks up this wording.
@@ -2193,6 +2216,13 @@ async function submit(form) {
       break;
     }
     case 'protocol-search': ui.protocols = { ...ui.protocols, query:(data.q || '').trim().slice(0, 120) }; break;
+    case 'guideline-withdraw': {
+      keeperOnly();
+      if (!patientCheck(form, data.reason || '')) return;
+      await protocolStep(withdrawGuideline(state.protocols, ui.protocols.shelf.slice(10), data.reason, state.actor, new Date().toISOString()), 'Guideline cards withdrawn. They no longer answer.');
+      ui.protocols = { ...ui.protocols, withdrawing:false };
+      break;
+    }
     case 'knowledge-withdraw': {
       keeperOnly();
       if (!patientCheck(form, data.reason || '')) return;

@@ -1,0 +1,8 @@
+{ "id": "invented-bellows", "title": "Blue Trainer bellows readiness (invented)", "applies": "Synthetic test material — NOT FOR CLINICAL USE.",
+  "source": { "title": "Practice Guideline: Blue Trainer Bellows Readiness (invented)", "issuer": "Lakeside Respiratory Society (fictional)", "year": 2026, "url": "https://example.org/invented-bellows", "rights": "Invented for tests." },
+  "cards": [
+   { "id": "r1", "kind": "recommendation", "title": "Bellows check before a drill", "where": "Recommendation 1", "passage": [8, 8], "fields": { "number": "1", "strength": "conditional, low certainty", "about": "a bellows check is not needed before every drill" }, "said": ["bellows check", "check the bellows"] },
+   { "id": "r2", "kind": "recommendation", "title": "Cuff during a drill", "where": "Recommendation 2", "passage": [14, 14], "fields": { "number": "2", "strength": "conditional, moderate certainty", "about": "a drill can run with or without a cuff of 3 cm or less" }, "said": ["cuff during drill", "drill cuff"] },
+   { "id": "v-start", "kind": "value", "title": "Gauge reading to start a drill", "where": "Question 2, background", "passage": [12, 12], "fields": { "what": "Gauge reading commonly used to start a drill", "value": "12 to 14 marks", "when": "as the guideline describes common practice" }, "said": ["start a drill", "gauge to start"] },
+   { "id": "v-stop", "kind": "value", "title": "Gauge reading to stop a drill", "where": "Question 2, background", "passage": [12, 12], "fields": { "what": "A drill is commonly stopped if the gauge falls below", "value": "6 marks" }, "said": ["stop a drill", "when to stop the drill"] }
+  ] }
