@@ -6,7 +6,7 @@ Updated 2026-11-11 from the owner's clarified direction. This is a plan. The cur
 
 The owner will introduce the app to willing coworkers in his own department, ask for patience and feedback, and improve it around their actual use. He intends to fund a server in a few weeks. The next milestone is useful adoption in that department.
 
-There is one private workspace for the department and one personal account per member, with their own email and credentials. This interprets the owner's statements together; it is not one shared identity or password. Only approved members can enter. Another job, cross-department membership, global profiles and a workspace switcher are outside the pilot's scope.
+There is one private workspace for the department and one personal identity per member, enrolled by invitation. The owner explicitly requires no email address or Department Hub password for sign-in. Only approved members can enter. Another job, cross-department membership, global profiles and a workspace switcher are outside the pilot's scope.
 
 The daily experience is one place for the schedule, department updates, due dates, meetings, messages and request conversations. Keep one department feed and stable navigation. Avoid a collection of channels and group-selection screens. Private conversations stay inside the same department.
 
@@ -24,13 +24,13 @@ Write the synthetic permission contract before account screens or synchronizatio
 
 ### Membership and accounts
 
-Enrollment and sign-in are separate. The existing direction combines a personal invite link with each member's own email/password account; the earlier description explicitly included email and a password. "Invite link" does not by itself select email-free device enrollment. The permission contract accepts authenticated fixture sessions without choosing an authentication provider or building credential storage. A change to device-only sign-in is a separate product decision.
+The owner has now explicitly ruled out email/password sign-in. The earlier email/password plan was an inference and is superseded. Invitations identify the intended member and department using stable internal IDs, not an email address. They are single-use and expire. A member keeps the same identity for agreements, personal records and recovery; there is no shared department login or shared PIN.
 
-The recommended enrollment flow is an administrator's single-use, expiring invitation bound to an intended email and department, verified email, then the member's own password and session. An invitation enrolls someone; it is not a reusable permanent login link. Use a maintained authentication implementation rather than custom password cryptography.
+The proposed implementation is a passkey, unlocked through the phone's existing Face ID, Touch ID or device PIN/passcode. Biometrics stay with the operating system; Department Hub receives a signed response, not face images, fingerprint data or the device PIN. A separate app-specific PIN scheme has not been selected or built. `docs/SIGN-IN.md` describes this passwordless design and its remaining checks. Use a maintained WebAuthn implementation that supports enrollment without collecting an email address; no provider or account backend is built yet.
 
-Prepare sign-in, sign-out, password recovery, invitation revocation and member removal. Removing membership must terminate server access and sessions; it cannot recall copies already downloaded. Establish a second administrator and a recovery route before wider use. Separate membership administration from the custodian's access to restricted named fairness records.
+Prepare sign-in, sign-out, invitation revocation, lost-credential recovery and member removal. Existing synced passkeys may work on a new device; do not assume one passkey means one physical phone. If no usable credential remains, an administrator confirms the person and issues a fresh enrollment invitation for the same identity. Recovery must not restore revoked membership or old privileges. Removing membership must terminate server access and sessions; it cannot recall copies already downloaded. Establish a second administrator and a recovery route before wider use. Separate membership administration from the custodian's access to restricted named fairness records.
 
-Members enter their own optional phone numbers. Do not upload the whole imported telephone directory on their behalf. Emails support sign-in and recovery; directory visibility must be explicit. Authenticated membership replaces Viewing as in shared mode. That selector stays only in the local simulation and fictional demo.
+Members enter their own optional phone numbers. Do not upload the whole imported telephone directory on their behalf. Phone sharing defaults off, and each person controls it. A withheld number remains visible to its owner for editing, and is excluded from coworkers' directory, search, Ask and directory exports; membership administrators and fairness custodians have no exception. Withdrawing sharing takes effect on subsequent requests, including already-used lookup routes. Phone numbers are not required for sign-in or recovery. Authenticated membership replaces Viewing as in shared mode. That selector stays only in the local simulation and fictional demo.
 
 ### Shared records and department boundaries
 
@@ -85,7 +85,7 @@ Prepare backups and tested restore of structured data and attachment bytes, rete
 | Stage | Prepare | Evidence before enabling |
 | --- | --- | --- |
 | Permission contract first | Synthetic departments, principals, role and resource boundaries, HTTP tests before account screens or sync | Real backend passes `npm run test:shared`, including allowed controls, cross-department denials, private threads/files, custodian restrictions and immediate revocation; no backend means blocked, not passed |
-| Accounts and sessions | Invitations, email/password/session recovery and chosen authentication integration | Rerun the same access gate with sessions from the actual sign-in implementation; distinct identities, invitation/recovery and revocation checks also pass |
+| Passwordless enrollment and sessions | Member-bound invitations, passkeys, device unlock, recovery and chosen WebAuthn integration | No email/password required; real-device enrollment/unlock, single-use invites and recovery work; rerun the same access gate with real sign-in sessions |
 | Shared consumption | Versioned roster, feed, dated/pinned posts, personal unread state and directory self-entry | Another signed-in phone receives a post and schedule correction; failure and stale states are accurate |
 | Conversations and exchanges | Private messages, request threads, immutable proposals and atomic agreement | Only participants can read messages; distinct accounts accept; competing trades cannot double-commit |
 | Reliable pilot | Notifications, reporting/removal, reviewed corrections, backups and checkpoints | Actual-phone checks, successful restore including media, failure tests and a short member-facing privacy explanation |

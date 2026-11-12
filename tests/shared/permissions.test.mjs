@@ -1,7 +1,7 @@
 // This is a real HTTP backend contract, intentionally outside the current local-app test glob.
 import { before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { allowed, client, denied, loadFixture, noPrivateSources } from './support.mjs';
+import { allowed, client, denied, hasPhone, loadFixture, noPrivateSources, phoneHidden } from './support.mjs';
 
 const f=loadFixture(process.env.DEPARTMENT_HUB_TEST_FIXTURE), request=client(f), s=f.sessions, r=f.records;
 const a=s.member.departmentId,b=s.foreign.departmentId;
@@ -9,6 +9,26 @@ const route=(dept,kind,id='')=>'/api/departments/'+encodeURIComponent(dept)+'/'+
 const foreignNeedles=[r.foreignPost.marker,r.foreignDocument.marker,r.foreignFile.marker];
 const foreignSources=[{kind:'post',id:r.foreignPost.id},{kind:'document',id:r.foreignDocument.id},{kind:'file',id:r.foreignFile.id}];
 const restricted=[{kind:'conversation',id:r.conversation.id},{kind:'file',id:r.privateFile.id},{kind:'fairness',id:s.partner.personId}];
+const contacts=f.contacts;
+const numberQuestion=contact=>({question:'What is '+contact.name+"'s number?"});
+const json=result=>JSON.parse(result.text);
+async function profile(session) {
+  const result=await request(session,route(a,'profile')); allowed(result);
+  assert.equal(json(result).personId,session.personId); return result;
+}
+async function withheld(viewer,contact) {
+  if(viewer.personId===contact.personId) return; // A person may retrieve their own private number.
+  const directory=await request(viewer,route(a,'directory')); allowed(directory); phoneHidden(directory,contact.phone);
+  assert.ok(Array.isArray(json(directory)),'The public directory is a contact list');
+  for(const record of json(directory).filter(person=>person.personId===contact.personId))
+    assert.ok(record.phone==null,'Withheld phone fields must be absent/null, including partial numbers');
+  const direct=await request(viewer,route(a,'directory',contact.personId));
+  assert.ok([200,403,404].includes(direct.status)); phoneHidden(direct,contact.phone);
+  if(direct.status===200) assert.ok(json(direct).phone==null);
+  const search=await request(viewer,route(a,'search')+'?q='+encodeURIComponent(contact.name)); allowed(search); phoneHidden(search,contact.phone);
+  const answer=await request(viewer,route(a,'ask'),{method:'POST',body:numberQuestion(contact)}); allowed(answer); phoneHidden(answer,contact.phone);
+  const exported=await request(viewer,route(a,'exports/directory')); allowed(exported); phoneHidden(exported,contact.phone);
+}
 
 describe('shared permission launch gate: real backend, synthetic records', {concurrency:false}, () => {
   before(async()=>{
@@ -47,6 +67,16 @@ describe('shared permission launch gate: real backend, synthetic records', {conc
     allowed(await request(s.member,route(a,'posts',post.id),{method:'PATCH',body:{body:body+' edited'}}),body+' edited');
     const removed=await request(s.member,route(a,'posts',post.id),{method:'DELETE'}); assert.ok([200,204].includes(removed.status));
     assert.equal((await request(s.member,route(a,'posts',post.id))).status,404);
+    for(const [session,contact,sharing] of [[s.member,contacts.shared,true],[s.partner,contacts.private,false],[s.outsider,contacts.defaultPrivate,false]]) {
+      const own=await profile(session); assert.ok(hasPhone(own,contact.phone)); assert.equal(json(own).sharePhone,sharing);
+    }
+    const omitted=await profile(s.keeper); assert.ok(json(omitted).phone==null); assert.equal(json(omitted).sharePhone,false);
+    // Public-number controls prevent an implementation that hides every number from passing.
+    const directory=await request(s.outsider,route(a,'directory')); allowed(directory); assert.ok(hasPhone(directory,contacts.shared.phone));
+    const direct=await request(s.outsider,route(a,'directory',contacts.shared.personId)); allowed(direct); assert.ok(hasPhone(direct,contacts.shared.phone));
+    const search=await request(s.outsider,route(a,'search')+'?q='+encodeURIComponent(contacts.shared.name)); allowed(search); assert.ok(hasPhone(search,contacts.shared.phone));
+    const answer=await request(s.outsider,route(a,'ask'),{method:'POST',body:numberQuestion(contacts.shared)}); allowed(answer); assert.ok(hasPhone(answer,contacts.shared.phone));
+    const contactExport=await request(s.outsider,route(a,'exports/directory')); allowed(contactExport); assert.ok(hasPhone(contactExport,contacts.shared.phone));
   });
 
   test('missing or invalid authentication cannot read a known record',async()=>{
@@ -144,6 +174,40 @@ describe('shared permission launch gate: real backend, synthetic records', {conc
     }
     denied(await request(s.member,route(b,'search')+'?q=fixture-signal'),foreignNeedles);
     denied(await request(s.member,route(b,'ask'),{method:'POST',body:{question:'What is new on the board?'}}),foreignNeedles);
+  });
+
+  test('optional phone numbers stay private by default across directory, search, Ask and exports',async()=>{
+    const added=await request(s.keeper,route(a,'profile'),{method:'PATCH',body:{phone:contacts.newPrivate.phone}});
+    allowed(added); assert.ok(hasPhone(added,contacts.newPrivate.phone)); assert.equal(json(added).sharePhone,false);
+    for(const viewer of [s.member,s.partner,s.outsider,s.keeper,s.admin])
+      for(const contact of [contacts.private,contacts.defaultPrivate,contacts.newPrivate]) await withheld(viewer,contact);
+    for(const viewer of [s.member,s.keeper,s.admin]) {
+      const targeted=await request(viewer,route(a,'profile')+'?personId='+encodeURIComponent(s.partner.personId));
+      allowed(targeted); assert.equal(json(targeted).personId,viewer.personId); phoneHidden(targeted,contacts.private.phone);
+    }
+    const forged=await request(s.member,route(a,'profile'),{method:'PATCH',body:{personId:s.partner.personId,sharePhone:true}});
+    if(forged.status===200) assert.equal(json(forged).personId,s.member.personId);
+    else assert.ok([400,403].includes(forged.status));
+    phoneHidden(forged,contacts.private.phone);
+    const own=await profile(s.partner); assert.equal(json(own).sharePhone,false); assert.ok(hasPhone(own,contacts.private.phone));
+    const fairnessExport=await request(s.keeper,route(a,'exports/fairness')); allowed(fairnessExport);
+    phoneHidden(fairnessExport,contacts.private.phone); phoneHidden(fairnessExport,contacts.defaultPrivate.phone);
+  });
+
+  test('withdrawing phone sharing removes it immediately from already-used lookup routes',async()=>{
+    const path=route(a,'profile'), contact=contacts.private;
+    const shared=await request(s.partner,path,{method:'PATCH',body:{sharePhone:true}}); allowed(shared); assert.equal(json(shared).sharePhone,true);
+    // Warm each route with the same coworker session before withdrawing consent.
+    for(const result of [
+      await request(s.outsider,route(a,'directory')),
+      await request(s.outsider,route(a,'directory',contact.personId)),
+      await request(s.outsider,route(a,'search')+'?q='+encodeURIComponent(contact.name)),
+      await request(s.outsider,route(a,'ask'),{method:'POST',body:numberQuestion(contact)}),
+      await request(s.outsider,route(a,'exports/directory'))
+    ]) { allowed(result); assert.ok(hasPhone(result,contact.phone)); }
+    const withdrawn=await request(s.partner,path,{method:'PATCH',body:{sharePhone:false}}); allowed(withdrawn); assert.equal(json(withdrawn).sharePhone,false);
+    for(const viewer of [s.member,s.outsider,s.keeper,s.admin]) await withheld(viewer,contact);
+    assert.ok(hasPhone(await profile(s.partner),contact.phone),'Withholding sharing does not erase the owner’s number');
   });
 
   test('removing the custodian role takes effect for an existing session',async()=>{

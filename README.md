@@ -68,6 +68,8 @@ For simulated interface checks, run `npm run build`, install `jsdom@26.1.0` into
 
 Shared deployment has a separate access-boundary gate: `npm run test:shared`, described in `docs/SHARED-CONTRACT.md`. It requires a real isolated backend and fresh authenticated synthetic fixtures. With no backend configured it exits nonzero as blocked; the local test suite passing does not establish shared permissions. Cross-department denial, private conversations/files, restricted fairness and immediate revocation are required before shared rollout, alongside successful access controls.
 
+Shared sign-in must not require an email address or Department Hub password. `docs/SIGN-IN.md` proposes personal invitations and passkeys unlocked with the device's existing Face ID/fingerprint/PIN. This is not implemented yet. Contact numbers remain optional and sharing defaults off; the backend contract tests both explicitly withheld numbers and immediate withdrawal across directory, search, Ask and exports.
+
 An exported receipt history can be checked independently with `node scripts/verify-receipts.mjs EXPORT.json FULL_CHECKPOINT_HASH`. The optional checkpoint must come from a separately retained trusted copy. Without one, the check establishes internal consistency only. It does not authenticate a person, establish a trusted time or prove factual correctness.
 
 The normal build creates `dist/`. The public demo build creates `dist-demo/` and disables the private file input. The GitHub Actions workflow builds and deploys only `dist-demo/`. Set the repository's Pages source to GitHub Actions. Source and demo fixtures are synthetic. Keep employer screenshots and all private imports out of Git, issue attachments, and Pages.
