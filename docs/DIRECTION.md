@@ -336,6 +336,14 @@ New local receipts cover changes, agreements, saved corrections, rule changes an
 
 `docs/CONTENT-REPORTS.md` records the separate proposed learning-content report design, including retained content versions, a private review inbox and source-based dispositions. It is not an implemented feature. Compound-date Ask questions still perform one lookup with a partial-answer notice; the remaining broader Ask parsing gaps stay backlog work rather than prerequisites for the shared pilot.
 
+## Version 14: build identity and anonymous text-screen stops
+
+The footer and workspace-data screen now identify Version 14 and a generated build fingerprint. The common receipt writer adds the version, full fingerprint and build mode to every new receipt before hashing it. Existing entries are not rewritten or assigned guessed build identities, so earlier checkpoints remain valid. Build fingerprints cover the generated code, styles, HTML and public assets; the HTML fingerprint value is blanked in its own digest and the manifest is excluded from itself. A manifest and verifier make that normalization explicit. This is artifact identification, not publisher authentication. Development mode is labelled without a release fingerprint.
+
+The text screen still creates no named blocked-save receipt. A fixed anonymous counter now counts each stop, including Ask stops, repeat attempts and false alarms. It keeps no input text, person or per-stop timestamp, stays outside workspace backups and is disabled in the fictional public demo. The existing v3 notice key is retained.
+
+Validation: 121 app tests, two launcher tests, both builds and the production-bundle interface check pass. The build verifier checks all 44 files in each output against its manifest. Regression checks cover build identities on new receipts and exports, unchanged old checkpoints, counter increments without named receipts, footer/data identity and the existing Ask/correction/exchange flows. These are synthetic and simulated checks, not real-photo replay or physical-phone testing.
+
 ## Earlier open import issues
 
 - Matches that are blocked are hidden with no reason given.
