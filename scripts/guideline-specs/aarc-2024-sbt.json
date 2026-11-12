@@ -9,29 +9,170 @@
   "citation": "Roberts KJ, Goodfellow LT, Battey-Muse CM, et al. Respir Care. 2024;69(7):891-901",
   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11285503/",
   "doi": "10.4187/respcare.11735",
-  "rights": "Copyright © 2024 Daedalus Enterprises. Department Hub holds none of its text; read it in your own copy (AARC members have access)."
+  "rights": "Copyright © 2024 Daedalus Enterprises. Department Hub holds none of its text; read it in your own copy (AARC members have access).",
+  "current": {
+   "checkedOn": "2026-11-12",
+   "how": "PubMed, searched 2026-11-12 for AARC clinical practice guidelines on spontaneous breathing trials: this 2024 guideline is the only one, none newer.",
+   "recheckMonths": 12
+  }
  },
  "cards": [
-  { "id": "r1-rsbi", "kind": "recommendation", "title": "RSBI before a breathing trial", "where": "Recommendation 1 (PICO 1)", "passage": [76, 76],
-    "fields": { "number": "1", "strength": "conditional, moderate certainty", "about": "a rapid shallow breathing index is not needed to decide readiness for a breathing trial" },
-    "said": ["rsbi", "rapid shallow breathing index", "shallow breathing index"] },
-  { "id": "r2-psv", "kind": "recommendation", "title": "Pressure support or T-piece for a breathing trial", "where": "Recommendation 2 (PICO 2)", "passage": [114, 114],
-    "fields": { "number": "2", "strength": "conditional, moderate certainty", "about": "a breathing trial can be done with or without low-level pressure support of 8 cm H2O or less" },
-    "said": ["pressure support during sbt", "sbt on pressure support", "sbt with pressure support", "psv during sbt", "t piece", "sbt settings", "sbt on psv"] },
-  { "id": "r3-timing", "kind": "recommendation", "title": "When in the day to do a breathing trial", "where": "Recommendation 3 (PICO 3)", "passage": [146, 146],
-    "fields": { "number": "3", "strength": "conditional, very low certainty", "about": "a standard daily assessment of readiness, and the trial itself when appropriate, done before noon" },
-    "said": ["sbt before noon", "time of day sbt", "what time sbt", "when to do sbt", "sbt timing", "when should sbt"] },
-  { "id": "r4-fio2", "kind": "recommendation", "title": "FIO2 during a breathing trial", "where": "Recommendation 4 (PICO 4)", "passage": [179, 179],
-    "fields": { "number": "4", "strength": "conditional, very low certainty", "about": "FIO2 should not be raised during a breathing trial" },
-    "said": ["fio2 during sbt", "increase fio2 sbt", "raise fio2 sbt", "oxygen during sbt", "turn up fio2 sbt"] },
-  { "id": "v-oxygenation", "kind": "value", "title": "Oxygenation commonly required before a breathing trial", "where": "PICO 4, background", "passage": [166, 166],
-    "fields": { "what": "Oxygenation commonly required before a breathing trial", "value": "SpO2 > 90% on FIO2 0.40, or PaO2/FIO2 > 200 mm Hg", "when": "as the guideline describes common practice; it does not set this threshold" },
-    "said": ["oxygenation before sbt", "sbt oxygenation criteria", "spo2 before sbt", "oxygen criteria sbt", "ready for sbt oxygen"] },
-  { "id": "v-stop", "kind": "value", "title": "Oxygen saturation at which a breathing trial is commonly stopped", "where": "PICO 4, background", "passage": [166, 166],
-    "fields": { "what": "Commonly, a breathing trial is stopped and support resumed if", "value": "SpO2 falls < 90%", "when": "as the guideline describes common practice in the trials it reviewed" },
-    "said": ["stop sbt", "terminate sbt", "fail sbt", "sbt failure", "when to stop sbt", "end sbt"] },
-  { "id": "v-niv", "kind": "value", "title": "Breathing trial for a patient going to NIV after extubation", "where": "Recommendation 2, justification", "passage": [124, 124],
-    "fields": { "what": "Common post-extubation NIV settings, described by the guideline as anecdotal", "value": "PSV 5–8 cm H2O and PEEP 5 cm H2O", "when": "for these patients the guideline finds it reasonable to run the trial on those settings" },
-    "said": ["niv after extubation", "postextubation niv", "extubate to bipap", "bipap after extubation", "extubated to niv", "sbt before niv"] }
+  {
+   "id": "r1-rsbi",
+   "kind": "recommendation",
+   "title": "RSBI before a breathing trial",
+   "where": "Recommendation 1 (PICO 1)",
+   "passage": [
+    76,
+    76
+   ],
+   "fields": {
+    "number": "1",
+    "strength": "conditional, moderate certainty",
+    "about": "a rapid shallow breathing index is not needed to decide readiness for a breathing trial"
+   },
+   "said": [
+    "rsbi",
+    "rapid shallow breathing index",
+    "shallow breathing index"
+   ]
+  },
+  {
+   "id": "r2-psv",
+   "kind": "recommendation",
+   "title": "Pressure support or T-piece for a breathing trial",
+   "where": "Recommendation 2 (PICO 2)",
+   "passage": [
+    114,
+    114
+   ],
+   "fields": {
+    "number": "2",
+    "strength": "conditional, moderate certainty",
+    "about": "a breathing trial can be done with or without low-level pressure support of 8 cm H2O or less"
+   },
+   "said": [
+    "pressure support during sbt",
+    "sbt on pressure support",
+    "sbt with pressure support",
+    "psv during sbt",
+    "t piece",
+    "sbt settings",
+    "sbt on psv"
+   ]
+  },
+  {
+   "id": "r3-timing",
+   "kind": "recommendation",
+   "title": "When in the day to do a breathing trial",
+   "where": "Recommendation 3 (PICO 3)",
+   "passage": [
+    146,
+    146
+   ],
+   "fields": {
+    "number": "3",
+    "strength": "conditional, very low certainty",
+    "about": "a standard daily assessment of readiness, and the trial itself when appropriate, done before noon"
+   },
+   "said": [
+    "sbt before noon",
+    "time of day sbt",
+    "what time sbt",
+    "when to do sbt",
+    "sbt timing",
+    "when should sbt"
+   ]
+  },
+  {
+   "id": "r4-fio2",
+   "kind": "recommendation",
+   "title": "FIO2 during a breathing trial",
+   "where": "Recommendation 4 (PICO 4)",
+   "passage": [
+    179,
+    179
+   ],
+   "fields": {
+    "number": "4",
+    "strength": "conditional, very low certainty",
+    "about": "FIO2 should not be raised during a breathing trial"
+   },
+   "said": [
+    "fio2 during sbt",
+    "increase fio2 sbt",
+    "raise fio2 sbt",
+    "oxygen during sbt",
+    "turn up fio2 sbt"
+   ]
+  },
+  {
+   "id": "v-oxygenation",
+   "kind": "value",
+   "title": "Oxygenation commonly required before a breathing trial",
+   "where": "PICO 4, background",
+   "passage": [
+    166,
+    166
+   ],
+   "fields": {
+    "what": "Oxygenation commonly required before a breathing trial",
+    "value": "SpO2 > 90% on FIO2 0.40, or PaO2/FIO2 > 200 mm Hg",
+    "when": "as the guideline describes common practice; it does not set this threshold"
+   },
+   "said": [
+    "oxygenation before sbt",
+    "sbt oxygenation criteria",
+    "spo2 before sbt",
+    "oxygen criteria sbt",
+    "ready for sbt oxygen"
+   ]
+  },
+  {
+   "id": "v-stop",
+   "kind": "value",
+   "title": "Oxygen saturation at which a breathing trial is commonly stopped",
+   "where": "PICO 4, background",
+   "passage": [
+    166,
+    166
+   ],
+   "fields": {
+    "what": "Commonly, a breathing trial is stopped and support resumed if",
+    "value": "SpO2 falls < 90%",
+    "when": "as the guideline describes common practice in the trials it reviewed"
+   },
+   "said": [
+    "stop sbt",
+    "terminate sbt",
+    "fail sbt",
+    "sbt failure",
+    "when to stop sbt",
+    "end sbt"
+   ]
+  },
+  {
+   "id": "v-niv",
+   "kind": "value",
+   "title": "Breathing trial for a patient going to NIV after extubation",
+   "where": "Recommendation 2, justification",
+   "passage": [
+    124,
+    124
+   ],
+   "fields": {
+    "what": "Common post-extubation NIV settings, described by the guideline as anecdotal",
+    "value": "PSV 5–8 cm H2O and PEEP 5 cm H2O",
+    "when": "for these patients the guideline finds it reasonable to run the trial on those settings"
+   },
+   "said": [
+    "niv after extubation",
+    "postextubation niv",
+    "extubate to bipap",
+    "bipap after extubation",
+    "extubated to niv",
+    "sbt before niv"
+   ]
+  }
  ]
 }

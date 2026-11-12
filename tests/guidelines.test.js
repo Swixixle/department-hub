@@ -16,7 +16,7 @@ const RECEIPT = { tool: 'Blinders', id: '00000000-0000-4000-8000-000000000001', 
 const WHO = 'Avery', OTHER = 'Morgan', AT = '2026-11-12T20:00:00.000Z';
 const ok = result => { if (!result.ok) throw new Error('Refused: ' + (result.why || result.problems.join('; '))); return result; };
 const built = async () => ok(await buildSet(SPEC(), TEXT, RECEIPT)).set;
-const held = async () => ok(addGuideline(emptyLibrary(), await built(), WHO, AT)).library;
+const held = async () => ok(await addGuideline(emptyLibrary(), await built(), WHO, AT)).library;
 const say = (library, question) => ask(question, { ...department, today: '2026-11-12', last: null, protocols: library });
 const h = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const tools = { h, button: (label, action, options = '') => '<button data-action="' + action + '" ' + options + '>' + label + '</button>', valueAttr: value => 'data-value="' + h(value) + '"' };
@@ -96,7 +96,7 @@ test('the guideline screen offers a member their own check, and the compare butt
   assert.equal(guidelineView({ set: matched.guidelines[0], actor: WHO, keeper: true, withdrawing: false }, tools).includes('guideline-compare'), false);
 });
 
-test('the shipped AARC 2024 breathing-trial cards are well formed and hold no text of the guideline', () => {
+test('the shipped AARC 2024 breathing-trial cards are well formed and hold no text of the guideline', async () => {
   const set = JSON.parse(readFileSync(new URL('../src/reference/guidelines/aarc-2024-sbt.json', import.meta.url), 'utf8'));
   assert.equal(set.format, GUIDELINE_FORMAT);
   assert.equal(set.source.capture.sha256, '29f3a368baca4213ef7451e563a4aeaccb2eab7f47a4740e71482d951bd70fad');
@@ -107,7 +107,7 @@ test('the shipped AARC 2024 breathing-trial cards are well formed and hold no te
     assert.ok(Object.keys(card.fields).every(key => ['what', 'value', 'unit', 'when', 'number', 'strength', 'about'].includes(key)), card.id);
     assert.ok(Object.values(card.fields).every(value => String(value).length <= 140), card.id);
   }
-  const library = ok(addGuideline(emptyLibrary(), set, WHO, AT)).library;
+  const library = ok(await addGuideline(emptyLibrary(), set, WHO, AT)).library;
   const expected = { 'do I need an rsbi before an sbt': 'r1-rsbi', 'can I do the sbt on pressure support': 'r2-psv', 'what time sbt': 'r3-timing', 'should I turn up fio2 during sbt': 'r4-fio2',
     'what spo2 before sbt': 'v-oxygenation', 'when to stop sbt': 'v-stop', 'patient is being extubated to bipap': 'v-niv' };
   for (const [question, card] of Object.entries(expected)) assert.deepEqual(say(library, question).guideline?.cards, [card], question);

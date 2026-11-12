@@ -14,6 +14,7 @@ import { stem, nearest, CORE_WORDS } from './words.js';
 import { sha256 } from './audit.js';
 import { sealOf } from './protocols.js';
 import { tokensOf, isNumber } from './witness.js';
+import { setFingerprint, checksForGuideline } from './assurance.js';
 
 export const GUIDELINE_FORMAT = 'department-hub-guideline-cards-v1';
 export const RESTATED = 'Restated in Department Hub’s own fixed wording from the guideline named. It is not the guideline’s text, not your hospital’s protocol, and not an order for any patient.';
@@ -104,12 +105,12 @@ export async function findIn(card, text, tokens = tokensOf(text)) {
 const sealed = (set, card) => sealOf({ source: set.source, card: { id: card.id, kind: card.kind, fields: card.fields, passage: card.passage, said: card.said } });
 const compared = (set, card) => (card.compared || []).filter(entry => entry.seal === sealed(set, card));
 
-export function addGuideline(library, set, who, at) {
+export async function addGuideline(library, set, who, at) {
   if (set?.format !== GUIDELINE_FORMAT || !Array.isArray(set.cards) || !set.cards.length) return refuse('This is not a Department Hub guideline card file.');
   if (setsOf(library).some(other => other.id === set.id && !other.withdrawn)) return refuse('These guideline cards are already held.');
-  const taken = { ...set, cards: set.cards.map(({ compared, matched, ...card }) => card), added: { by: who, at }, withdrawn: null };
+  const fingerprint = await setFingerprint(set), taken = { ...set, cards: set.cards.map(({ compared, matched, ...card }) => card), fingerprint, added: { by: who, at }, withdrawn: null };
   return { ok: true, library: { ...library, guidelines: [...setsOf(library).filter(other => other.id !== set.id), taken] },
-    receipt: { type: 'Guideline cards added', details: { set: set.id, title: set.title, cards: set.cards.length, capture: set.source.capture.id, sha256: set.source.capture.sha256,
+    receipt: { type: 'Guideline cards added', details: { set: set.id, title: set.title, cards: set.cards.length, capture: set.source.capture.id, sha256: set.source.capture.sha256, fingerprint,
       note: 'Restated in fixed wording; every number was found in its passage of the owner’s capture. Not yet compared by anyone with their own copy.' } } };
 }
 
@@ -162,7 +163,7 @@ export function guidelineAnswer(question, world) {
     understood: 'a guideline card: ' + best.map(hit => hit.card.title.toLowerCase()).join('; '),
     lines: [...(best.length > 1 ? best.map(hit => sentenceOf(hit.card)) : []), RESTATED + (first.applies ? ' ' + first.applies : '')],
     items: [...best.map(({ set, card }) => { const by = comparedBy(set, card);
-      return { text: set.source.title + ' · ' + card.where, href: set.source.url, card: card.id,
+      return { text: set.source.title + ' · ' + card.where, href: set.source.url, card: card.id, checks: checksForGuideline(set, card, comparedBy, world.today),
         sub: [set.source.issuer + ', ' + set.source.year, 'every number checked against an exact capture of the guideline',
           by.length ? 'compared with the guideline by ' + by.join(' and ') : 'not yet compared with the guideline by a second person', 'read it in your own copy'].join(' · ') }; }),
       { text: 'See these cards, and check them against your own copy', sub: 'Every card from this guideline, and who has compared it', go: 'guideline|' + first.id }],

@@ -592,8 +592,8 @@ const loadReferences = () => import('./reference/respiratory-sources.json').then
 const shownRevision = () => ui.protocols.family ? revisionOf(state.protocols, ui.protocols.revision) || landingRevision(state.protocols, ui.protocols.family, localToday()) : null;
 function protocolsScreen() {
   const view = ui.protocols, today = localToday();
-  if (view.shelf?.startsWith('guideline:')) return guidelineView({ set:(state.protocols.guidelines || []).find(set => set.id === view.shelf.slice(10)), actor:state.actor, keeper:isKeeper(), withdrawing:view.withdrawing }, viewTools);
-  if (view.shelf?.startsWith('knowledge:')) return knowledgeView({ set:(state.protocols.knowledge || []).find(set => set.id === view.shelf.slice(10)), keeper:isKeeper(), withdrawing:view.withdrawing }, viewTools);
+  if (view.shelf?.startsWith('guideline:')) return guidelineView({ set:(state.protocols.guidelines || []).find(set => set.id === view.shelf.slice(10)), actor:state.actor, keeper:isKeeper(), withdrawing:view.withdrawing, today }, viewTools);
+  if (view.shelf?.startsWith('knowledge:')) return knowledgeView({ set:(state.protocols.knowledge || []).find(set => set.id === view.shelf.slice(10)), keeper:isKeeper(), withdrawing:view.withdrawing, today }, viewTools);
   if (view.shelf === 'references' && referenceList) return referencesView({ list:referenceList, query:view.refQuery, section:view.refSection, retired:view.refRetired, today }, viewTools);
   if (!view.family) return libraryView({ library:state.protocols, today, documents:state.documents, query:view.query, results:view.query ? searchLibrary(state.protocols, view.query, today) : [], keeper:isKeeper(), demo:publicDemo,
     sampleNext:['1', '2'].find(label => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + label + '.pdf')) || null, references:referenceList,
@@ -1048,6 +1048,7 @@ function dialogMarkup() {
     const result = q ? currentAsk() : null;
     const canRemember = result?.taught || (ui.dialog.opened?.startsWith('doc|') && result?.items.some(entry => entry.go === ui.dialog.opened));
     const item = entry => '<div class="ask-item' + (entry.branch && !entry.go ? ' branch' : '') + '"><div><b>' + h(entry.text) + '</b>' + (entry.sub ? '<small>' + h((entry.go?.startsWith('doc|') ? 'Legacy document, not a reviewed protocol · ' : '') + entry.sub) + '</small>' : '') +
+      (entry.checks ? '<ul class="checks">' + entry.checks.map(one => '<li class="' + (one.done ? 'done' : 'open') + '"><span aria-hidden="true">' + (one.done ? '✓' : '○') + '</span>' + h(one.label) + '</li>').join('') + '</ul>' : '') +
       (entry.quote ? entry.quote.map((text, index) => '<blockquote class="source-quote">' + h(text) + '</blockquote>' + (entry.pictures || []).filter(picture => picture.passage === index).map(picture => pictureOf(picture, shotUrl(picture.shot), h)).join('')).join('') : '') + '</div>' +
       (entry.href ? '<a class="secondary link-button" href="' + h(entry.href) + '" target="_blank" rel="noopener noreferrer">Open official source ↗</a>' : entry.go ? button('Open', 'ask-go', 'class="secondary" ' + valueAttr(entry.go)) : '') + '</div>';
     return shell('Ask', '<form data-form="ask"><label>Your question<input name="q" maxlength="200" autocomplete="off" enterkeyhint="search" placeholder="When do I work next?" value="' + h(q) + '"' + (result ? '' : ' autofocus') + '></label>' +
@@ -1459,7 +1460,7 @@ async function act({action, value, kind}) {
     case 'guideline-add': {
       keeperOnly();
       const set = (await import('./reference/guidelines/aarc-2024-sbt.json')).default;
-      await protocolStep(addGuideline(state.protocols, set, state.actor, new Date().toISOString()), 'Guideline cards added. Each of you can check them against your own copy of the guideline.');
+      await protocolStep(await addGuideline(state.protocols, set, state.actor, new Date().toISOString()), 'Guideline cards added. Each of you can check them against your own copy of the guideline.');
       ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'guideline:' + set.id, withdrawing:false };
       break;
     }

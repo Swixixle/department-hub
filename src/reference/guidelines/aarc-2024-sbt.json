@@ -11,6 +11,11 @@
   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11285503/",
   "doi": "10.4187/respcare.11735",
   "rights": "Copyright © 2024 Daedalus Enterprises. Department Hub holds none of its text; read it in your own copy (AARC members have access).",
+  "current": {
+   "checkedOn": "2026-11-12",
+   "how": "PubMed, searched 2026-11-12 for AARC clinical practice guidelines on spontaneous breathing trials: this 2024 guideline is the only one, none newer.",
+   "recheckMonths": 12
+  },
   "capture": {
    "tool": "Blinders",
    "id": "803dce3b-05ae-4a39-8a10-24b27f8d3921",

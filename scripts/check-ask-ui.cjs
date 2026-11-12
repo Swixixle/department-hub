@@ -43,7 +43,7 @@ const {JSDOM} = require('jsdom');
   localStorage.setItem(key+'-seen',JSON.stringify('2000-01-01T00:00:00Z'));
   const fetches=[];
   globalThis.fetch = async input => {const url=String(input); fetches.push(url); assert.ok(url.endsWith('/fixtures/manifest.json'), 'Unexpected request: '+url); return new Response(JSON.stringify(manifest));};
-  const entry = fs.readdirSync('dist/assets').find(name => /^index-.*\.js$/.test(name));
+  const entry = fs.readFileSync('dist/index.html', 'utf8').match(/assets\/(index-[A-Za-z0-9_-]+\.js)/)[1];
   await import(pathToFileURL(path.join(root,'dist/assets',entry)));
   const settle = () => new Promise(resolve=>setTimeout(resolve,70));
   const waitFor = async (ready,label) => {for(let i=0;i<150;i++) {if(ready()) {await settle(); return;} await new Promise(resolve=>setTimeout(resolve,20));} assert.fail('Timed out: '+label);};
