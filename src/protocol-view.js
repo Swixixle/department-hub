@@ -8,6 +8,7 @@ import { passageAt } from './pdftext.js';
 import { reviewHolds, validateBundle, wholeRule } from './bundles.js';
 import { cautionsFor, searchReferences } from './references.js';
 import { cardHolds, cite, passagesOf, NOT_A_PROTOCOL, WITNESS, CARD_FORMAT } from './facts.js';
+import { sentenceOf, comparedBy, RESTATED } from './guidelines.js';
 
 export const NOT_AUTHORITY = 'Recorded for the profile selected on this device. This prototype does not verify who that is, and a recorded review is not clinical sign-off.';
 export const HELD_HERE = 'This is the copy held on this device. Department Hub cannot tell whether whoever issued a protocol has published a newer one.';
@@ -19,7 +20,7 @@ export const chipFor = (library, revision, today) => { const where = standing(li
 // The revision a protocol's page opens on: the one in force, or failing that the newest held.
 export const landingRevision = (library, familyId, today) => applicable(library, familyId, today).revision || historyOf(library, familyId)[0] || null;
 
-export function libraryView({ library, today, documents, query, results, keeper, demo, sampleNext, references, cardSetOffered }, { h, button, valueAttr }) {
+export function libraryView({ library, today, documents, query, results, keeper, demo, sampleNext, references, cardSetOffered, guidelineOffered }, { h, button, valueAttr }) {
   const families = [...library.families].sort((a, b) => Number(library.marks.includes(b.id)) - Number(library.marks.includes(a.id)) || a.identifier.localeCompare(b.identifier));
   const card = family => {
     const now = applicable(library, family.id, today), shown = now.revision || historyOf(library, family.id)[0], marked = library.marks.includes(family.id);
@@ -44,6 +45,10 @@ export function libraryView({ library, today, documents, query, results, keeper,
     ((library.knowledge || []).filter(set => !set.withdrawn).length ? '<div class="line-list">' + library.knowledge.filter(set => !set.withdrawn).map(set => { const done = set.cards.filter(card => cardHolds(set, card)).length;
       return '<div><span><b>' + h(set.title) + '</b> <small>' + h(done + ' of ' + set.cards.length + ' cards answering · ' + set.source.publisher) + '</small></span><span class="pair">' + button('Open', 'knowledge-open', 'class="secondary" ' + valueAttr(set.id)) + '</span></div>'; }).join('') + '</div>' : '<p class="subtle">No reference cards are held.</p>') +
     (keeper && cardSetOffered ? '<p>' + button('Add the blood-gas reference cards', 'knowledge-add', 'class="secondary"') + ' <span class="subtle">Twelve cards on adult arterial blood gas values, from a Blinders capture of an openly licensed textbook page. Adding them reads the page’s screenshots on this device, which takes about a minute.</span></p>' : '') +
+    '<h2 class="group-head">Guidelines, restated</h2><p class="subtle">What a published guideline recommends, in Department Hub’s own fixed wording, for guidelines whose text may not be shown here. Every number on a card was checked against an exact capture of the guideline, which stays on its owner’s computer. Each of you can check the cards against your own copy.</p>' +
+    ((library.guidelines || []).filter(set => !set.withdrawn).length ? '<div class="line-list">' + library.guidelines.filter(set => !set.withdrawn).map(set => { const done = set.cards.filter(card => comparedBy(set, card).length).length;
+      return '<div><span><b>' + h(set.source.issuer + ' ' + set.source.year + ': ' + set.title) + '</b> <small>' + h(set.cards.length + ' cards · ' + done + ' compared with the guideline by a member') + '</small></span><span class="pair">' + button('Open', 'guideline-open', 'class="secondary" ' + valueAttr(set.id)) + '</span></div>'; }).join('') + '</div>' : '<p class="subtle">No guideline cards are held.</p>') +
+    (keeper && guidelineOffered ? '<p>' + button('Add the AARC 2024 breathing-trial cards', 'guideline-add', 'class="secondary"') + ' <span class="subtle">Seven cards on spontaneous breathing trials for adults: the guideline’s four recommendations and three values it describes.</span></p>' : '') +
     '<h2 class="group-head">Professional references</h2><p class="subtle">Published guidelines from AARC and others, and NBRC’s credentialing pages: titles and links to the official originals. Department Hub holds none of their text and answers nothing from them. They are not your hospital’s protocols.</p>' +
     (references ? '<p>' + button('Browse ' + references.records.length + ' professional references', 'reference-shelf', 'class="secondary"') + '</p>' : '<p class="subtle">The reference list is loading.</p>') +
     '<h2 class="group-head">Pasted documents</h2><p class="subtle">Added before protocols were kept as files, or pasted as plain text. Ask searches their words and quotes what it finds. They are not reviewed protocols and do not become one by being here.</p>' +
@@ -212,5 +217,28 @@ export function knowledgeView({ set, keeper, withdrawing }, { h, button, shotUrl
           passagesOf(set, card).map((text, index) => quote(text) + (card.witness?.pictures || []).filter(picture => picture.passage === index).map(picture => pictureOf(picture, shotUrl(picture.shot), h)).join('')).join('')
           : '<p class="subtle">In the source: ' + h(card.where) + '</p>') + '</article>'; }).join('') + '</div>' +
     (keeper && !set.withdrawn ? '<section class="panel protocol-step"><h3>Record</h3>' + (withdrawing ? '<form data-form="knowledge-withdraw"><label>Why are these cards being withdrawn? The reason is kept with the record.<input name="reason" maxlength="200" required autocomplete="off"></label>' +
+      '<div class="actions inline"><button class="danger">Withdraw these cards</button>' + button('Cancel', 'protocol-withdraw-cancel', 'class="secondary"') + '</div></form>' : '<p>' + button('Withdraw these cards…', 'protocol-withdraw', 'class="text-button"') + '</p>') + '</section>' : '');
+}
+
+// One restated guideline: each card's sentence, where it is in the guideline, who has found it in their own copy and
+// who has compared it with the guideline. Anyone can give the app their own copy; nobody is shown the guideline's text.
+export function guidelineView({ set, actor, keeper, withdrawing }, { h, button, valueAttr }) {
+  if (!set) return '<div class="panel empty"><h3>Those cards are no longer held</h3>' + button('All protocols', 'protocol-home', 'class="secondary"') + '</div>';
+  const capture = set.source.capture, mine = card => (card.matched || []).some(entry => entry.by === actor);
+  return '<p class="pair start">' + button('‹ All protocols', 'protocol-home', 'class="text-button"') + '</p><div class="intro"><div><div class="eyebrow">GUIDELINE, RESTATED</div><h1>' + h(set.title) + '</h1>' +
+    '<div class="standing-line"><span class="badge standing ' + (set.withdrawn ? 'withdrawn' : 'added') + '">' + (set.withdrawn ? 'Withdrawn' : set.cards.filter(card => comparedBy(set, card).length).length + ' of ' + set.cards.length + ' compared by a member') + '</span></div></div></div>' +
+    '<div class="notice reference-terms" role="note"><b>' + h(RESTATED) + '</b> ' + h(set.applies || '') + '</div>' +
+    (set.withdrawn ? '<div class="notice" role="status">Withdrawn by ' + h(set.withdrawn.by) + ': ' + h(set.withdrawn.reason) + '</div>' : '') +
+    '<section class="panel knowledge-source"><h3>The guideline</h3><p>' + h(set.source.title) + '. ' + h(set.source.citation || '') + '.</p><p class="subtle">' + h(set.source.rights) + '</p>' +
+      '<dl class="record"><dt>Built from</dt><dd>' + h(capture.tool) + ' capture ' + h(capture.id) + ', ' + h(String(capture.savedAt).slice(0, 10)) + '</dd><dt>SHA-256</dt><dd class="digest">' + h(capture.sha256) + '</dd></dl>' +
+      '<p><a class="secondary link-button" href="' + h(set.source.url) + '" target="_blank" rel="noopener noreferrer">Open the guideline ↗</a></p></section>' +
+    (set.withdrawn ? '' : '<section class="panel protocol-step"><h3>Check these cards against your own copy</h3><p class="subtle">Open the guideline, capture its article text with Blinders, and give the app that file. ' +
+      'It looks for each card’s passage in your copy, word for word, and checks every number again. Your copy is not kept. Then read each found passage in your copy and record whether the card says the same.</p>' +
+      '<label class="drop"><b>Choose your Blinders capture of the guideline</b><span>A .txt file from Blinders</span><input id="guideline-copy" type="file" accept="text/plain,.txt"></label></section>') +
+    '<h2 class="group-head">Cards</h2><div class="reference-list">' + set.cards.map(card => { const by = comparedBy(set, card), found = (card.matched || []).map(entry => entry.by);
+      return '<article class="panel bundle ' + (by.length ? 'reviewed' : 'open') + '" data-guideline-card="' + h(card.id) + '"><h4>' + h(card.title) + ' <span class="badge ' + (by.length ? '' : 'learning') + '">' + (by.length ? 'Compared by ' + h(by.join(' and ')) : 'Not yet compared by a member') + '</span></h4>' +
+        '<p class="fair-line">' + h(sentenceOf(card)) + '</p><p class="subtle">In the guideline: ' + h(card.where) + ' · every number checked against the capture' + (found.length ? ' · passage found in the copy of ' + h(found.join(' and ')) : '') + '</p>' +
+        (!set.withdrawn && mine(card) && !by.includes(actor) ? button('I read this passage in my copy and the card says the same', 'guideline-compare', 'class="primary" ' + valueAttr(card.id)) : '') + '</article>'; }).join('') + '</div>' +
+    (keeper && !set.withdrawn ? '<section class="panel protocol-step"><h3>Record</h3>' + (withdrawing ? '<form data-form="guideline-withdraw"><label>Why are these cards being withdrawn? The reason is kept with the record.<input name="reason" maxlength="200" required autocomplete="off"></label>' +
       '<div class="actions inline"><button class="danger">Withdraw these cards</button>' + button('Cancel', 'protocol-withdraw-cancel', 'class="secondary"') + '</div></form>' : '<p>' + button('Withdraw these cards…', 'protocol-withdraw', 'class="text-button"') + '</p>') + '</section>' : '');
 }

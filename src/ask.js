@@ -8,6 +8,7 @@
 import { holidays, isWeekendTurn, staffing, statSheet } from './fairness.js';
 import { protocolAnswer } from './pathways.js';
 import { factAnswer } from './facts.js';
+import { guidelineAnswer } from './guidelines.js';
 import { namesAReference, referenceAnswer } from './references.js';
 import { addDays, minutesByWeek, normalizeName, payWeekStart, shiftInterval, shiftTimes, weekStart } from './model.js';
 import { expand, isThanks, keywords, nearest, qualifiers, readWorkPhrases, stem, tidyQuestion } from './words.js';
@@ -282,6 +283,9 @@ export function ask(question, world) {
   // General reference knowledge (a normal range, a definition) comes from a checked card that cites its page.
   const fromCard = world.protocols ? factAnswer(question, world) : null;
   if (fromCard) return fromCard;
+  // A guideline restated in fixed wording, its numbers checked against an exact capture, its text not held.
+  const fromGuideline = world.protocols ? guidelineAnswer(question, world) : null;
+  if (fromGuideline) return fromGuideline;
   // A question that names AARC, NBRC or a practice guideline is pointed at the published original when the reference
   // list has a title for it. Nothing is answered from a reference: the list holds titles and links, not text.
   const listed = world.references?.length > 0;

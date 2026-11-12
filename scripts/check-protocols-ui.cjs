@@ -256,6 +256,19 @@ const { JSDOM } = require('jsdom');
   assert.ok(!/mk\/min/.test(reply));
   await click('close');
 
+  // Guidelines restated: added by the record keeper, answered in fixed wording, never quoting the guideline.
+  await click('tab', 'protocols'); await click('protocol-home');
+  assert.match(content(), /Guidelines, restated[\s\S]*No guideline cards are held\./);
+  await click('guideline-add'); await waitFor(() => document.querySelector('[data-guideline-card="r4-fio2"]'), 'guideline cards added');
+  assert.equal(types().at(-1), 'Guideline cards added');
+  assert.match(content(), /0 of 7 compared by a member[\s\S]*Restated in Department Hub’s own fixed wording/);
+  assert.ok(document.querySelector('#guideline-copy'), 'anyone can give the app their own copy');
+  assert.equal(find('guideline-compare'), undefined, 'nobody can record a comparison before their own copy held the passage');
+  reply = await ask('should I turn up fio2 during sbt');
+  assert.match(reply, /Recommendation 4 \(conditional, very low certainty\): FIO2 should not be raised during a breathing trial\.[\s\S]*not yet compared with the guideline by a second person/);
+  assert.equal(find('ask-yes'), undefined, 'a guideline card offers no Yes or No');
+  await click('close');
+
   // Your links: kept in this browser only, outside the workspace, its backups and its receipts.
   const workspaceBefore = localStorage.getItem(key);
   await click('my-links');
@@ -278,7 +291,7 @@ const { JSDOM } = require('jsdom');
   assert.ok(JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(name => [name, localStorage.getItem(name)]))).includes('WakeMed Pathology Laboratories'), 'the captured page is held in storage');
   for (const typed of ['Blue Trainer drill at', 'amber seal lamp serviced', 'swallow screen before', 'suction', 'normal range for PaCO2', 'normal SpO2']) assert.ok(!kept.includes(typed), 'storage holds what was typed: ' + typed);
   assert.deepEqual(types().slice(receiptsAtStart), ['Protocol reading confirmed', 'Protocol answers mapped', ...Array(6).fill('Protocol answer reviewed'), 'Protocol answers reviewed', 'Protocol revision made active',
-    'Reference cards added', 'Protocol revision withdrawn']);
+    'Reference cards added', 'Protocol revision withdrawn', 'Guideline cards added']);
   assert.deepEqual(read().events[0], stored.events[0], 'the receipt from before protocols is untouched');
   assert.equal((await audit.verifyReceipts(read().events)).ok, true);
   assert.equal(read().documents[0].text, stored.documents[0].text);

@@ -1,0 +1,206 @@
+{
+ "format": "department-hub-guideline-cards-v1",
+ "id": "aarc-2024-sbt",
+ "title": "Spontaneous breathing trials for adults on the ventilator",
+ "applies": "Adults on mechanical ventilation. Every recommendation in this guideline is conditional: the guideline itself says different choices will suit different patients.",
+ "source": {
+  "title": "AARC Clinical Practice Guideline: Spontaneous Breathing Trials for Liberation From Adult Mechanical Ventilation",
+  "issuer": "AARC",
+  "year": 2024,
+  "citation": "Roberts KJ, Goodfellow LT, Battey-Muse CM, et al. Respir Care. 2024;69(7):891-901",
+  "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11285503/",
+  "doi": "10.4187/respcare.11735",
+  "rights": "Copyright © 2024 Daedalus Enterprises. Department Hub holds none of its text; read it in your own copy (AARC members have access).",
+  "capture": {
+   "tool": "Blinders",
+   "id": "803dce3b-05ae-4a39-8a10-24b27f8d3921",
+   "sha256": "29f3a368baca4213ef7451e563a4aeaccb2eab7f47a4740e71482d951bd70fad",
+   "bytes": 47980,
+   "savedAt": "2026-11-12T19:25:37.376739+00:00"
+  }
+ },
+ "cards": [
+  {
+   "id": "r1-rsbi",
+   "kind": "recommendation",
+   "title": "RSBI before a breathing trial",
+   "said": [
+    "rsbi",
+    "rapid shallow breathing index",
+    "shallow breathing index"
+   ],
+   "where": "Recommendation 1 (PICO 1)",
+   "fields": {
+    "number": "1",
+    "strength": "conditional, moderate certainty",
+    "about": "a rapid shallow breathing index is not needed to decide readiness for a breathing trial"
+   },
+   "passage": {
+    "words": 18,
+    "starts": "we",
+    "fingerprint": "6fd8148b792669f6ed169816e3103489",
+    "numbers": []
+   }
+  },
+  {
+   "id": "r2-psv",
+   "kind": "recommendation",
+   "title": "Pressure support or T-piece for a breathing trial",
+   "said": [
+    "pressure support during sbt",
+    "sbt on pressure support",
+    "sbt with pressure support",
+    "psv during sbt",
+    "t piece",
+    "sbt settings",
+    "sbt on psv"
+   ],
+   "where": "Recommendation 2 (PICO 2)",
+   "fields": {
+    "number": "2",
+    "strength": "conditional, moderate certainty",
+    "about": "a breathing trial can be done with or without low-level pressure support of 8 cm H2O or less"
+   },
+   "passage": {
+    "words": 19,
+    "starts": "we",
+    "fingerprint": "3b1919bacff05fd6cbb3ecd3597dad96",
+    "numbers": [
+     "8"
+    ]
+   }
+  },
+  {
+   "id": "r3-timing",
+   "kind": "recommendation",
+   "title": "When in the day to do a breathing trial",
+   "said": [
+    "sbt before noon",
+    "time of day sbt",
+    "what time sbt",
+    "when to do sbt",
+    "sbt timing",
+    "when should sbt"
+   ],
+   "where": "Recommendation 3 (PICO 3)",
+   "fields": {
+    "number": "3",
+    "strength": "conditional, very low certainty",
+    "about": "a standard daily assessment of readiness, and the trial itself when appropriate, done before noon"
+   },
+   "passage": {
+    "words": 23,
+    "starts": "we",
+    "fingerprint": "bc8e60ef6119d053cca5a16dcb5e618f",
+    "numbers": []
+   }
+  },
+  {
+   "id": "r4-fio2",
+   "kind": "recommendation",
+   "title": "FIO2 during a breathing trial",
+   "said": [
+    "fio2 during sbt",
+    "increase fio2 sbt",
+    "raise fio2 sbt",
+    "oxygen during sbt",
+    "turn up fio2 sbt"
+   ],
+   "where": "Recommendation 4 (PICO 4)",
+   "fields": {
+    "number": "4",
+    "strength": "conditional, very low certainty",
+    "about": "FIO2 should not be raised during a breathing trial"
+   },
+   "passage": {
+    "words": 16,
+    "starts": "we",
+    "fingerprint": "94862a02c78fb66f72ba139942f525d7",
+    "numbers": []
+   }
+  },
+  {
+   "id": "v-oxygenation",
+   "kind": "value",
+   "title": "Oxygenation commonly required before a breathing trial",
+   "said": [
+    "oxygenation before sbt",
+    "sbt oxygenation criteria",
+    "spo2 before sbt",
+    "oxygen criteria sbt",
+    "ready for sbt oxygen"
+   ],
+   "where": "PICO 4, background",
+   "fields": {
+    "what": "Oxygenation commonly required before a breathing trial",
+    "value": "SpO2 > 90% on FIO2 0.40, or PaO2/FIO2 > 200 mm Hg",
+    "when": "as the guideline describes common practice; it does not set this threshold"
+   },
+   "passage": {
+    "words": 99,
+    "starts": "acceptable",
+    "fingerprint": "ac8194c8a9da5f29d0fe829cce3b5bc1",
+    "numbers": [
+     "90%",
+     "0.40",
+     "200"
+    ]
+   }
+  },
+  {
+   "id": "v-stop",
+   "kind": "value",
+   "title": "Oxygen saturation at which a breathing trial is commonly stopped",
+   "said": [
+    "stop sbt",
+    "terminate sbt",
+    "fail sbt",
+    "sbt failure",
+    "when to stop sbt",
+    "end sbt"
+   ],
+   "where": "PICO 4, background",
+   "fields": {
+    "what": "Commonly, a breathing trial is stopped and support resumed if",
+    "value": "SpO2 falls < 90%",
+    "when": "as the guideline describes common practice in the trials it reviewed"
+   },
+   "passage": {
+    "words": 99,
+    "starts": "acceptable",
+    "fingerprint": "ac8194c8a9da5f29d0fe829cce3b5bc1",
+    "numbers": [
+     "90%"
+    ]
+   }
+  },
+  {
+   "id": "v-niv",
+   "kind": "value",
+   "title": "Breathing trial for a patient going to NIV after extubation",
+   "said": [
+    "niv after extubation",
+    "postextubation niv",
+    "extubate to bipap",
+    "bipap after extubation",
+    "extubated to niv",
+    "sbt before niv"
+   ],
+   "where": "Recommendation 2, justification",
+   "fields": {
+    "what": "Common post-extubation NIV settings, described by the guideline as anecdotal",
+    "value": "PSV 5–8 cm H2O and PEEP 5 cm H2O",
+    "when": "for these patients the guideline finds it reasonable to run the trial on those settings"
+   },
+   "passage": {
+    "words": 64,
+    "starts": "there",
+    "fingerprint": "37c64fc2c3f3308e298aa4a7f4f89b38",
+    "numbers": [
+     "5-8",
+     "5"
+    ]
+   }
+  }
+ ]
+}
