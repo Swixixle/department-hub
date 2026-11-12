@@ -15,7 +15,10 @@ import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, v
 const publicDemo = __PUBLIC_DEMO__;
 const storageKey = 'department-hub-v1-' + (publicDemo ? 'demo' : 'local');
 const draftKey = storageKey + '-draft';
-const BUILD = 13;
+const BUILD = 14;
+const fingerprint = document.querySelector('meta[name="department-hub-build"]')?.content || '';
+const BUILD_INFO = Object.freeze({ version:BUILD, fingerprint:/^[a-f0-9]{64}$/.test(fingerprint) ? fingerprint : null, mode:__BUILD_MODE__ });
+const BUILD_LABEL = 'Version ' + BUILD + ' · ' + (BUILD_INFO.fingerprint?.slice(0,12) || (__BUILD_MODE__ === 'development' ? 'development' : 'unidentified build'));
 const HOURS = /^\d{1,2}(:\d{2})?-\d{1,2}(:\d{2})?$/;
 const asset = path => new URL(import.meta.env.BASE_URL + path, window.location.href).href;
 const app = document.querySelector('#app');
@@ -143,7 +146,8 @@ const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Boar
   'form:offer':'Said they could pick up a shift', 'form:trade-rules':'Changed the trade rules', 'ask-next':'Pressed a next-step question', 'ask-yes':'Said an answer helped', 'ask-no':'Said an answer did not help', 'ask-send':'Sent a question to the record keeper', verify:'Checked the receipts', 'notice-ok':'Acknowledged the notice', notice:'Opened the notice', 'mark-copy':'Copied the latest fingerprint', 'form:mark':'Looked for an earlier fingerprint', 'form:teach':'Taught an answer', 'ask-open':'Opened Ask', 'ask-wrong':'Said what was wrong with an answer', 'form:reading-try':'Tried a rewording', 'reading-save':'Saved a reading correction', 'form:passage-find':'Looked for a passage', 'passage-pick':'Chose a passage for a question', 'correction-remove':'Removed a correction', 'teach-copy':'Copied the waiting questions', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
   import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
-  over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog' };
+  over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog',
+  'text-screen-blocked':'Text screen stops (including repeats and false alarms)' };
 // When the board was last opened on this device, so Ask can say what is new since then.
 const seenKey = storageKey + '-seen';
 let sourceVersions = {};
@@ -167,12 +171,14 @@ async function runAsk(q) {
   const dialog = { type:'ask', q, previousContext:ui.askContext }, result = currentAsk(dialog);
   ui.askContext = result.context;
   ui.lastAsk = ui.dialog = dialog;
+  if (result.kind === 'blocked') countPress('text-screen-blocked');
   // A lookup stays in this conversation. Only explicitly saved feedback changes the record.
 }
 // A repeated press never overrides this screen. Files' contents are not inspected; the visible notice explains that.
 function patientCheck(form, text) {
   const signs = patientSigns(text);
   if (!signs.length) return signs;
+  countPress('text-screen-blocked');
   let note = form.querySelector('.refusal');
   if (!note) { note = document.createElement('p'); note.className = 'refusal'; note.setAttribute('role', 'alert'); form.append(note); }
   // The words that set it off are shown to the person who wrote them, and kept nowhere.
@@ -250,6 +256,7 @@ const contactButtons = (person, body) => {
 async function receipt(type, details, actor) {
   const payload = {
     id: crypto.randomUUID(), time: new Date().toISOString(), type,
+    build: BUILD_INFO,
     rosterRevision: state.revision, policyVersion: state.policy.version,
     previousHash: state.events.at(-1)?.hash || null, actor, details
   };
@@ -538,7 +545,7 @@ function render() {
     (ui.notice ? '<div role="status" class="notice">' + h(ui.notice) + '</div>' : '') +
     (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : schedule()) +
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
-    ' · No payroll or official schedule changes · Version ' + BUILD + '</span><span>' + (publicDemo ? '' : button('Backup and restore', 'data', 'class="text-button"') + ' ') +
+    ' · No payroll or official schedule changes · <span data-build="' + h(BUILD_INFO.fingerprint || '') + '" title="' + h(BUILD_INFO.fingerprint || 'No release fingerprint available') + '">' + h(BUILD_LABEL) + '</span></span><span>' + (publicDemo ? '' : button('Backup and restore', 'data', 'class="text-button"') + ' ') +
     button('Activity log', 'audit', 'class="text-button"') + '</span></footer></div></main>' + dialogMarkup();
   for (const item of playing) {
     const player = app.querySelector('[data-media="' + CSS.escape(item.id) + '"]');
@@ -767,10 +774,12 @@ function dialogMarkup() {
   if (type === 'audit') {
     const head = state.events.at(-1)?.hash || '';
     const who = event => isKeeper() || isSame(event.actor, state.actor) ? ' · ' + event.actor : '';
+    const buildLabel = event => event.build ? 'v' + event.build.version + ' · ' + (event.build.fingerprint?.slice(0,12) || event.build.mode) :
+      Number.isInteger(event.details?.build) ? 'v' + event.details.build + ' · fingerprint not recorded' : 'build not recorded';
     return shell('Activity log', '<p class="subtle">Changes, agreements, rule changes, saved corrections and export requests leave hash-linked receipts. Opening shifts, posts, documents and Ask answers does not create a named receipt; ordinary navigation keeps button totals only. Older browsing receipts remain unchanged in the history. Receipts record the selected profile, device time and source fingerprints. No authenticated identity or active human monitoring is provided. Internal changes and missing middle entries can be detected; detecting a missing tail or replaced log requires a checkpoint kept separately. ' +
       (isKeeper() ? 'You keep the record, so you see every name.' : 'You see your own name. Whoever keeps the record sees them all.') + '</p>' +
       (state.events.length ? '<p><b>' + state.events.length + ' receipts.</b> The newest 25:</p><ul class="compact">' + [...state.events].reverse().slice(0,25).map(event => '<li>' +
-        h(event.type + who(event) + ' · ' + timeLabel(event.time) + ' · ' + event.hash.slice(0,12)) + '</li>').join('') + '</ul>' : '<p>Nothing recorded yet.</p>') +
+        h(event.type + who(event) + ' · ' + timeLabel(event.time) + ' · ' + buildLabel(event) + ' · ' + event.hash.slice(0,12)) + '</li>').join('') + '</ul>' : '<p>Nothing recorded yet.</p>') +
       '<div class="actions">' + button('Check every receipt', 'verify', 'class="secondary"') + button('Check retained posts, files and documents', 'verify-content', 'class="secondary"') + (isKeeper() ? button('Export receipts', 'export', 'class="secondary"') : '') +
       (!publicDemo ? button('Backup and restore', 'data', 'class="text-button"') : '') + '</div>' +
       (head ? '<h3>Latest fingerprint</h3><p class="mark">' + h(head) + '</p><p class="subtle">Whoever holds this device could replace the whole log. A fingerprint kept somewhere else is what catches that. Copy this one and send it to yourself or a coworker now and then. ' +
@@ -823,7 +832,7 @@ function dialogMarkup() {
     button('Keep it', 'close', 'class="secondary"') + button('Remove it', 'remove-post-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
   if (type === 'notice') return shell('Before you use this', '<p><b>This is not an official hospital product.</b> It is run by department staff to make the schedule and department news easier to follow. The hospital’s own systems stay the official record.</p>' +
     '<p><b>Never put patient information here.</b> No names, faces, monitors, charts, record numbers or anything that could point to a patient, in a post, a picture, a video, a recording or a question.</p>' +
-    '<p><b>Changes and exports use cryptographic audit receipts.</b> Agreements, rule changes and saved corrections are included. Ordinary browsing and Ask lookups keep button totals only, without names, question fingerprints or opened-record details. Your last board visit is kept on this device to show what is new. Sending a reviewed question or remembering wording saves that text or its search words in this browser and in backups. Older browsing receipts remain in existing history.</p>' +
+    '<p><b>Changes and exports use cryptographic audit receipts.</b> Agreements, rule changes and saved corrections are included. Ordinary browsing, Ask lookups and text-screen stops keep anonymous totals only, without names, question fingerprints, blocked text or opened-record details. Your last board visit is kept on this device to show what is new. Sending a reviewed question or remembering wording saves that text or its search words in this browser and in backups. Older browsing receipts remain in existing history.</p>' +
     '<p><b>Hashing does not protect patient information.</b> It is not encryption, a patient-information detector, hospital approval or proof of who acted. The text screen checks only some patterns; it does not inspect uploaded images, video, audio or document-file contents. No one is actively monitoring this device. Deleted content cannot be recovered from its fingerprint.</p>' +
     '<p class="subtle">Receipts use the selected Viewing as profile and this device’s clock. Whoever controls this browser can replace the whole history; keep an independent checkpoint to detect replacement. Keep backups and exports private.</p>' +
     (noticeSeen ? '<p class="subtle">Acknowledged on this device ' + h(timeLabel(noticeSeen.at)) + ', viewing as ' + h(noticeSeen.by) + '.</p><div class="actions">' + button('Close', 'close', 'class="secondary"') + '</div>' :
@@ -959,15 +968,17 @@ function dialogMarkup() {
       state.assignments.length + ' shifts and ' + state.people.length + ' contacts will be removed. Save a backup file first if you might want them back.') + '</p><div class="actions">' +
       button('Cancel', 'data', 'class="secondary"') + button('Erase everything in this browser', 'erase', 'class="danger"') + '</div>');
     return shell('Workspace data', '<p>This workspace is kept in this browser only, at <b>' + h(location.host) + '</b>. A different browser, or a different address, starts with sample names.</p>' +
-      '<p><b>' + state.assignments.length + '</b> shifts · <b>' + state.people.length + '</b> contacts · ' + h(state.mode === 'sample' ? 'sample workspace' : 'published ' + timeLabel(state.importedAt)) + ' · version ' + BUILD + '</p>' +
+      '<p><b>' + state.assignments.length + '</b> shifts · <b>' + state.people.length + '</b> contacts · ' + h(state.mode === 'sample' ? 'sample workspace' : 'published ' + timeLabel(state.importedAt)) + ' · ' + h(BUILD_LABEL) + '</p>' +
+      '<p class="subtle">Build fingerprint: ' + h(BUILD_INFO.fingerprint || 'No release fingerprint') + ' · ' + h(BUILD_INFO.mode) + '. New receipts include this build identity.</p>' +
       '<h3>Backup</h3><p class="subtle">A backup file holds the schedule, the contacts with their phone numbers, requests, history and added documents. Photos, videos and recordings are not included. Keep the file somewhere private.</p>' +
       '<p>' + button('Save a backup file', 'backup', 'class="primary"') + '</p>' +
       '<label class="drop"><b>Restore from a backup file</b><span>Choose a file saved with the button above</span><input id="backup-file" type="file" accept="application/json,.json"></label>' +
       (() => {
         const usage = loadState(usageKey, null), rows = Object.entries(usage?.counts || {}).sort((a, b) => b[1] - a[1]);
         return '<h3>How this copy gets used</h3><p class="subtle">Which buttons get pressed, by button name and total only. No names, no shifts, no typed words, no recordings. Kept in this browser and left out of backups.</p>' +
+          '<p>Text screen stops: <b>' + (usage?.counts?.['text-screen-blocked'] || 0) + '</b>. Counts each stop, including repeat presses and false alarms. No blocked text or person is recorded; this is not a count of confirmed patient disclosures.</p>' +
           (rows.length ? '<div class="usage">' + rows.slice(0, 15).map(([name, total]) => '<div><span>' + h(USAGE_NAMES[name] || name) + '</span><b>' + total + '</b></div>').join('') + '</div>' +
-            '<p class="subtle">' + rows.reduce((sum, row) => sum + row[1], 0) + ' presses since ' + h(usage.since) + '.</p><p>' + button('Copy the counts', 'usage-copy', 'class="secondary"') + ' ' +
+            '<p class="subtle">' + rows.reduce((sum, row) => sum + row[1], 0) + ' actions counted since ' + h(usage.since) + '.</p><p>' + button('Copy the counts', 'usage-copy', 'class="secondary"') + ' ' +
             button('Reset the counts', 'usage-reset', 'class="secondary"') + '</p>' : '<p class="subtle">Nothing counted yet.</p>');
       })() +
       '<h3>Start over</h3><p class="subtle">Clears the roster, contacts, source photos, messages and receipts from this browser and brings back the sample names.</p>' +
@@ -1307,7 +1318,7 @@ async function act({action, value, kind}) {
     case 'usage-copy': {
       const usage = loadState(usageKey, null);
       const text = Object.entries(usage?.counts || {}).sort((a, b) => b[1] - a[1]).map(([name, total]) => total + '\t' + (USAGE_NAMES[name] || name)).join('\n');
-      try { await navigator.clipboard.writeText('Department Hub button counts since ' + (usage?.since || '') + '\n' + text); ui.flash = 'Counts copied.'; }
+      try { await navigator.clipboard.writeText('Department Hub action totals since ' + (usage?.since || '') + '\n' + text); ui.flash = 'Counts copied.'; }
       catch { ui.flash = 'Copying was not allowed here.'; }
       break;
     }

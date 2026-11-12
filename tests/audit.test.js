@@ -35,6 +35,17 @@ test('tail deletion needs a separately retained full checkpoint and later entrie
   assert.equal((await verifyReceipts([],checkpoint)).ok,false);
 });
 
+test('build identity is hash-covered without changing a legacy receipt or its checkpoint', async () => {
+  const events = await chain(1), checkpoint = events[0].hash, original = structuredClone(events[0]);
+  const payload = { id:'new-build-event', time:'2026-11-11T12:00:00Z', type:'Rule change', previousHash:checkpoint,
+    build:{version:14,fingerprint:'a'.repeat(64),mode:'production'}, details:{} };
+  events.push({...payload,hash:await sha256(JSON.stringify(payload))});
+  assert.equal((await verifyReceipts(events,checkpoint)).ok,true);
+  assert.deepEqual(events[0],original);
+  events[1].build.fingerprint = 'b'.repeat(64);
+  assert.equal((await verifyReceipts(events,checkpoint)).at,2);
+});
+
 test('a full re-created chain cannot satisfy the previously saved checkpoint', async () => {
   const original=await chain(), replacement=await chain(4);
   replacement[0].details.index=400;

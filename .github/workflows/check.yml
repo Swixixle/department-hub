@@ -25,6 +25,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_*.py'
       - run: npm run build
       - run: npm run build:demo
+      - run: node scripts/check-build.mjs
       - name: Prepare simulated interface checks
         run: npm install --prefix "$RUNNER_TEMP/department-hub-ui" --no-package-lock --no-audit --no-fund jsdom@26.1.0
       - name: Check production interface and receipts
