@@ -6,6 +6,15 @@ Recorded 2026-11-10 from the owner's conversation with Claude. Read this after `
 
 ## What the owner has decided
 
+### Protocol answers are a central purpose, decided 2026-11-12
+
+Immediate, source-backed answers from the department's actual protocols are a central purpose of Department Hub, not
+an extra on Ask. A dedicated Protocols section should let people browse the same material Ask uses, and every answer
+should open its exact source. The owner marked this very important. `docs/PROTOCOLS.md` records the decision, what
+the code does today, the five things to build, the rules that hold, two questions to settle first, and the first
+milestone: one complete protocol working end to end. None of it is built beyond the existing Documents list and
+passage search.
+
 ### Current rollout scope, clarified 2026-11-11
 
 The owner plans to introduce the app through his own department, invite willing coworkers, ask for patience and feedback, and improve it around their daily use. He expects to pay for a server in a few weeks and wants preparation done beforehand.
@@ -385,6 +394,47 @@ The implementation must preserve the same member and phone-consent settings, rev
 - Shift-linked trade/coverage actions and the 60/48 px sizing pass already exist. Real-phone touch/layout checks remain outstanding.
 
 These are recorded ideas, not new runtime features or changes to the Mac installation.
+
+## The department as the public identity, and professional updates: recorded, not decided (2026-11-12)
+
+Two ideas from the owner, written down so they are not lost. Neither is built, scheduled or designed.
+
+**The department is the profile; no person is ranked.** If the app suits respiratory it could suit a nursing unit,
+radiology or a physician group. The owner's condition is that it never becomes a place where one person can look
+better than another: nobody with a wall of compliments beside somebody with none. The department has the public face;
+a person has a name, a role and the contact details they chose.
+
+What is already true, checked in the source on this date: there are no likes, reactions, follower counts or compliment
+tallies anywhere in the app or the server. Posts and record changes carry their author. Fairness figures for other
+people are shown only to the record keeper; everyone sees their own and the department's. So the idea needs nothing
+removed. It needs one rule kept: **no screen that counts appreciation, participation or popularity per person.**
+Equal appreciation cannot be guaranteed without faking it; what can be guaranteed is that the app never turns unequal
+appreciation into a public ranking, and that posting nothing is ordinary. Anonymous authorship is not part of this:
+who posted and who changed a record stays visible.
+
+Another department would mean the same core with its own configuration. Respiratory's shifts, qualifications and
+trade rules should not be assumed to fit anyone else.
+
+**Rejected, on purpose.** Advice the owner was given elsewhere proposed running the tool where the hospital's IT,
+risk and legal staff could not see or audit it, and letting it spread before administration knew. That is not this
+project's direction. [PROTOCOLS.md](PROTOCOLS.md) already says hospital protocols are the employer's documents and
+their owner has to be asked. A tool that can show who sees what, where each answer came from and every change made
+has a case for being adopted. One that depends on not being noticed gets removed, and the person who installed it
+answers for it.
+
+**Professional updates.** A place on the board for news from the NBRC, the AARC and the Indiana Professional
+Licensing Agency: each item with its source, its date, a link to the original and any stated deadline; savable, with
+a private reminder; answerable from Ask ("anything new from NBRC?"). No language model is needed. A research article
+would stay labelled as research and would never become department policy by appearing there.
+
+The constraint that decides how: a web page cannot read another organisation's site unless that site allows it, so
+the app in a browser cannot collect these itself. Collection needs the shared server fetching on a schedule. Until
+there is one, this can only be a set of labelled links. Not established: whether any of the three publishes a feed,
+and what their terms say about automated reading. Neither is verified anywhere in this project's records.
+
+**Connecting a person's own NBRC or licensing account** for direct notices was offered as a passing thought. No
+supported way for an outside app to connect is known. Without one it would mean holding people's portal passwords,
+which this project has avoided everywhere else. Not to be built on what is known today.
 
 ## Earlier open import issues
 

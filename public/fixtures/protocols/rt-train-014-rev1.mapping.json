@@ -1,0 +1,374 @@
+{
+ "format": "department-hub-protocol-mapping-v1",
+ "note": "Synthetic test material — NOT FOR CLINICAL USE. Mapped answers for the invented protocol RT-TRAIN-014, revision 1.",
+ "revision": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+ "subject": [
+  "blue trainer",
+  "bellows",
+  "drill",
+  "rt-train-014"
+ ],
+ "facts": {
+  "age": {
+   "name": "the age band",
+   "ask": "Is the manikin adult or pediatric?",
+   "options": [
+    {
+     "value": "adult",
+     "label": "Adult (18 years and over)",
+     "said": [
+      "adult",
+      "adults",
+      "grown up",
+      "18 and over"
+     ]
+    },
+    {
+     "value": "pediatric",
+     "label": "Pediatric (under 18 years)",
+     "said": [
+      "pediatric",
+      "paediatric",
+      "peds",
+      "child",
+      "children",
+      "kid",
+      "kids",
+      "under 18"
+     ]
+    }
+   ]
+  },
+  "order": {
+   "name": "whether a written drill order is on file",
+   "ask": "Is a written drill order on file?",
+   "options": [
+    {
+     "value": "yes",
+     "label": "A written order is on file",
+     "said": [
+      "with an order",
+      "with a written order",
+      "order on file",
+      "have an order",
+      "has an order",
+      "got an order",
+      "there is an order"
+     ]
+    },
+    {
+     "value": "no",
+     "label": "No written order",
+     "said": [
+      "no order",
+      "without an order",
+      "without order",
+      "verbal request",
+      "verbal order",
+      "not ordered",
+      "no written order",
+      "not on file"
+     ]
+    }
+   ]
+  }
+ },
+ "topics": [
+  {
+   "id": "start",
+   "title": "Starting the drill",
+   "said": [
+    "start",
+    "starting rate",
+    "begin",
+    "what rate",
+    "how fast",
+    "initial rate",
+    "set the rate",
+    "highest rate",
+    "recheck"
+   ],
+   "needs": [
+    "age",
+    "order"
+   ],
+   "bundles": [
+    {
+     "id": "start-adult",
+     "title": "Starting an adult drill",
+     "when": {
+      "age": "adult",
+      "order": "yes"
+     },
+     "requires": [
+      "rule",
+      "order",
+      "qualification",
+      "exception",
+      "stop",
+      "escalation"
+     ],
+     "plain": {
+      "interpretation": "Start an adult drill at 12 mk/min.",
+      "explanation": "Recheck after 10 minutes. At each recheck raise the rate by 2 mk/min while the green lamp stays lit, and never go above 20 mk/min."
+     },
+     "links": [
+      {
+       "role": "rule",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p2.b3.r1",
+       "hash": "99083c68a7d7f72e02795390"
+      },
+      {
+       "role": "rule",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p2.b5",
+       "hash": "5cd5da3fa8aa2b463effdfb6"
+      },
+      {
+       "role": "order",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p1.b9",
+       "hash": "1bb27a8a00bb94bf706ade7b"
+      },
+      {
+       "role": "qualification",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p1.b7",
+       "hash": "873ceab3308aa4d609b13982"
+      },
+      {
+       "role": "exception",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p3.b3",
+       "hash": "f6c8b573b5f25b980a4348ff"
+      },
+      {
+       "role": "stop",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p3.b5",
+       "hash": "d87f6d5883b65b3721e493cd"
+      },
+      {
+       "role": "escalation",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p3.b7",
+       "hash": "0db05b5df2803feb30cc57b6"
+      }
+     ]
+    },
+    {
+     "id": "start-pediatric",
+     "title": "Starting a pediatric drill",
+     "when": {
+      "age": "pediatric",
+      "order": "yes"
+     },
+     "requires": [
+      "rule",
+      "order",
+      "qualification",
+      "exception",
+      "stop",
+      "escalation"
+     ],
+     "plain": {
+      "interpretation": "Start a pediatric drill at 6 mk/min, with the small cuff fitted.",
+      "explanation": "Recheck after 5 minutes. At each recheck raise the rate by 1 mk/min while the green lamp stays lit, and never go above 10 mk/min."
+     },
+     "links": [
+      {
+       "role": "rule",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p2.b3.r2",
+       "hash": "ce2b820a987998b84e70ec24"
+      },
+      {
+       "role": "rule",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p2.b7",
+       "hash": "2d7c995d17aa7155e256b57b"
+      },
+      {
+       "role": "order",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p1.b9",
+       "hash": "1bb27a8a00bb94bf706ade7b"
+      },
+      {
+       "role": "qualification",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p1.b7",
+       "hash": "873ceab3308aa4d609b13982"
+      },
+      {
+       "role": "exception",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p3.b3",
+       "hash": "f6c8b573b5f25b980a4348ff"
+      },
+      {
+       "role": "stop",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p3.b5",
+       "hash": "d87f6d5883b65b3721e493cd"
+      },
+      {
+       "role": "escalation",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p3.b7",
+       "hash": "0db05b5df2803feb30cc57b6"
+      }
+     ]
+    },
+    {
+     "id": "start-no-order",
+     "title": "No written order",
+     "when": {
+      "order": "no"
+     },
+     "requires": [
+      "order"
+     ],
+     "plain": {
+      "interpretation": "Do not start. A written drill order is required first.",
+      "explanation": "A verbal request is not a drill order. The order comes from the Simulation Lead."
+     },
+     "links": [
+      {
+       "role": "order",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p1.b9",
+       "hash": "1bb27a8a00bb94bf706ade7b"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "not-start",
+   "title": "When the drill must not be started",
+   "said": [
+    "must not",
+    "not start",
+    "not be started",
+    "contraindication",
+    "contraindications",
+    "contraindicated",
+    "amber",
+    "amber lamp",
+    "seal lamp",
+    "lamp is lit",
+    "serviced",
+    "servicing",
+    "when not"
+   ],
+   "needs": [],
+   "bundles": [
+    {
+     "id": "not-start",
+     "title": "When the drill must not be started",
+     "requires": [
+      "exception"
+     ],
+     "plain": {
+      "interpretation": "Do not start if the amber seal lamp is lit, or if the bellows was serviced within the last 24 hours.",
+      "explanation": "This applies to adult and pediatric drills."
+     },
+     "links": [
+      {
+       "role": "exception",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p3.b3",
+       "hash": "f6c8b573b5f25b980a4348ff"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "stop",
+   "title": "Stopping the drill and who to call",
+   "said": [
+    "stop",
+    "stopping",
+    "red lamp",
+    "gauge",
+    "who do i call",
+    "who to call",
+    "who should i call",
+    "escalate",
+    "escalation",
+    "goes wrong"
+   ],
+   "needs": [],
+   "bundles": [
+    {
+     "id": "stop",
+     "title": "When to stop and who to call",
+     "requires": [
+      "stop",
+      "escalation"
+     ],
+     "plain": {
+      "interpretation": "Stop at once if the red lamp lights or the gauge reads above 30 marks.",
+      "explanation": "Then call the Simulation Lead. If there is no answer within 5 minutes, call the Education Supervisor."
+     },
+     "links": [
+      {
+       "role": "stop",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p3.b5",
+       "hash": "d87f6d5883b65b3721e493cd"
+      },
+      {
+       "role": "escalation",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p3.b7",
+       "hash": "0db05b5df2803feb30cc57b6"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "who",
+   "title": "Who may run the drill",
+   "said": [
+    "who may",
+    "who can",
+    "allowed",
+    "student",
+    "students",
+    "qualified",
+    "qualification",
+    "card holder",
+    "trainer card",
+    "may i run",
+    "can i run"
+   ],
+   "needs": [],
+   "bundles": [
+    {
+     "id": "who",
+     "title": "Who may run the drill",
+     "requires": [
+      "qualification"
+     ],
+     "plain": {
+      "interpretation": "Only a therapist who holds a current Blue Trainer card.",
+      "explanation": "A student may run the drill only while a card holder is present in the room."
+     },
+     "links": [
+      {
+       "role": "qualification",
+       "digest": "d09ae851f3b242a33c69c0e6db5e2eb2620ec2ea2cfb1b254cefa98c16a67ed4",
+       "anchor": "p1.b7",
+       "hash": "873ceab3308aa4d609b13982"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

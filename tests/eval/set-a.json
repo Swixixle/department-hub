@@ -1,0 +1,559 @@
+[
+ [
+  "who works the most weekends",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": null
+  }
+ ],
+ [
+  "who works the fewest weekends",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "lowest",
+   "shift": null
+  }
+ ],
+ [
+  "which of the night staff has the most weekends",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "who pulls the most weekend nights",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "who is carrying the most weekends on days",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "whos doing the most weekends besides me",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": null
+  }
+ ],
+ [
+  "who has the fewest weekend day shifts apart from Indigo",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "lowest",
+   "shift": "D",
+   "exclude": [
+    "Indigo"
+   ]
+  }
+ ],
+ [
+  "rank everyone by weekend shifts",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": null
+  }
+ ],
+ [
+  "order the day staff by weekends worked",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "top 5 by weekend shifts",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "limit": 5
+  }
+ ],
+ [
+  "bottom two for weekend nights",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "lowest",
+   "shift": "N",
+   "limit": 2
+  }
+ ],
+ [
+  "who is busiest on nights",
+  {
+   "op": "rank",
+   "metric": "shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "who has the most shifts",
+  {
+   "op": "rank",
+   "metric": "shifts",
+   "direction": "highest",
+   "shift": null
+  }
+ ],
+ [
+  "who works the most hours",
+  {
+   "op": "rank",
+   "metric": "hours",
+   "direction": "highest",
+   "shift": null
+  }
+ ],
+ [
+  "who has the fewest hours on day shift",
+  {
+   "op": "rank",
+   "metric": "hours",
+   "direction": "lowest",
+   "shift": "D"
+  }
+ ],
+ [
+  "who takes charge the most",
+  {
+   "op": "rank",
+   "metric": "charge-turns",
+   "direction": "highest",
+   "shift": null
+  }
+ ],
+ [
+  "who has the most icu turns",
+  {
+   "op": "rank",
+   "metric": "icu-turns",
+   "direction": "highest",
+   "shift": null
+  }
+ ],
+ [
+  "who worked the most holidays",
+  {
+   "op": "rank",
+   "metric": "holidays",
+   "direction": "highest",
+   "shift": null
+  }
+ ],
+ [
+  "who has more weekends, Blair or Jamie",
+  {
+   "op": "compare",
+   "metric": "weekend-shifts",
+   "people": [
+    "Blair",
+    "Jamie"
+   ],
+   "direction": "highest"
+  }
+ ],
+ [
+  "does Blair or Casey have more weekend day shifts",
+  {
+   "op": "compare",
+   "metric": "weekend-shifts",
+   "shift": "D",
+   "people": [
+    "Blair",
+    "Casey"
+   ],
+   "direction": "highest"
+  }
+ ],
+ [
+  "between Morgan and Jordan who has more weekend nights",
+  {
+   "op": "compare",
+   "metric": "weekend-shifts",
+   "shift": "N",
+   "people": [
+    "Morgan",
+    "Jordan"
+   ],
+   "direction": "highest"
+  }
+ ],
+ [
+  "who has fewer shifts, Emery or Indigo",
+  {
+   "op": "compare",
+   "metric": "shifts",
+   "people": [
+    "Emery",
+    "Indigo"
+   ],
+   "direction": "lowest"
+  }
+ ],
+ [
+  "compare Blair and Casey on weekend shifts",
+  {
+   "op": "compare",
+   "metric": "weekend-shifts",
+   "people": [
+    "Blair",
+    "Casey"
+   ],
+   "direction": "highest"
+  }
+ ],
+ [
+  "Blair vs Jamie on weekends",
+  {
+   "op": "compare",
+   "metric": "weekend-shifts",
+   "people": [
+    "Blair",
+    "Jamie"
+   ],
+   "direction": "highest"
+  }
+ ],
+ [
+  "who has the most weekends in December",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "period": true
+  }
+ ],
+ [
+  "most weekend day shifts in november",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D",
+   "period": true
+  }
+ ],
+ [
+  "who had the most weekends next week",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "period": true
+  }
+ ],
+ [
+  "who is furthest above their fair share on nights",
+  {
+   "op": "rank",
+   "metric": "weekend-fair-gap",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "who is furthest under their share of weekends on days",
+  {
+   "op": "rank",
+   "metric": "weekend-fair-gap",
+   "direction": "lowest",
+   "shift": "D"
+  }
+ ],
+ [
+  "who is over their weekend share on day shift",
+  {
+   "op": "rank",
+   "metric": "weekend-fair-gap",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "who has worked the most separate weekends on days",
+  {
+   "op": "rank",
+   "metric": "distinct-weekends",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "how many different weekends has each person worked on nights",
+  {
+   "op": "count",
+   "metric": "distinct-weekends",
+   "shift": "N"
+  }
+ ],
+ [
+  "who has the most unique weekends",
+  {
+   "op": "rank",
+   "metric": "distinct-weekends",
+   "direction": "highest"
+  }
+ ],
+ [
+  "most weekends on days excluding Avery and Blair",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D",
+   "exclude": [
+    "Avery",
+    "Blair"
+   ]
+  }
+ ],
+ [
+  "who has the most weekends leaving out Avery",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "exclude": [
+    "Avery"
+   ]
+  }
+ ],
+ [
+  "most weekend shifts minus Avery",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "exclude": [
+    "Avery"
+   ]
+  }
+ ],
+ [
+  "aside from Casey who has the fewest weekends",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "lowest",
+   "exclude": [
+    "Casey"
+   ]
+  }
+ ],
+ [
+  "who but not Avery has the most weekend days",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D",
+   "exclude": [
+    "Avery"
+   ]
+  }
+ ],
+ [
+  "most weekends on the day side",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "who is doing the most weekend nocs",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "wich day staff has the most weekneds",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "who has teh most weekends on nights",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "so like who ends up with the most weekends anyway",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest"
+  }
+ ],
+ [
+  "um who has the most weekend shifts on day shift i guess",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "on nights, most weekends, who",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "N"
+  }
+ ],
+ [
+  "weekends on day shift ranked by who has the most",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts",
+   "direction": "highest",
+   "shift": "D"
+  }
+ ],
+ [
+  "who has the most weekends per person per month",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "who averages the most weekend shifts",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "what percentage of weekends does Blair work",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "who had the most weekends last year",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "who should get the next weekend off",
+  {
+   "unsupported": true
+  }
+ ],
+ [
+  "who has the most weekends other than Zephyrine",
+  {
+   "unresolved": true
+  }
+ ],
+ [
+  "who has the most weekends except Doctor Who",
+  {
+   "unresolved": true
+  }
+ ],
+ [
+  "when do i work next",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "who is on tonight",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "how many weekends have i worked",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "what is the leave policy",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "which shifts are understaffed",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "how many hours do i have next week",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "who can i trade my next shift with",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "is Blair on friday",
+  {
+   "notAPlan": true
+  }
+ ],
+ [
+  "do i work more weekends than Blair",
+  {
+   "op": "compare",
+   "metric": "weekend-shifts",
+   "people": [
+    "Blair"
+   ],
+   "direction": "highest"
+  }
+ ],
+ [
+  "who else works as many weekends as me",
+  {
+   "op": "rank",
+   "metric": "weekend-shifts"
+  }
+ ]
+]

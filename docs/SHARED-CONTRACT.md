@@ -1,6 +1,8 @@
 # Shared permission launch gate
 
-Status: contract tests written; shared backend, fixture seeder, sign-in and synchronization are not implemented. No access-control claim is established by this document. Version 15 on the Mac is unchanged.
+Status: the contract passes against a real server and a fresh seeder, run end to end by `npm run gate:shared`. Passkey sign-in and the app's own connection to the server are not implemented, so no shared rollout claim is established: the sessions the gate uses are minted by the seeder directly in the database, which tests the server's treatment of an authenticated identity and says nothing about whether sign-in is correct. Version 15 on the Mac is unchanged and the public demo is unchanged.
+
+**Decided clarification:** sign-in uses a passkey with no email typed at sign-in; members enter their own phone/email information. **Open:** email as optional contact information, an administrator-only recovery-confirmation channel, or separate fields for both. Nothing here selects one, and this contract covers phone only.
 
 **Decided clarification:** sign-in uses a passkey with no email typed at sign-in; members enter their own phone/email information. **Open:** email as optional contact information, administrator-only recovery confirmation or separate fields for both. The candidate email contract below explores only the contact option; it does not settle that choice, select a production schema or authorize sending. See `EMAIL-OPTIONS.md`.
 
@@ -53,28 +55,28 @@ Source kinds are `post`, `document`, `file`, `conversation`, `fairness`, `schedu
 
 Phone controls prove an explicitly shared number is returned through directory list/detail, name search, the named-number Ask question and directory export. Private-number checks then exercise those same routes across coworkers, administrators and custodians. The phone assertion checks raw, formatted and encoded numbers in content and headers. Sharing-withdrawal checks first warm every route with a real shared result, then require the same existing session to stop receiving it on the next request. Search sources may still identify the coworker; their name is not treated as a private phone number. Consent applies to the structured contact record, not a promise to erase screenshots, previously downloaded copies or independently authored text.
 
-## Candidate email-contact contract — exploratory, not selected
+## Four faults this contract used to miss, now covered
 
-This is a separate candidate contract under `tests/shared/`, not an implicit expansion of the selected product direction. The existing `test:shared` command still runs the permission/phone suite. Run the email-contact candidate explicitly, against a fresh isolated backend fixture:
+Found by running the contract against deliberately broken copies of the server, one fault at a time. Each was
+originally caught only by the server's own tests, so the gate alone would have passed a backend with it:
 
-```sh
-DEPARTMENT_HUB_TEST_FIXTURE="$PWD/local-data/shared-email-fixture.json" npm run test:shared:email-contact
-```
+1. A create refused with 400 or 403 was never read back, so a server that saves the row and then returns the refusal
+   passed.
+2. No non-administrator ever attempted `PATCH` or `DELETE` on `/memberships/:id`, so a server that let any member
+   revoke anyone passed.
+3. A legitimate participant naming the other participant in an accept body was never sent, so a server that records
+   one person's acceptance as the other's passed. Only the outsider's attempt was tested, and that is refused
+   earlier for not being a participant at all.
+4. Authorship forged in a request *header* was never sent, only in the body, so a server that trusts `X-Actor` for
+   authorship passed.
 
-With no backend fixture this also exits 2 and says it has **not passed**. It does not skip or manufacture a green result. The command does not send messages. The `email` values in `fixture.example.json` are synthetic `example.invalid` candidate data, distinct per person and containing the run ID. The ordinary gate does not require an email implementation just because those example values exist.
-
-If the contact-information option is selected, seed the same four scenarios as phone: explicitly shared member, explicitly withheld partner, outsider with an email and no sharing consent, and keeper initially without an email. The test adds the keeper's address without consent and requires it to stay private. Candidate profile notation is `{personId,email,shareEmail}` with self-only update authority; adding an address does not share it, and email consent does not change phone consent. These are candidate test-interface names, not a production/recovery schema decision.
-
-The candidate requires shared-address positive controls in directory list, direct person lookup, name search, Ask's named-email question and `exports/directory`. A server that hides every address fails. Withheld/default-private/withdrawn values must be absent from those routes and the authorized `exports/fairness` response, including administrator/custodian views. Owners may retain their own value through the self-profile route. Directory/detail email fields are absent/null rather than partial addresses. No fixture email, including a shared one, may appear in response headers. Case and surrounding whitespace are normalized when comparing values; nested JSON, URI encoding and response headers are inspected.
-
-Withdrawal first warms all five public lookup routes with a real shared result, then requires the same live session and other coworkers/admin/custodian sessions to lose that address on the next request. Fairness export must still return actual records without withheld addresses; denying the export is not a passing privacy result. Forged self-profile person IDs cannot read/change another person's address or sharing choice. The foreign-department session cannot retrieve even a legitimately shared address from this department.
-
-Before enabling contact email, this candidate must be adopted deliberately and pass against the real implementation, alongside the permission gate. If only administrator recovery email is selected, a distinct contract must instead cover that purpose's restricted access/update rules. If both are selected, separate fields and both contracts are needed; directory-sharing positives cannot authorize disclosure of a recovery channel. No recovery-email endpoint or sending mechanism is specified here.
-
-Share remains the existing device handoff. A simulated-interface regression checks that a native Share payload contains the post text, without structured coworker addresses, and that email/text fallback links have no prefilled recipient. This does not claim to inspect arbitrary words or attachments a person authored, or prove delivery from a real phone.
+All four are now explicit checks here: the first and fourth in "client role, actor and department hints do not grant
+authority", the second in "membership administration requires the administrator role", the third in "a participant
+acceptance is attributed to the authenticated participant only". Each was re-verified by breaking the server in that
+one way and confirming this contract alone fails. `tests/server/backend.test.mjs` keeps its own versions as well.
 
 ## What still remains
 
 There is no shared server or seeder to run this against yet, so the real permission gate remains blocked. This finite contract is the initial minimum, not exhaustive proof of authorization correctness. The backend must add coverage as routes, caches, uploads, invitations and recovery are implemented. Atomic trade conflicts and stale-proposal rejection require their own real-database tests. A later two-phone test must exercise the chosen sign-in integration, permissions and synchronization together. Revocation rejects future server requests; it cannot recall bytes already downloaded. Existing public or independently usable storage URLs need explicit handling before claiming that those access paths are revoked too.
 
-Before enabling shared mode, the backend implementation must wire its server startup, fresh seeding and this command into a required CI job. That job does not exist yet. The current local-app CI is not a substitute for that launch gate.
+`npm run gate:shared` starts the server, seeds a fresh synthetic fixture and runs this contract in one command, exiting with the contract's status. It is the command a required CI job should run; the CI job itself is not wired up yet. The current local-app CI is not a substitute for it.

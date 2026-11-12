@@ -1,6 +1,8 @@
 # Preparing the private department pilot
 
-Updated 2026-11-11 from the owner's clarified direction. This is a plan. The current local build is still one-browser software: shared accounts, storage, messages between devices and notifications are not built.
+Updated 2026-11-12. The parts of this that are now built are listed under **What is built now** below; the rest is still a plan. The phone app is still one-browser software: it has not been connected to the server, and shared accounts, messages between devices and notifications are not built.
+
+**Clarification — decided:** passkey sign-in with no email typed at sign-in; members supply their own phone/email information; no app-sent email/text is authorized by this work. **Open:** email's purpose, collection requirements and app-sent notifications. `EMAIL-OPTIONS.md` records alternatives, not a selected design. The implementation stages below remain proposals, not built features.
 
 **Clarification — decided:** passkey sign-in with no email typed at sign-in; members supply their own phone/email information; no app-sent email/text is authorized by this work. **Open:** email's purpose, collection requirements and app-sent notifications. `EMAIL-OPTIONS.md` records alternatives, not a selected design. The implementation stages below remain proposals, not built features.
 
@@ -14,9 +16,93 @@ The daily experience is one place for the schedule, department updates, due date
 
 Information ordinarily sent by email should be easier to notice and consume here. Start with a person posting the relevant announcement, source link and dates. Mailbox ingestion, email credentials and replacing email are not requirements. Seeing an announcement does not establish that a course or official requirement was completed.
 
+## What is built now
+
+A locally runnable server with persistent records, a repeatable synthetic seeder, and the permission contract passing
+against both. Passkey sign-in and the app's own connection to it are not built; the section below this one is still
+the plan for those.
+
+```sh
+npm run gate:shared     # start the server, seed a fresh synthetic fixture, run the permission contract, exit with its status
+npm run test:server     # the server's own implementation tests: permissions, passkeys, and the shared board
+npm run server          # run it to talk to by hand: DEPARTMENT_HUB_DB=./local-data/hub.sqlite npm run server -- --port 18080
+npm run seed:shared     # write a synthetic fixture and its manifest into local-data/
+npm run bootstrap:admin # the department's first administrator and their one-time passkey link
+```
+
+`.github/workflows/shared-gate.yml` runs the first two on every pull request, and then does one more thing: it
+removes the phone-sharing filter from the server and requires the gate to fail. A gate that would pass a backend
+with no access control is not a gate, so the job proves it is load-bearing rather than merely green.
+
+Routine technical choices, and why:
+
+- **`node:sqlite`, built into Node 22.5 and later.** The repository has two dependencies, Vite and Tesseract. A
+  database that needs neither a native build nor a running service keeps it that way, and it gives real files, real
+  transactions and real constraints — which is what "a denied write leaves nothing changed" and "a trade commits or
+  does not" actually require. It is still marked experimental in Node, so the schema is kept in one file
+  (`server/db.mjs`) and every query is plain SQL, so moving to another SQLite driver or to Postgres later is a
+  change of driver rather than a rewrite.
+- **`node:http` with a small router.** No framework. The whole surface is one file of handlers
+  (`server/api.mjs`) and the request plumbing is another (`server/index.mjs`).
+- **One database file per department pilot, loopback by default.** It listens on 127.0.0.1 unless told otherwise.
+- **Configuration is non-secret and all in environment variables**: `DEPARTMENT_HUB_DB`, `DEPARTMENT_HUB_PORT`,
+  `DEPARTMENT_HUB_HOST`, `DEPARTMENT_HUB_ORIGIN`, `DEPARTMENT_HUB_BUILD`, and the relying-party settings
+  `DEPARTMENT_HUB_RP_ID`, `DEPARTMENT_HUB_RP_NAME`, `DEPARTMENT_HUB_RP_ORIGIN`.
+
+How identity is decided, in one paragraph, because everything else rests on it: a request carries a bearer token and
+nothing else that counts. The token's hash is looked up, the membership it names is read again from the database, and
+that membership's roles are parsed on every request. So removing a role or revoking a membership takes effect on the
+next request with no logout, refresh or expiry wait. A person, department, role or actor named in a request body,
+query string or header is either refused outright or ignored. The permission decisions happen while the caller's view
+of the records is being assembled (`server/world.mjs`), so the search and the Ask engine never hold a record the
+asker may not see; nothing is filtered out of an answer after the fact.
+
+What the seeder will not do: it refuses to run against a database holding records it did not create, it invents every
+name, number and shift it writes, and it never reads the owner's workspace or his imported telephone list. The
+numbers are reserved 555-01xx numbers. Its manifest contains live test sessions, so it is written into ignored
+`local-data/`.
+
+This is a local service. It is not a deployment, it selects no hosting provider or domain, and a passkey registered
+against `localhost` would prove nothing about a production relying party.
+
 ## What can be prepared before hosting
 
 Build and test locally using synthetic records, two isolated test departments and separate authenticated test users. Keep the existing local app and fictional public demo usable. Do not silently upload the owner's browser workspace when shared mode becomes available.
+
+### What the app does with any of this: nothing yet
+
+The adapter is written and tested; no screen calls it. `src/backend.js` now has `sharedBoard` beside `localBoard`,
+offering the same six functions over HTTP, so nothing above that line has to know which one is in use. What differs
+is visible on purpose:
+
+- `where` says the department rather than this browser.
+- `state` is `ready`, `stale`, `failed`, `sending` or `unsent`, and the difference between the last few matters. A
+  dropped connection keeps the posts already on screen and marks them old. A refusal — a revoked membership, a
+  department that is not yours — throws the local copy away, because somebody who has been removed should not keep
+  reading the board from a cached copy, even one labelled stale.
+- A post carries an id the phone made before sending. A retry after a dropped connection carries the same one and
+  the server returns the post that is already there, so a flaky signal does not post twice.
+- `clear()` does nothing at all. A member wiping their own device must not empty the department.
+- Attachments go up as their own bytes rather than inflated through JSON, belong to nobody's post until a post names
+  them, and can only be named by whoever uploaded them. Removing a post removes its own attachments and nothing
+  else.
+
+`tests/server/shared.test.mjs` runs that adapter against the real server with two members who each signed in with
+their own passkey: one publishes, the other receives, a member of the other department gets nothing by board,
+search, Ask or file download, and a revoked member stops receiving on the next read. It also covers the stale and
+unsent states, the duplicate-free retry, attachment bytes round-tripping through the authorized path, and that
+reading, searching and asking add no receipt, keep no question text and keep no question fingerprint.
+
+An exchange is rechecked at every acceptance, before that person's agreement is recorded: each shift in it still
+exists, is still held by the person the proposal says holds it, and is still at the revision the proposal was built
+against; and the department's trade rules have not changed. The check is per shift, so a trade elsewhere in the
+department does not invalidate this one. All of it happens in one database transaction, and the shifts move only
+when the last person has agreed.
+
+**Two caveats, stated rather than buried.** The concurrency test runs in one process against one SQLite file, where
+writes serialize anyway: it shows the transaction holds and the second request is refused, not that a
+multi-process deployment is safe. And a two-session exercise is not a two-phone exercise — there is no phone,
+browser, Face ID or fingerprint reader anywhere in these tests, and the relying party is localhost.
 
 ### Definition of done: access boundaries first
 
