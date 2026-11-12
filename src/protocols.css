@@ -75,3 +75,4 @@
 @media(max-width:780px){.reference-search{grid-template-columns:minmax(0,1fr)}.reference-search .check{grid-column:auto}.reference .link-button{width:100%;text-align:center}}
 .group-divider{margin:8px 0 0;padding-top:10px;border-top:1px solid var(--line)}
 .reference .badge{justify-self:start}
+.knowledge-source{max-width:900px;margin:10px 0;display:grid;gap:6px;justify-items:start}

@@ -15,7 +15,8 @@ import { readPdf } from './pdftext.js';
 import { emptyLibrary, prepareLibrary, addRevision, checkExtraction, supplyText, markFigure, activate, withdraw, toggleMark, revisionOf, searchLibrary } from './protocols.js';
 import { addMapping, reviewBundle, markMappingsReviewed } from './bundles.js';
 import { protocolTopics } from './pathways.js';
-import { libraryView, familyView, addDialog, landingRevision, referencesView } from './protocol-view.js';
+import { libraryView, familyView, addDialog, landingRevision, referencesView, knowledgeView } from './protocol-view.js';
+import { addSet, reviewCard, withdrawSet } from './facts.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
 const publicDemo = __PUBLIC_DEMO__;
@@ -562,9 +563,11 @@ const loadReferences = () => import('./reference/respiratory-sources.json').then
 const shownRevision = () => ui.protocols.family ? revisionOf(state.protocols, ui.protocols.revision) || landingRevision(state.protocols, ui.protocols.family, localToday()) : null;
 function protocolsScreen() {
   const view = ui.protocols, today = localToday();
+  if (view.shelf?.startsWith('knowledge:')) return knowledgeView({ set:(state.protocols.knowledge || []).find(set => set.id === view.shelf.slice(10)), keeper:isKeeper(), withdrawing:view.withdrawing }, viewTools);
   if (view.shelf === 'references' && referenceList) return referencesView({ list:referenceList, query:view.refQuery, section:view.refSection, retired:view.refRetired, today }, viewTools);
   if (!view.family) return libraryView({ library:state.protocols, today, documents:state.documents, query:view.query, results:view.query ? searchLibrary(state.protocols, view.query, today) : [], keeper:isKeeper(), demo:publicDemo,
-    sampleNext:['1', '2'].find(label => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + label + '.pdf')) || null, references:referenceList }, viewTools);
+    sampleNext:['1', '2'].find(label => !state.protocols.revisions.some(revision => revision.file.name === 'rt-train-014-rev' + label + '.pdf')) || null, references:referenceList,
+    cardSetOffered:!(state.protocols.knowledge || []).some(set => set.id === 'blood-gases-adult' && !set.withdrawn) }, viewTools);
   const revision = shownRevision();
   return familyView({ library:state.protocols, today, familyId:view.family, revisionId:revision?.id, pane:view.pane, cite:view.cite, keeper:isKeeper(), held:revision ? originals.get(revision.digest) : undefined,
     sampleMapping:Boolean(revision && SAMPLE_PROTOCOL.test(revision.file.name)), withdrawing:view.withdrawing, fromAsk:view.fromAsk && Boolean(ui.lastAsk),
@@ -1024,6 +1027,8 @@ function dialogMarkup() {
         (result.next?.length ? '<div class="chip-list"><span class="subtle">Next</span><div>' + result.next.map((text, index) => button(h(text), 'ask-next', 'class="chip plain" ' + valueAttr(index))).join('') + '</div></div>' : '') +
         (result.kind === 'blocked' ? '' : ui.dialog.yes ? '<p class="subtle">' + h(ui.dialog.yes) + '</p>' :
           // A protocol answer is not open to a vote. Nothing a reader presses here can change it.
+          result.kind === 'fact' ? '<p class="subtle">A reference card answers only after someone here has checked it against its source. “Yes”, repeated questions and search cannot change one. If it looks wrong, open the page and tell a record keeper.</p><div class="actions wrap">' +
+            button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + '</div>' :
           result.kind === 'protocol' ? '<p class="subtle">A protocol answer comes only from a reviewed mapping. “Yes”, repeated questions and search cannot change it. If it looks wrong, open the original and tell a record keeper.</p><div class="actions wrap">' +
             button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + '</div>' : result.empty ? '<div class="actions wrap">' + button('Review and send to the record keeper', 'ask-send', 'class="secondary"') + button('Put this question on the board', 'ask-post', 'class="secondary"') +
           (isKeeper() ? button('Teach the answer', 'ask-teach', 'class="secondary"') : '') + '</div>' :
@@ -1383,6 +1388,7 @@ async function act({action, value, kind}) {
       if (ui.dialog?.type === 'ask' && ui.lastAsk) ui.lastAsk = { ...ui.lastAsk, opened:value };      // the one they chose to read is the one a yes is about
       if (kind === 'doc') { ui.dialog = { type:'doc', id:first, at:Number(second) }; ui.scrollTo = '#doc-mark'; break; }
       if (kind === 'note') { ui.dialog = { type:'note', id:first }; break; }
+      if (kind === 'knowledge') { ui.dialog = null; ui.tab = 'protocols'; ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'knowledge:' + first, withdrawing:false, fromAsk:false }; ui.scrollTo = '.content'; break; }
       if (kind === 'refs') { ui.dialog = null; ui.tab = 'protocols'; ui.protocols = { ...ui.protocols, shelf:'references', refQuery:decodeURIComponent(first || ''), refSection:'', refRetired:second === 'retired', fromAsk:false }; ui.scrollTo = '.content'; break; }
       // The exact revision cited, at the cited place, even when a later revision has since replaced it.
       if (kind === 'protocol' || kind === 'protocol-family') {
@@ -1401,6 +1407,15 @@ async function act({action, value, kind}) {
       break;
     }
     case 'protocol-home': ui.protocols = { ...ui.protocols, family:null, revision:null, cite:null, withdrawing:false, fromAsk:false, shelf:null }; break;
+    case 'knowledge-open': ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'knowledge:' + value, withdrawing:false }; ui.scrollTo = '.content'; break;
+    case 'knowledge-add': {
+      keeperOnly();
+      const set = (await import('./reference/cards-blood-gases.json')).default;
+      await protocolStep(addSet(state.protocols, set, state.actor, new Date().toISOString()), 'Reference cards added, unchecked. None answers until it has been compared with the cited page.');
+      ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'knowledge:' + set.id, withdrawing:false };
+      break;
+    }
+    case 'knowledge-check': keeperOnly(); await protocolStep(reviewCard(state.protocols, ui.protocols.shelf.slice(10), value, state.actor, new Date().toISOString())); break;
     case 'reference-shelf': ui.protocols = { ...ui.protocols, family:null, revision:null, shelf:'references' }; ui.scrollTo = '.content'; break;
     case 'protocol-open': ui.protocols = { ...ui.protocols, family:value, revision:landingRevision(state.protocols, value, localToday())?.id || null, cite:null, withdrawing:false, fromAsk:false }; ui.scrollTo = '.content'; break;
     case 'protocol-revision': ui.protocols = { ...ui.protocols, revision:value, cite:null, withdrawing:false }; break;
@@ -1579,7 +1594,7 @@ async function act({action, value, kind}) {
       try { await navigator.clipboard.writeText(state.events.at(-1)?.hash || ''); ui.flash = 'Copied. Keep it somewhere outside this app.'; }
       catch { ui.flash = 'Copying was not allowed here. Press and hold the fingerprint to copy it.'; }
       break;
-    case 'ask-no': if (currentAsk()?.kind === 'protocol') return; ui.lastAsk = ui.dialog = { ...ui.dialog, no:true }; break;
+    case 'ask-no': if (['protocol', 'fact'].includes(currentAsk()?.kind)) return; ui.lastAsk = ui.dialog = { ...ui.dialog, no:true }; break;
     case 'ask-wrong': {
       const q = (ui.dialog?.q || '').trim(), result = q ? currentAsk() : null;
       if (!result || result.kind === 'blocked') return;
@@ -1636,7 +1651,7 @@ async function act({action, value, kind}) {
       const { q } = ui.dialog, result = currentAsk(), opened = ui.dialog.opened;
       const top = result.items.some(item => item.go === opened) ? opened : '';
       if (!result || ui.dialog.yes) return;
-      if (result.kind === 'blocked' || result.kind === 'protocol') return;
+      if (result.kind === 'blocked' || result.kind === 'protocol' || result.kind === 'fact') return;
       const terms = keywords(result.read || q), documentId = top.startsWith('doc|') ? top.split('|')[1] : '', sourceHash = sourceVersions[documentId];
       const same = link => link.go === top && link.terms.join(' ') === terms.join(' ') && link.sourceHash === sourceHash, asked = q.trim();
       // Two ways it learns from a yes: a confirmed passage comes first next time, and a taught answer picks up this wording.
@@ -2133,6 +2148,13 @@ async function submit(form) {
       break;
     }
     case 'protocol-search': ui.protocols = { ...ui.protocols, query:(data.q || '').trim().slice(0, 120) }; break;
+    case 'knowledge-withdraw': {
+      keeperOnly();
+      if (!patientCheck(form, data.reason || '')) return;
+      await protocolStep(withdrawSet(state.protocols, ui.protocols.shelf.slice(10), data.reason, state.actor, new Date().toISOString()), 'Cards withdrawn. They no longer answer.');
+      ui.protocols = { ...ui.protocols, withdrawing:false };
+      break;
+    }
     case 'reference-search': ui.protocols = { ...ui.protocols, refQuery:(data.q || '').trim().slice(0, 120), refSection:data.section || '', refRetired:Boolean(data.retired) }; break;
     case 'protocol-add': {
       keeperOnly();

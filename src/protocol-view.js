@@ -7,6 +7,7 @@ import { applicable, historyOf, standing, STANDING, shortDigest, familyOf, revis
 import { passageAt } from './pdftext.js';
 import { reviewHolds, validateBundle, wholeRule } from './bundles.js';
 import { cautionsFor, searchReferences } from './references.js';
+import { cardHolds, cite, NOT_A_PROTOCOL, CUSTODY } from './facts.js';
 
 export const NOT_AUTHORITY = 'Recorded for the profile selected on this device. This prototype does not verify who that is, and a recorded review is not clinical sign-off.';
 export const HELD_HERE = 'This is the copy held on this device. Department Hub cannot tell whether whoever issued a protocol has published a newer one.';
@@ -18,7 +19,7 @@ export const chipFor = (library, revision, today) => { const where = standing(li
 // The revision a protocol's page opens on: the one in force, or failing that the newest held.
 export const landingRevision = (library, familyId, today) => applicable(library, familyId, today).revision || historyOf(library, familyId)[0] || null;
 
-export function libraryView({ library, today, documents, query, results, keeper, demo, sampleNext, references }, { h, button, valueAttr }) {
+export function libraryView({ library, today, documents, query, results, keeper, demo, sampleNext, references, cardSetOffered }, { h, button, valueAttr }) {
   const families = [...library.families].sort((a, b) => Number(library.marks.includes(b.id)) - Number(library.marks.includes(a.id)) || a.identifier.localeCompare(b.identifier));
   const card = family => {
     const now = applicable(library, family.id, today), shown = now.revision || historyOf(library, family.id)[0], marked = library.marks.includes(family.id);
@@ -39,6 +40,10 @@ export function libraryView({ library, today, documents, query, results, keeper,
       ? 'Adds revision 1 of a made-up training drill (' + h(SYNTHETIC) + ') exactly as a real file would be added: unchecked, unreviewed and answering nothing until you take each step.'
       : 'Adds revision 2 of the invented drill, effective 1 November 2026. From that date revision 1 is history, and nothing answers until revision 2 has been checked and reviewed.') + '</p>' +
       button(sampleNext === '1' ? 'Add the invented protocol' : 'Add revision 2 of the invented protocol', 'protocol-sample', 'class="secondary"') + '</div>' : '') +
+    '<h2 class="group-head">Reference knowledge</h2><p class="subtle">Short cards for general facts such as a normal range or a definition. Each states its figures, names the page they were read from and links to it. A card answers in Ask only after a person here has compared it with that page. ' + h(NOT_A_PROTOCOL) + '</p>' +
+    ((library.knowledge || []).filter(set => !set.withdrawn).length ? '<div class="line-list">' + library.knowledge.filter(set => !set.withdrawn).map(set => { const done = set.cards.filter(card => cardHolds(set, card)).length;
+      return '<div><span><b>' + h(set.title) + '</b> <small>' + h(done + ' of ' + set.cards.length + ' cards checked · ' + set.source.publisher) + '</small></span><span class="pair">' + button('Open', 'knowledge-open', 'class="secondary" ' + valueAttr(set.id)) + '</span></div>'; }).join('') + '</div>' : '<p class="subtle">No reference cards are held.</p>') +
+    (keeper && cardSetOffered ? '<p>' + button('Add the blood-gas reference cards', 'knowledge-add', 'class="secondary"') + ' <span class="subtle">Twelve cards on adult arterial blood gas values, from an openly licensed textbook. They arrive unchecked.</span></p>' : '') +
     '<h2 class="group-head">Professional references</h2><p class="subtle">Published guidelines from AARC and others, and NBRC’s credentialing pages: titles and links to the official originals. Department Hub holds none of their text and answers nothing from them. They are not your hospital’s protocols.</p>' +
     (references ? '<p>' + button('Browse ' + references.records.length + ' professional references', 'reference-shelf', 'class="secondary"') + '</p>' : '<p class="subtle">The reference list is loading.</p>') +
     '<h2 class="group-head">Pasted documents</h2><p class="subtle">Added before protocols were kept as files, or pasted as plain text. Ask searches their words and quotes what it finds. They are not reviewed protocols and do not become one by being here.</p>' +
@@ -168,4 +173,25 @@ export function referencesView({ list, query, section, retired, today }, { h, bu
       '<div class="panel empty"><h3>No title matches</h3><p>The list is searched by title and topic only, because none of the documents themselves are held here.</p></div>') +
     '<p class="subtle">Collected ' + h(list.collectedOn) + ' from AARC’s guideline index and guidance page and from NBRC’s site. ' + h(list.checked.aarcGuidelineIndex) + ' ' + h(list.checked.aarcHostedLinks) + ' ' + h(list.checked.otherLinks) + ' ' + h(list.checked.nbrc) +
       ' Opening a source needs an internet connection and takes you to its publisher.</p>';
+}
+
+// One set of reference cards, laid out for checking against its source: the card, where on the page its figures
+// are, how many times they were read, and one button a person presses after looking.
+export function knowledgeView({ set, keeper, withdrawing }, { h, button, valueAttr }) {
+  if (!set) return '<div class="panel empty"><h3>Those cards are no longer held</h3>' + button('All protocols', 'protocol-home', 'class="secondary"') + '</div>';
+  const done = set.cards.filter(card => cardHolds(set, card)).length;
+  return '<p class="pair start">' + button('‹ All protocols', 'protocol-home', 'class="text-button"') + '</p><div class="intro"><div><div class="eyebrow">REFERENCE KNOWLEDGE</div><h1>' + h(set.title) + '</h1>' +
+    '<div class="standing-line"><span class="badge standing ' + (set.withdrawn ? 'withdrawn' : done === set.cards.length ? 'active' : 'added') + '">' + (set.withdrawn ? 'Withdrawn' : done + ' of ' + set.cards.length + ' cards checked') + '</span></div></div></div>' +
+    '<div class="notice reference-terms" role="note"><b>' + h(NOT_A_PROTOCOL) + '</b> ' + h(set.applies) + '</div>' +
+    '<section class="panel knowledge-source"><h3>Where these come from</h3><p>' + h(cite(set)) + '</p><p><a class="secondary link-button" href="' + h(set.source.url) + '" target="_blank" rel="noopener noreferrer">Open the source page ↗</a></p>' +
+      '<p class="subtle">' + h(set.written) + ' Read on ' + h(set.source.readOn) + '. The page may have changed since.</p></section>' +
+    (set.withdrawn ? '<div class="notice" role="status">Withdrawn by ' + h(set.withdrawn.by) + ': ' + h(set.withdrawn.reason) + '. These cards no longer answer.</div>' : '') +
+    '<h2 class="group-head">Cards</h2><p class="subtle">To check a card: open the source page, find the place named on the card, and compare every figure and unit. ' + h(CUSTODY) + '</p>' +
+    '<div class="reference-list">' + set.cards.map(card => { const holds = cardHolds(set, card);
+      return '<article class="panel bundle ' + (holds ? 'reviewed' : 'open') + '" data-card="' + h(card.id) + '"><h4>' + h(card.title) + ' <span class="badge ' + (holds ? '' : 'learning') + '">' + (holds ? 'Checked' : card.review ? 'Changed since it was checked' : 'Not checked') + '</span></h4>' +
+        '<p class="fair-line">' + h(card.answer) + '</p><p class="subtle">In the source: ' + h(card.where) + ' · ' + (card.read === 'twice' ? 'two separate readings of the page agreed on these figures' : 'read from the page once; not cross-checked') + '</p>' +
+        (holds ? '<p class="subtle">Checked against the page by ' + h(card.review.by) + ' on ' + h(String(card.review.at).slice(0, 10)) + '.</p>' :
+          keeper && !set.withdrawn ? button('I opened the page and this card matches it', 'knowledge-check', 'class="primary" ' + valueAttr(card.id)) : '') + '</article>'; }).join('') + '</div>' +
+    (keeper && !set.withdrawn ? '<section class="panel protocol-step"><h3>Record</h3>' + (withdrawing ? '<form data-form="knowledge-withdraw"><label>Why are these cards being withdrawn? The reason is kept with the record.<input name="reason" maxlength="200" required autocomplete="off"></label>' +
+      '<div class="actions inline"><button class="danger">Withdraw these cards</button>' + button('Cancel', 'protocol-withdraw-cancel', 'class="secondary"') + '</div></form>' : '<p>' + button('Withdraw these cards…', 'protocol-withdraw', 'class="text-button"') + '</p>') + '</section>' : '');
 }

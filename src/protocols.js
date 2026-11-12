@@ -20,10 +20,10 @@ export const STANDING = {
   added: 'Added · reading not checked', checked: 'Reading checked · answers not reviewed', reviewed: 'Answers reviewed · not yet active',
   scheduled: 'Active from its effective date', active: 'Active', superseded: 'Superseded · history only', withdrawn: 'Withdrawn' };
 
-export const emptyLibrary = () => ({ families: [], revisions: [], marks: [] });
+export const emptyLibrary = () => ({ families: [], revisions: [], marks: [], knowledge: [] });
 // A workspace saved before protocols existed has no library. Anything already held is kept exactly as it was.
 export const prepareLibrary = held => ({ families: Array.isArray(held?.families) ? held.families : [], revisions: Array.isArray(held?.revisions) ? held.revisions : [],
-  marks: Array.isArray(held?.marks) ? held.marks : [] });
+  marks: Array.isArray(held?.marks) ? held.marks : [], knowledge: Array.isArray(held?.knowledge) ? held.knowledge : [] });
 
 const refuse = why => ({ ok: false, why });
 const isDate = value => /^\d{4}-\d{2}-\d{2}$/.test(value || '') && !Number.isNaN(Date.parse(value + 'T12:00:00Z'));

@@ -47,7 +47,7 @@ const { JSDOM } = require('jsdom');
   const settle = () => new Promise(resolve => setTimeout(resolve, 70));
   const waitFor = async (ready, label) => { for (let i = 0; i < 150; i++) { if (ready()) { await settle(); return; } await new Promise(resolve => setTimeout(resolve, 20)); } assert.fail('Timed out: ' + label); };
   const find = (action, value) => [...document.querySelectorAll('[data-action]')].find(el => el.dataset.action === action && (value === undefined || el.dataset.value === value));
-  const READING = new Set(['tab', 'protocol-home', 'protocol-open', 'protocol-revision', 'protocol-pane', 'protocol-cite', 'protocol-mark', 'protocol-ask', 'reference-shelf', 'ask-go', 'ask-open', 'ask-back', 'ask-next', 'close', 'protocol-withdraw', 'protocol-withdraw-cancel']);
+  const READING = new Set(['tab', 'protocol-home', 'protocol-open', 'protocol-revision', 'protocol-pane', 'protocol-cite', 'protocol-mark', 'protocol-ask', 'reference-shelf', 'knowledge-open', 'ask-go', 'ask-open', 'ask-back', 'ask-next', 'close', 'protocol-withdraw', 'protocol-withdraw-cancel']);
   const click = async (action, value) => { const before = read().events, el = find(action, value); assert.ok(el, 'Missing action ' + action + (value ? ' ' + value : '')); el.click(); await settle();
     if (READING.has(action)) assert.deepEqual(read().events, before, 'Reading must not add a receipt: ' + action); };
   const submit = async (selector, values) => { const form = document.querySelector(selector); assert.ok(form, 'Missing form ' + selector); for (const [name, value] of Object.entries(values)) form.querySelector('[name=' + name + ']').value = value;
@@ -183,6 +183,38 @@ const { JSDOM } = require('jsdom');
   await click('close');
   await actor('Jordan');
 
+  // Reference knowledge: cards arrive unchecked, answer only after a person records the check, and cite their page.
+  await click('tab', 'protocols'); await click('protocol-home');
+  assert.match(content(), /Reference knowledge[\s\S]*No reference cards are held\./);
+  await click('knowledge-add');
+  assert.equal(types().at(-1), 'Reference cards added');
+  assert.equal(document.querySelectorAll('[data-action="knowledge-check"]').length, 12);
+  assert.match(content(), /0 of 12 cards checked[\s\S]*Reference knowledge\. It is not your hospital’s protocol and not an order for any patient\./);
+  assert.equal(document.querySelector('.knowledge-source a.link-button').href, 'https://wtcs.pressbooks.pub/nursingfundamentals/chapter/15-5-acid-base-balance/');
+  reply = await ask('What is a normal PaCO2?');
+  assert.match(reply, /A reference card on this is held and has not been checked against its source/);
+  assert.ok(!/35-45/.test(reply), 'an unchecked card showed its figure');
+  await click('close');
+  await actor('Avery'); await click('tab', 'protocols');
+  assert.equal(find('knowledge-check'), undefined, 'a non-keeper is not offered the check');
+  const beforeCard = localStorage.getItem(key), forgedCard = document.createElement('button'); forgedCard.dataset.action = 'knowledge-check'; forgedCard.dataset.value = 'paco2'; document.querySelector('#app').append(forgedCard); forgedCard.click(); await settle();
+  assert.match(document.querySelector('.content > .notice').textContent, /Only a record keeper can change the protocols held here\./);
+  assert.equal(localStorage.getItem(key), beforeCard);
+  await actor('Jordan'); await click('tab', 'protocols');
+  await click('knowledge-check', 'paco2');
+  assert.deepEqual([types().at(-1), read().events.at(-1).details.card, read().events.at(-1).details.where], ['Reference card checked', 'PaCO2', 'Table 15.5a']);
+  assert.match(content(), /1 of 12 cards checked/);
+  reply = await ask('whats the normal range for PaCO2');
+  assert.match(reply, /Understood as: reference knowledge: paco2\.[\s\S]*Adult normal PaCO2 is 35-45 mmHg\. The source lists a PaCO2 less than 25 mmHg or greater than 60 mmHg as critical\.[\s\S]*Reference knowledge\. It is not your hospital’s protocol and not an order for any patient\./);
+  const cited = document.querySelector('.ask-answer .ask-item a.link-button');
+  assert.deepEqual([cited.href, cited.target, cited.rel], ['https://wtcs.pressbooks.pub/nursingfundamentals/chapter/15-5-acid-base-balance/', '_blank', 'noopener noreferrer']);
+  assert.equal(find('ask-yes'), undefined, 'a reference card offers no Yes or No');
+  reply = await ask('What is a normal pH?');
+  assert.match(reply, /has not been checked against its source/, 'checking one card does not check another');
+  reply = await ask('What is a normal SpO2?');
+  assert.ok(!/reference knowledge/i.test(reply), 'the arterial-saturation card answered a pulse-oximetry question');
+  await click('close');
+
   // Professional references: a shelf of links out. Nothing of any guideline is held, shown or answered from.
   await click('tab', 'protocols'); await click('protocol-home');
   await waitFor(() => find('reference-shelf'), 'the reference list loaded');
@@ -226,8 +258,9 @@ const { JSDOM } = require('jsdom');
 
   // What was kept, and what was not.
   const kept = JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(name => [name, localStorage.getItem(name)])));
-  for (const typed of ['Blue Trainer drill at', 'amber seal lamp serviced', 'swallow screen before', 'suction']) assert.ok(!kept.includes(typed), 'storage holds what was typed: ' + typed);
-  assert.deepEqual(types().slice(receiptsAtStart), ['Protocol reading confirmed', 'Protocol answers mapped', ...Array(6).fill('Protocol answer reviewed'), 'Protocol answers reviewed', 'Protocol revision made active', 'Protocol revision withdrawn']);
+  for (const typed of ['Blue Trainer drill at', 'amber seal lamp serviced', 'swallow screen before', 'suction', 'normal range for PaCO2', 'normal SpO2']) assert.ok(!kept.includes(typed), 'storage holds what was typed: ' + typed);
+  assert.deepEqual(types().slice(receiptsAtStart), ['Protocol reading confirmed', 'Protocol answers mapped', ...Array(6).fill('Protocol answer reviewed'), 'Protocol answers reviewed', 'Protocol revision made active',
+    'Reference cards added', 'Reference card checked', 'Protocol revision withdrawn']);
   assert.deepEqual(read().events[0], stored.events[0], 'the receipt from before protocols is untouched');
   assert.equal((await audit.verifyReceipts(read().events)).ok, true);
   assert.equal(read().documents[0].text, stored.documents[0].text);
