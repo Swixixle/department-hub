@@ -130,6 +130,34 @@ const {JSDOM} = require('jsdom');
   assert.match(await ask('Who is working this Friday?'), /Understood as: who is on, Fri, Nov 13\./);
   assert.match(await ask('Who is working next Friday?'), /Understood as: who is on, Fri, Nov 20\./);
   assert.match(await ask('Am I working this Friday or next Friday?'), /Partial answer\. You asked about Fri, Nov 13 and Fri, Nov 20\./);
+  // The repaired exchanges through the same form, action handler and context path the phone uses, not direct ask() calls.
+  assert.match(await ask('Who is on Friday night?'), /Fri, Nov 13 night: /);
+  const fixedShift = await ask('No, I meant day shift.');
+  assert.match(fixedShift, /Understood as: who is on, Fri, Nov 13, days\./);
+  assert.match(fixedShift, /Casey/);
+  assert.doesNotMatch(fixedShift, /Quinn/);                                    // the night team of that same Friday
+  await ask('Who is on Friday day?');
+  assert.match(await ask('No, the other Friday.'), /Which Friday do you mean, Fri, Nov 20 or Fri, Nov 27\?/);
+  assert.deepEqual([...document.querySelectorAll('.ask-answer [data-action="ask-next"]')].map(el => el.textContent), ['Fri, Nov 20', 'Fri, Nov 27']);
+  const beforeChoice = JSON.parse(localStorage.getItem(key)).events;
+  await click('ask-next', '0');
+  await waitFor(() => /Nov 20/.test(document.querySelector('.ask-answer')?.textContent || ''), 'the chosen Friday answered');
+  const chosen = document.querySelector('.ask-answer').textContent;
+  assert.match(chosen, /Understood as: who is on, Fri, Nov 20, days\./);
+  assert.match(chosen, /Indigo/);
+  assert.doesNotMatch(chosen, /Casey/);                                        // the Friday that was corrected away from
+  assert.deepEqual(JSON.parse(localStorage.getItem(key)).events, beforeChoice, 'Choosing a clarification must not write a receipt');
+  await ask('When do I work next?');
+  const hours = await ask('What time should I be there?');
+  assert.match(hours, /Thu, Nov 12 night shift has no hours written on the schedule/);
+  assert.match(hours, /19:00 to 07:00/);
+  const thanked = await ask('thanks');
+  assert.match(thanked, /Any time\./);
+  assert.doesNotMatch(thanked, /Searched the board/);
+  const notAQuestion = await ask('zxqw blorp');
+  assert.match(notAQuestion, /I did not understand that as a question I can look up\./);
+  assert.doesNotMatch(notAQuestion, /Nothing on record answers that/);
+  assert.equal(localStorage.getItem(key).includes('zxqw blorp'), false);
   await click('docs');
   await submitForm('doc',{title:'Leave policy',text:'Leave requests are submitted through the request screen. The custodian confirms the current official process.'});
   const added=read().documents.at(-1);

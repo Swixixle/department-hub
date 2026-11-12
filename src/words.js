@@ -115,3 +115,28 @@ export function expand(text, groups = SYNONYMS) {
   }
   return [...extra];
 }
+
+// Ordinary ways of saying things Ask already understands, rewritten into words it routes on. This is deliberately
+// narrow: each phrase is recognised in the context that makes it a work question, never substituted everywhere.
+// Returns { text, changes: [[typed, read]] }, so the answer can show what it did.
+const PHRASES = [
+  // "do i have to come in tomorrow" is a schedule question; "when does this come into effect" is not.
+  [/\b(come|comes|coming|came)\s+in(?:to)?\b(?!\s+(?:effect|force|play|view|question|contact|focus|being|use|place))(?:\s+to\s+work)?/g, 'work'],
+  // "are we thin tonight" is about staffing; "thin liquids" is a clinical phrase and must stay one.
+  [/\b(?:are|is|was|were|look|looks|looking|feel|feels|feeling|be|been|running|pretty|bit|too|very|so|real|really)\s+((?:\w+\s+){0,2}?)thin\b(?!\s+(?:liquid|liquids|film|films|layer|layers|client|clients|section|sections))/g, (whole, middle) => whole.replace(/thin$/, 'short')]
+];
+export function readWorkPhrases(text) {
+  let out = String(text || ''), changes = [];
+  for (const [shape, into] of PHRASES) {
+    out = out.replace(shape, (...args) => {
+      const whole = args[0], next = typeof into === 'function' ? into(...args) : into;
+      if (next !== whole) changes.push([whole.trim(), next.trim()]);
+      return next;
+    });
+  }
+  return { text: out.replace(/\s+/g, ' ').trim(), changes };
+}
+
+// A message that is only courtesy, with no question in it.
+const THANKS = /^\s*(?:ok(?:ay)?|alright|cool|great|perfect|awesome|nice|sweet|yes|yep|yeah)?[\s,.!]*(?:thanks?(?:\s+you)?|thank\s+you|thx|ty|tysm|appreciate\s+it|much\s+appreciated|got\s+it|gotcha)[\s,.!]*(?:a\s+lot|so\s+much|again|man|dude|buddy|friend)?[\s,.!]*$/i;
+export const isThanks = text => THANKS.test(String(text || ''));
