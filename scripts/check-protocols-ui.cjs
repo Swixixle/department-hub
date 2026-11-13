@@ -262,12 +262,12 @@ const { JSDOM } = require('jsdom');
   assert.match(content(), /Guidelines, restated[\s\S]*No guideline cards are held\./);
   await click('guideline-add'); await waitFor(() => document.querySelector('[data-guideline-card="r4-fio2"]'), 'guideline cards added');
   assert.equal(types().at(-1), 'Guideline cards added');
-  assert.match(content(), /0 of 7 compared by a member[\s\S]*Restated in Department Hub’s own fixed wording/);
+  assert.match(content(), /7 of 7 cards: every word found in its passage[\s\S]*Restated in Department Hub’s own fixed wording/);
   assert.ok(document.querySelector('#guideline-copy'), 'anyone can give the app their own copy');
   assert.equal(find('guideline-compare'), undefined, 'nobody can record a comparison before their own copy held the passage');
   reply = await ask('should I turn up fio2 during sbt');
-  assert.match(reply, /Recommendation 4 \(conditional, very low certainty\): FIO2 should not be raised during a breathing trial\.[\s\S]*not yet compared with the guideline by a second person/);
-  assert.deepEqual([...document.querySelectorAll('.ask-answer .checks li')].map(li => li.className), ['done', 'done', 'open', 'open', 'done'], 'not yet found or compared by a member shows as not done');
+  assert.match(reply, /Recommendation 4 \(conditional, very low certainty\): FIO2 should not be increased during an SBT\.[\s\S]*every word found in its passage/);
+  assert.deepEqual([...document.querySelectorAll('.ask-answer .checks li')].map(li => li.className), ['done', 'done', 'done', 'done'], 'numbers, words, fixed wording and edition all pass; a member’s copy is not listed as a gap');
   assert.equal(find('ask-yes'), undefined, 'a guideline card offers no Yes or No');
   await click('close');
 

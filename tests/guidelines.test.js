@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { buildSet, checkCard, addGuideline, matchCopy, compareCard, withdrawGuideline, guidelineAnswer, sentenceOf, comparedBy, GUIDELINE_FORMAT } from '../src/guidelines.js';
+import { buildSet, checkCard, wordCheck, addGuideline, matchCopy, compareCard, withdrawGuideline, guidelineAnswer, sentenceOf, comparedBy, GUIDELINE_FORMAT } from '../src/guidelines.js';
 import { ask } from '../src/ask.js';
 import { emptyLibrary, prepareLibrary } from '../src/protocols.js';
 import { guidelineView } from '../src/protocol-view.js';
@@ -25,7 +25,7 @@ test('cards are fixed sentences filled from the guideline, every number found in
   const set = await built();
   assert.equal(set.format, GUIDELINE_FORMAT);
   assert.deepEqual(set.cards.map(sentenceOf), ['Recommendation 1 (conditional, low certainty): a bellows check is not needed before every drill.', 'Recommendation 2 (conditional, moderate certainty): a drill can run with or without a cuff of 3 cm or less.',
-    'Gauge reading commonly used to start a drill: 12 to 14 marks, as the guideline describes common practice.', 'A drill is commonly stopped if the gauge falls below: 6 marks.']);
+    'Gauge reading at which trainers commonly start a drill: 12 to 14 marks, as the guideline describes common practice.', 'A drill is commonly stopped if the gauge falls below: 6 marks.']);
   const shipped = JSON.stringify(set);
   // The title is the guideline's name, which a citation carries; nothing else of it may.
   const body = TEXT.split('\n').slice(2).filter(line => line.split(' ').length > 6);
@@ -45,6 +45,32 @@ test('the build refuses a wrong number, a wrong section, free text and a capture
   assert.match(checkCard({ ...card[2], passage: [40, 41] }, TEXT).join(), /not in the capture/);
   const result = await buildSet(SPEC(), TEXT.replace('6 marks', '5 marks'), RECEIPT);
   assert.equal(result.ok, false); assert.ok(result.problems.some(problem => /not the one its receipt describes/.test(problem)));
+});
+
+test('the word check: a card may use only its passage’s words, keeps every negation, and may not add a modal', async () => {
+  const card = SPEC().cards, words = (index, field, value) => checkCard({ ...card[index], fields: { ...card[index].fields, [field]: value } }, TEXT).join();
+  assert.match(words(0, 'about', 'a bellows check is not useful before every drill'), /uses words its passage does not: useful/);
+  assert.match(words(0, 'about', 'a bellows check is needed before every drill'), /drops a negation its passage has: not/);
+  assert.match(words(1, 'about', 'a drill should run with or without a cuff of 3 cm or less'), /uses words its passage does not: should/);
+  assert.match(words(1, 'strength', 'strong, moderate certainty'), /uses words its passage does not: strong/);
+  assert.match(words(3, 'what', 'A drill is never stopped if the gauge falls below'), /uses words its passage does not: never/);
+  assert.equal(words(2, 'when', 'as the guideline describes common practice'), '', 'a fixed framing phrase may be added');
+  assert.equal(words(2, 'when', 'as the guideline describes usual practice'), 'Card "Gauge reading to start a drill" uses words its passage does not: guideline, describes, usual, practice.', 'only the exact framing');
+  // Abbreviations come from one fixed list: a card may say SBT for a passage's "spontaneous breathing trial", and the reverse.
+  const sbt = { id: 'x', title: 'x', kind: 'value', passage: [0, 0], fields: { what: 'Length of an SBT', value: '30 minutes' } };
+  assert.deepEqual(wordCheck(sbt, 'A spontaneous breathing trial commonly lasts 30 minutes, the length of most.'), []);
+  assert.deepEqual(wordCheck({ ...sbt, fields: { what: 'Length of a spontaneous breathing trial', value: '30 minutes' } }, 'An SBT lasts 30 minutes, the length of most.'), []);
+  const set = await built();
+  assert.ok(set.cards.every(one => one.passage.checked.includes('words')), 'every built card records that its words were checked');
+});
+
+test('a replaced guideline answers only where no newer one covers the question, and says it was replaced', async () => {
+  const newer = await built(), older = { ...(await built()), id: 'invented-bellows-old', replacedBy: { id: newer.id, title: newer.title } };
+  const both = ok(await addGuideline(ok(await addGuideline(emptyLibrary(), older, WHO, AT)).library, newer, WHO, AT)).library;
+  assert.equal(say(both, 'when do I stop a drill?').guideline.set, 'invented-bellows');
+  const alone = ok(await addGuideline(emptyLibrary(), older, WHO, AT)).library, reply = say(alone, 'when do I stop a drill?');
+  assert.equal(reply.guideline.set, 'invented-bellows-old');
+  assert.match(reply.items[0].sub, /replaced by /);
 });
 
 test('a member’s own copy is searched for each passage, wherever its lines break; a changed number is not found', async () => {
@@ -77,7 +103,7 @@ test('Ask gives the card’s sentence, where it is, and whether anyone has compa
   const library = await held(), reply = say(library, 'when do I stop a drill?');
   assert.deepEqual([reply.kind, reply.title, reply.guideline.cards], ['guideline', 'A drill is commonly stopped if the gauge falls below: 6 marks.', ['v-stop']]);
   assert.match(reply.lines.at(-1), /^Restated in Department Hub’s own fixed wording from the guideline named\. It is not the guideline’s text/);
-  assert.match(reply.items[0].sub, /every number checked against an exact capture of the guideline · not yet compared with the guideline by a second person · read it in your own copy$/);
+  assert.match(reply.items[0].sub, /every number checked against an exact capture of the guideline · every word found in its passage · read it in your own copy$/);
   assert.equal(reply.items.at(-1).go, 'guideline|invented-bellows');
   for (const line of TEXT.split('\n').slice(2).filter(line => line.split(' ').length > 6)) assert.ok(!JSON.stringify(reply).includes(line));
   assert.deepEqual(say(library, 'When do I work next?'), say(emptyLibrary(), 'When do I work next?'), 'schedule questions are untouched');
@@ -98,6 +124,7 @@ test('the guideline screen offers a member their own check, and the compare butt
 
 test('the shipped AARC 2024 breathing-trial cards are well formed and hold no text of the guideline', async () => {
   const set = JSON.parse(readFileSync(new URL('../src/reference/guidelines/aarc-2024-sbt.json', import.meta.url), 'utf8'));
+  assert.ok(set.cards.every(card => card.passage.checked.join() === 'numbers,words'), 'every shipped card passed the word check');
   assert.equal(set.format, GUIDELINE_FORMAT);
   assert.equal(set.source.capture.sha256, '29f3a368baca4213ef7451e563a4aeaccb2eab7f47a4740e71482d951bd70fad');
   assert.match(set.source.rights, /Copyright © 2024 Daedalus Enterprises\. Department Hub holds none of its text/);
@@ -111,5 +138,5 @@ test('the shipped AARC 2024 breathing-trial cards are well formed and hold no te
   const expected = { 'do I need an rsbi before an sbt': 'r1-rsbi', 'can I do the sbt on pressure support': 'r2-psv', 'what time sbt': 'r3-timing', 'should I turn up fio2 during sbt': 'r4-fio2',
     'what spo2 before sbt': 'v-oxygenation', 'when to stop sbt': 'v-stop', 'patient is being extubated to bipap': 'v-niv' };
   for (const [question, card] of Object.entries(expected)) assert.deepEqual(say(library, question).guideline?.cards, [card], question);
-  assert.equal(say(library, 'should I turn up fio2 during sbt').title, 'Recommendation 4 (conditional, very low certainty): FIO2 should not be raised during a breathing trial.');
+  assert.equal(say(library, 'should I turn up fio2 during sbt').title, 'Recommendation 4 (conditional, very low certainty): FIO2 should not be increased during an SBT.');
 });

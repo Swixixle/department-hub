@@ -1,0 +1,398 @@
+{
+ "checked": "2026-11-13",
+ "list": "https://www.aarc.org/resource/clinical-practice-guidelines/",
+ "guidelines": [
+  {
+   "id": "aarc-2026-o2-transition",
+   "title": "Adult Patients Transitioning From the Hospital on Oxygen",
+   "year": 2026,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.1177/19433654261472990",
+   "pdf": null,
+   "status": "to capture",
+   "note": "Published Sept 2026; not yet on AARC’s list page (last changed June 2026)."
+  },
+  {
+   "id": "aarc-palisi-2025-peds-asthma",
+   "title": "AARC and PALISI: Pediatric Critical Asthma",
+   "year": 2025,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.1089/respcare.12897",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2025/05/white-et-al-2025-aarc-and-palisi-clinical-practice-guideline-pediatric-critical-asthma.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2024-pva",
+   "title": "Patient-Ventilator Assessment",
+   "year": 2024,
+   "kind": "graded",
+   "page": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11298231/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2024/10/patient-ventilator-assessment-aarc-cpg.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2024-sbt",
+   "title": "Spontaneous Breathing Trials for Liberation From Adult Mechanical Ventilation",
+   "year": 2024,
+   "kind": "graded",
+   "page": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11285503/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2023/11/CPG2024SpontaneousBreathingTrial.pdf",
+   "status": "done",
+   "note": "Done: 7 cards."
+  },
+  {
+   "id": "aarc-2022-cbg",
+   "title": "Capillary Blood Gas Sampling for Neonatal and Pediatric Patients",
+   "year": 2022,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.10151",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2022/10/cpg-capillary-blood-gas-sampling.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2022-suctioning",
+   "title": "Artificial Airway Suctioning",
+   "year": 2022,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.09548",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2022/10/cpg-artificial-airway-suctioning.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2022-adult-o2",
+   "title": "Management of Adult Patients With Oxygen in the Acute Care Setting",
+   "year": 2022,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.09294",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2022/10/cpg-clinical-mangement-adult-o2-acute-settings.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2021-peds-o2",
+   "title": "Management of Pediatric Patients With Oxygen in the Acute Care Setting",
+   "year": 2021,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.09006",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2021/08/management-of-pediatric-patients-with-oxygen-in-the-acute-setting.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2021-adult-trach",
+   "title": "Management of Adult Patients With Tracheostomy in the Acute Care Setting",
+   "year": 2021,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.08206",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2025/03/mussa-et-al-2020-aarc-clinical-practice-guideline-management-of-adult-patients-with-tracheostomy-in-the-acute-care.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2021-peds-trach",
+   "title": "Management of Pediatric Patients With Tracheostomy in the Acute Care Setting",
+   "year": 2021,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.08137",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2025/03/volsko-et-al-2021-aarc-clinical-practice-guideline-management-of-pediatric-patients-with-tracheostomy-in-the-acute-care.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2015-pharm-act",
+   "title": "Effectiveness of Pharmacologic Airway Clearance Therapies in Hospitalized Patients",
+   "year": 2015,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.04165",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/pharm_cpg.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2013-nonpharm-act",
+   "title": "Effectiveness of Nonpharmacologic Airway Clearance Therapies in Hospitalized Patients",
+   "year": 2013,
+   "kind": "graded",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.02925",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/nonpharmacologic_2013.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2010-ino-neonates",
+   "title": "Inhaled Nitric Oxide for Neonates With Acute Hypoxic Respiratory Failure",
+   "year": 2010,
+   "kind": "graded",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/21122181/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2025/03/diblasi-et-al-2010-evidence-based-clinical-practice-guideline-inhaled-nitric-oxide-for-neonates-with-acute-hypoxic.pdf",
+   "status": "to capture",
+   "note": "Full-text page still to find (PubMed has no DOI for it)."
+  },
+  {
+   "id": "aarc-2003-vent-circuit",
+   "title": "Care of the Ventilator Circuit and Its Relation to Ventilator-Associated Pneumonia",
+   "year": 2003,
+   "kind": "graded",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/14513820/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/09.03.0869.pdf",
+   "status": "to capture",
+   "note": "No DOI; full-text page still to find."
+  },
+  {
+   "id": "aarc-2002-weaning",
+   "title": "Weaning and Discontinuing Ventilatory Support",
+   "year": 2002,
+   "kind": "graded",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/ebgwdvscpg.pdf",
+   "status": "to capture",
+   "note": "Joint ACCP/AARC/SCCM guideline; no web page found yet. The 2024 SBT guideline covers part of it but does not replace it."
+  },
+  {
+   "id": "aarc-2012-aerosol-devices",
+   "title": "Aerosol Delivery Device Selection for Spontaneously Breathing Patients",
+   "year": 2012,
+   "kind": "reference",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.01756",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/aerosol_delivery_2012.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2004-neonatal-cpap",
+   "title": "Application of CPAP to Neonates via Nasal Prongs, Nasopharyngeal Tube, or Nasal Mask",
+   "year": 2004,
+   "kind": "reference",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/09.04.1100.pdf",
+   "status": "to capture",
+   "note": "No web page found yet."
+  },
+  {
+   "id": "aarc-2013-bga",
+   "title": "Blood Gas Analysis and Hemoximetry",
+   "year": 2013,
+   "kind": "reference",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.02786",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2025/03/davis-et-al-2013-aarc-clinical-practice-guideline-blood-gas-analysis-and-hemoximetry-2013.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2007-bronchoscopy",
+   "title": "Bronchoscopy Assisting",
+   "year": 2007,
+   "kind": "reference",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/bronchoscopy_assisting.pdf",
+   "status": "to capture",
+   "note": "No web page found yet."
+  },
+  {
+   "id": "aarc-2001-cbg",
+   "title": "Capillary Blood Gas Sampling for Neonatal and Pediatric Patients (2001)",
+   "year": 2001,
+   "kind": "reference",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/05.01.506.pdf",
+   "status": "to capture",
+   "note": "Replaced by the 2022 guideline of the same name.",
+   "replacedBy": {
+    "id": "aarc-2022-cbg",
+    "title": "Capillary Blood Gas Sampling for Neonatal and Pediatric Patients (2022)"
+   }
+  },
+  {
+   "id": "aarc-2011-capnography",
+   "title": "Capnography/Capnometry During Mechanical Ventilation",
+   "year": 2011,
+   "kind": "reference",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.01175",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/04.11.0503.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2023-pft-race",
+   "title": "Effect of Race and Ethnicity on Pulmonary Function Testing Interpretation",
+   "year": 2023,
+   "kind": "reference",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2023/08/effect-race-ethnicity-pulmonary-function-testing-interpretation.pdf",
+   "status": "to capture",
+   "note": "Not found in PubMed; may exist only as the AARC PDF."
+  },
+  {
+   "id": "aarc-2010-ets",
+   "title": "Endotracheal Suctioning of Mechanically Ventilated Patients With Artificial Airways",
+   "year": 2010,
+   "kind": "reference",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/20507660/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/06.10.0758.pdf",
+   "status": "to capture",
+   "note": "Replaced by Artificial Airway Suctioning (2022): my reading of the two scopes.",
+   "replacedBy": {
+    "id": "aarc-2022-suctioning",
+    "title": "Artificial Airway Suctioning (2022)"
+   }
+  },
+  {
+   "id": "aarc-2012-humidification",
+   "title": "Humidification During Invasive and Noninvasive Mechanical Ventilation",
+   "year": 2012,
+   "kind": "reference",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.01766",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/12.05.0782.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2002-transport",
+   "title": "In-Hospital Transport of the Mechanically Ventilated Patient",
+   "year": 2002,
+   "kind": "reference",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/12078656/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/06.02.721.pdf",
+   "status": "to capture",
+   "note": "No DOI; full-text page still to find."
+  },
+  {
+   "id": "aarc-2011-incentive-spirometry",
+   "title": "Incentive Spirometry",
+   "year": 2011,
+   "kind": "reference",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.01471",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/10.11.1600.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2008-infant-pft",
+   "title": "Infant/Toddler Pulmonary Function Tests",
+   "year": 2008,
+   "kind": "reference",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/07.08.0929.pdf",
+   "status": "to capture",
+   "note": "No web page found yet."
+  },
+  {
+   "id": "aarc-2003-ippb",
+   "title": "Intermittent Positive Pressure Breathing",
+   "year": 2003,
+   "kind": "reference",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/12778895/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/05.03.0540.pdf",
+   "status": "to capture",
+   "note": "No DOI; full-text page still to find."
+  },
+  {
+   "id": "aarc-2007-home-ventilation",
+   "title": "Long-Term Invasive Mechanical Ventilation in the Home",
+   "year": 2007,
+   "kind": "reference",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/17715560/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/08.07.1056.pdf",
+   "status": "to capture",
+   "note": "No DOI; full-text page still to find."
+  },
+  {
+   "id": "aarc-2004-indirect-calorimetry",
+   "title": "Metabolic Measurement Using Indirect Calorimetry During Mechanical Ventilation",
+   "year": 2004,
+   "kind": "reference",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/09.04.1073.pdf",
+   "status": "to capture",
+   "note": "No web page found yet."
+  },
+  {
+   "id": "aarc-2004-nts",
+   "title": "Nasotracheal Suctioning",
+   "year": 2004,
+   "kind": "reference",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/09.04.1080.pdf",
+   "status": "to capture",
+   "note": "No web page found yet. Not replaced: the 2022 suctioning guideline covers artificial airways only."
+  },
+  {
+   "id": "aarc-2002-adult-o2",
+   "title": "Oxygen Therapy for Adults in the Acute Care Facility",
+   "year": 2002,
+   "kind": "reference",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/12078655/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/06.02.717.pdf",
+   "status": "to capture",
+   "note": "Replaced by the 2022 adult oxygen guideline: my reading of the two scopes.",
+   "replacedBy": {
+    "id": "aarc-2022-adult-o2",
+    "title": "Management of Adult Patients With Oxygen in the Acute Care Setting (2022)"
+   }
+  },
+  {
+   "id": "aarc-2007-home-o2",
+   "title": "Oxygen Therapy in the Home or Alternate Site Health Care Facility",
+   "year": 2007,
+   "kind": "reference",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/17715561/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/08.07.1063.pdf",
+   "status": "to capture",
+   "note": "No DOI. The 2026 transition guideline overlaps but does not replace it."
+  },
+  {
+   "id": "aarc-1995-psg",
+   "title": "Polysomnography",
+   "year": 1995,
+   "kind": "reference",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/10153260/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/12.05.1336.pdf",
+   "status": "to capture",
+   "note": "From 1995: the oldest on the list."
+  },
+  {
+   "id": "aarc-2010-caregiver-training",
+   "title": "Providing Patient and Caregiver Training",
+   "year": 2010,
+   "kind": "reference",
+   "page": "https://pubmed.ncbi.nlm.nih.gov/20507661/",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/06.10.0765.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2007-extubation",
+   "title": "Removal of the Endotracheal Tube",
+   "year": 2007,
+   "kind": "reference",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2014/08/removal_of_endotracheal_tube.pdf",
+   "status": "to capture",
+   "note": "No web page found yet."
+  },
+  {
+   "id": "aarc-2013-surfactant",
+   "title": "Surfactant Replacement Therapy",
+   "year": 2013,
+   "kind": "reference",
+   "page": "https://journals.sagepub.com/doi/full/10.4187/respcare.02189",
+   "pdf": "https://www.aarc.org/wp-content/uploads/2025/03/walsh-et-al-2013-aarc-clinical-practice-guideline-surfactant-replacement-therapy-2013.pdf",
+   "status": "to capture",
+   "note": ""
+  },
+  {
+   "id": "aarc-2004-tcm-neonatal",
+   "title": "Transcutaneous Blood Gas Monitoring for Neonatal & Pediatric Patients",
+   "year": 2004,
+   "kind": "reference",
+   "page": null,
+   "pdf": "https://www.aarc.org/wp-content/uploads/2025/03/2004-transcutaneous-blood-gas-monitoring-for-neonatal-pediatric-patients-2004-revision-update.pdf",
+   "status": "to capture",
+   "note": "A 2012 update (Restrepo et al., Respir Care 2012;57(11):1955-62, doi 10.4187/respcare.02011) exists but AARC’s page lists the 2004 one. Undecided which to card."
+  }
+ ]
+}

@@ -10,4 +10,4 @@ GitHub is the independent record: a device can change its own cards and fingerpr
 | Set | Title | Fingerprint (SHA-256) |
 | --- | --- | --- |
 | blood-gases-adult-witnessed | Arterial blood gases: adult normal values and reading a result | `4e7b88ba16974ca2ed9fee2303f43a240473a84701f8b01cf1560014514c64e5` |
-| aarc-2024-sbt | Spontaneous breathing trials for adults on the ventilator | `a0848be078b678099b0499362b72ea533bc5e229a2e87b449210d1b201820087` |
+| aarc-2024-sbt | Spontaneous breathing trials for adults on the ventilator | `e5a5a4d109a256e85afca95cec33c491c3a661348cb0cef43ca042a8dffd5649` |
