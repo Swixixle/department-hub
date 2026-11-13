@@ -1,6 +1,6 @@
 # Preparing the private department pilot
 
-Updated 2026-11-12. The parts of this that are now built are listed under **What is built now** below; the rest is still a plan. The phone app is still one-browser software: it has not been connected to the server, and shared accounts, messages between devices and notifications are not built.
+Updated 2026-11-12. The parts of this that are now built are listed under **What is built now** below; the rest is still a plan. The board can now be shared through the server when the app is opened from it (see **What the app does with it now**); the schedule and the rest are still one-browser, and messages between devices and notifications are not built.
 
 **Clarification — decided:** passkey sign-in with no email typed at sign-in; members supply their own phone/email information; no app-sent email/text is authorized by this work. **Open:** email's purpose, collection requirements and app-sent notifications. `EMAIL-OPTIONS.md` records alternatives, not a selected design. The implementation stages below remain proposals, not built features.
 
@@ -67,7 +67,12 @@ against `localhost` would prove nothing about a production relying party.
 
 Build and test locally using synthetic records, two isolated test departments and separate authenticated test users. Keep the existing local app and fictional public demo usable. Do not silently upload the owner's browser workspace when shared mode becomes available.
 
-### What the app does with any of this: nothing yet
+### What the app does with it now
+
+Updated 2026-11-12. Opened from the department server (the page carries a `department-hub-server` mark that the server adds), the app offers sign-in on the board: joining from an invitation link, the read-aloud code, and signing in with a passkey. Signed in, the board reads and writes through `sharedBoard`; administrators invite, confirm, remove and promote members from Account. Opened from serve.py or the public demo, nothing changes and no request is made to look for a server. The schedule, requests, fairness and protocols stay in the browser. `docs/DEPLOY.md` covers putting it online.
+
+The paragraphs below describe the adapter as it was first written.
+
 
 The adapter is written and tested; no screen calls it. `src/backend.js` now has `sharedBoard` beside `localBoard`,
 offering the same six functions over HTTP, so nothing above that line has to know which one is in use. What differs

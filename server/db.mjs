@@ -251,6 +251,9 @@ export function open(path) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec(SCHEMA);
+  // Added after the first pilot schema: what kind of post it is (Learning, kept inside, dated, voice). A database made
+  // before the column existed gets it here, empty, and its posts read as plain posts.
+  if (!db.prepare('PRAGMA table_info(posts)').all().some(column => column.name === 'extras')) db.exec('ALTER TABLE posts ADD COLUMN extras TEXT');
   return db;
 }
 

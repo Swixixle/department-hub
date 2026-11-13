@@ -22,8 +22,27 @@ const notFound = () => { throw new Refused(404, 'not found'); };
 const forbidden = () => { throw new Refused(403, 'not permitted'); };
 const badRequest = message => { throw new Refused(400, message); };
 
+// What kind of post it is, as the phone's board shows it. Only these keys, each checked, and nothing free-form.
+const WHEN_KINDS = ['due', 'meeting', 'event'];
+export function postExtras(value = {}) {
+  const extras = {};
+  if (value.learning === true) extras.learning = true;
+  if (value.inside === true) extras.inside = true;
+  if (value.voice === true) extras.voice = true;
+  if (value.seconds !== undefined) {
+    const seconds = Number(value.seconds);
+    if (!Number.isFinite(seconds) || seconds < 0 || seconds > 3600) badRequest('seconds is a recording length');
+    extras.seconds = Math.round(seconds * 10) / 10;
+  }
+  if (value.when !== undefined && value.when !== null) {
+    if (!WHEN_KINDS.includes(value.when.kind) || !/^\d{4}-\d{2}-\d{2}$/.test(String(value.when.date || ''))) badRequest('when is a kind and a date');
+    extras.when = { kind: value.when.kind, date: value.when.date };
+  }
+  return extras;
+}
+const readExtras = text => { try { return text ? JSON.parse(text) : {}; } catch { return {}; } };
 const postJson = (row, media = []) => ({ id: row.id, departmentId: row.department_id, authorId: row.author_id, body: row.body,
-  clientId: row.client_id ?? null, createdAt: row.created_at, editedAt: row.edited_at ?? null,
+  clientId: row.client_id ?? null, createdAt: row.created_at, editedAt: row.edited_at ?? null, extras: readExtras(row.extras),
   media: media.map(file => ({ id: file.id, name: file.name, contentType: file.content_type, bytes: file.bytes?.length ?? file.size ?? null })) });
 const messageJson = row => ({ id: row.id, conversationId: row.conversation_id, authorId: row.author_id, body: row.body, createdAt: row.created_at });
 
@@ -60,7 +79,11 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
         .map(row => postJson(row, mediaOf(row.id))));
       if (method === 'POST') {
         const text = String(body?.body ?? '').trim();
-        if (!text) badRequest('a post needs words');
+        const media = Array.isArray(body.media) ? body.media.map(String) : [];
+        // Words, or at least one attachment: a voice message or a photo can stand on its own.
+        if (!text && !media.length) badRequest('a post needs words or an attachment');
+        if (text.length > 2000) badRequest('a post is at most 2000 characters');
+        const extras = postExtras(body.extras || {});
         // An authorId or departmentId in the body is refused rather than quietly honoured, so a client cannot
         // discover that forging one is merely ineffective.
         if (body.authorId && body.authorId !== session.personId) badRequest('authorship comes from the session');
@@ -72,10 +95,10 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
           const already = db.prepare('SELECT * FROM posts WHERE department_id = ? AND client_id = ?').get(dept, clientId);
           if (already) return { status: 200, body: { ...postJson(already, mediaOf(already.id)), duplicate: true } };
         }
-        const media = Array.isArray(body.media) ? body.media.map(String) : [];
         const row = transact(db, () => {
           const id = newId('post'), at = now();
-          db.prepare('INSERT INTO posts (id, department_id, author_id, body, client_id, created_at) VALUES (?,?,?,?,?,?)').run(id, dept, session.personId, text, clientId, at);
+          db.prepare('INSERT INTO posts (id, department_id, author_id, body, client_id, created_at, extras) VALUES (?,?,?,?,?,?,?)')
+            .run(id, dept, session.personId, text, clientId, at, Object.keys(extras).length ? JSON.stringify(extras) : null);
           for (const mediaId of media) {
             // Only this person's own just-uploaded attachments, from this department, not yet on another post.
             const file = db.prepare('SELECT * FROM files WHERE id = ? AND department_id = ? AND post_id IS NULL AND conversation_id IS NULL').get(mediaId, dept);
@@ -126,13 +149,16 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
   }
 
   if (kind === 'directory') {
-    const rows = db.prepare(`SELECT p.id, p.id AS person_id, p.name, pr.phone, pr.share_phone
+    const rows = db.prepare(`SELECT p.id, p.id AS person_id, p.name, pr.phone, pr.share_phone, m.id AS membership_id, m.roles
       FROM memberships m JOIN people p ON p.id = m.person_id LEFT JOIN profiles pr ON pr.person_id = p.id
       WHERE m.department_id = ? AND m.revoked_at IS NULL AND m.activated_at IS NOT NULL ORDER BY p.name`).all(dept);
-    if (!first) return json(rows.map(row => directoryPerson(session, row)));
+    // An administrator also sees each membership's id and roles, which is what removing someone or changing a role
+    // needs. Nobody else does.
+    const shown = row => canAdministerMembership(session) ? { ...directoryPerson(session, row), membershipId: row.membership_id, roles: (() => { try { return JSON.parse(row.roles); } catch { return []; } })() } : directoryPerson(session, row);
+    if (!first) return json(rows.map(shown));
     const one = rows.find(row => row.person_id === first);
     if (!one) notFound();
-    return json(directoryPerson(session, one));
+    return json(shown(one));
   }
 
   // Your own contact record, and nobody else's. A personId anywhere in the request is refused.
