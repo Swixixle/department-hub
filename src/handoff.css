@@ -1,0 +1,53 @@
+/* Handoff: one card per bed, fields in a grid, settings in short boxes side by side. */
+.handoff-terms { max-width: 900px; border-color: #e7c3a3; background: #fff7ee; color: #5b3414; }
+.handoff-banner { background: #fff1e0; }
+.handoff-start { max-width: 740px; display: grid; gap: 10px; }
+.handoff-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; max-width: 900px; margin: 10px 0; }
+.handoff-bar .actions { margin: 0; }
+.handoff-add { max-width: 900px; display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px; }
+.handoff-add label { flex: 1; }
+.handoff-bed { max-width: 900px; margin-bottom: 12px; display: grid; gap: 10px; }
+.handoff-bed header { display: flex; align-items: center; gap: 10px; }
+.handoff-bed h2 { font-size: 1.5rem; margin: 0; }
+.handoff-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px 10px; }
+.handoff-field { display: grid; gap: 3px; grid-column: span 3; font-size: .8rem; font-weight: 700; color: #335346; }
+.handoff-field.short { grid-column: span 1; }
+.handoff-field.long { grid-column: 1 / -1; }
+.handoff-field input, .handoff-field select, .handoff-field textarea { font-size: 1rem; font-weight: 500; min-height: 44px; }
+.handoff-refusal { font-weight: 500; }
+.handoff-photos { display: flex; flex-wrap: wrap; gap: 8px; }
+.handoff-photos figure { margin: 0; width: 140px; }
+.handoff-photos img { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+.handoff-photos figcaption { font-size: .75rem; color: var(--muted); }
+.handoff-photo-pick { position: relative; overflow: hidden; display: inline-flex; align-items: center; min-height: 44px; cursor: pointer; }
+.handoff-photo-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.mask-stage canvas { width: 100%; height: auto; display: block; border-radius: 8px; touch-action: none; border: 1px solid var(--line); background: #000; }
+.handoff-found { border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; display: grid; gap: 4px; }
+.handoff-found .check { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.heard-plan p { margin: 4px 0; font-size: .95rem; }
+.bedside section { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.bedside h3 { font-size: 1.6rem; }
+.bedside dl, .print-bed dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 6px 0; }
+.bedside dt { font-weight: 800; font-size: 1.1rem; }
+.bedside dd { margin: 0; font-size: 1.25rem; }
+.handoff-print { display: none; }
+@media (max-width: 780px) {
+  .handoff-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .handoff-field { grid-column: 1 / -1; }
+  .handoff-field.short { grid-column: span 1; }
+}
+@media print {
+  body * { visibility: hidden; }
+  .handoff-print, .handoff-print * { visibility: visible; }
+  .handoff-print { display: block; position: absolute; inset: 0 auto auto 0; width: 100%; color: #000; background: #fff; font-size: 11pt; }
+  .handoff-print h1 { font-size: 16pt; margin: 0 0 4pt; }
+  .handoff-print h2 { font-size: 13pt; margin: 8pt 0 2pt; }
+  .print-bed { break-inside: avoid; border-top: 1px solid #000; padding-top: 4pt; }
+  .print-bed dt { font-weight: 700; }
+  .print-bed dd { margin: 0; }
+}
+html.dark .handoff-terms { background: #2a231d; border-color: #5a4635; color: #f0d2bb; }
+html.dark .handoff-banner { background: #2a231d; }
+html.dark .handoff-field { color: #cfe0d6; }
+/* Six tabs on a phone: a little smaller, so every word fits its tab. */
+@media (max-width: 780px) { nav .nav-item { font-size: min(.8125rem, 3.05vw); letter-spacing: -.01em; padding-left: 0; padding-right: 0; } }

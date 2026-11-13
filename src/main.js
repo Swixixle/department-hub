@@ -4,6 +4,7 @@ import './protocols.css';
 import './dark.css';
 import './studio.css';
 import './warm.css';
+import './handoff.css';
 import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes, shiftInterval } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia, putOutbox, listOutbox, deleteOutbox } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
@@ -24,6 +25,7 @@ import { protocolTopics } from './pathways.js';
 import { libraryView, familyView, addDialog, landingRevision, referencesView, knowledgeView, pictureOf, guidelineView } from './protocol-view.js';
 import { addGuideline, matchCopy, compareCard, withdrawGuideline } from './guidelines.js';
 import { addSet, withdrawSet } from './facts.js';
+import { HANDOFF_NOTE, openHandoff, handoffScreen, handoffDialog, handoffAct, handoffChange, handoffSubmit, afterHandoffRender } from './handoff-ui.js';
 import { documentVersion, fileFingerprint, postVersion, sha256, verifyContent, verifyReceipts } from './audit.js';
 
 const publicDemo = __PUBLIC_DEMO__;
@@ -165,7 +167,7 @@ function countPress(action, value) {
     localStorage.setItem(usageKey, JSON.stringify(usage));
   } catch { /* counting must never get in the way */ }
 }
-const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory', 'tab:protocols':'Opened Protocols', 'reference-shelf':'Opened the professional references',
+const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Board', 'tab:requests':'Opened Requests', 'tab:fairness':'Opened Fairness', 'tab:people':'Opened Directory', 'tab:protocols':'Opened Protocols', 'tab:handoff':'Opened Handoff', 'reference-shelf':'Opened the professional references',
   shift:'Opened a shift', options:'Looked for ways off a shift', 'options-loops':'Looked for three-person loops', propose:'Proposed an exchange', 'exchange-agree':'Agreed to an exchange', 'exchange-decline':'Declined an exchange',
   'form:offer':'Said they could pick up a shift', 'form:trade-rules':'Changed the trade rules', 'ask-next':'Pressed a next-step question', 'ask-yes':'Said an answer helped', 'ask-no':'Said an answer did not help', 'ask-send':'Sent a question to the record keeper', verify:'Checked the receipts', 'notice-ok':'Acknowledged the notice', notice:'Opened the notice', 'mark-copy':'Copied the latest fingerprint', 'form:mark':'Looked for an earlier fingerprint', 'form:teach':'Taught an answer', 'ask-open':'Opened Ask', 'ask-wrong':'Said what was wrong with an answer', 'form:reading-try':'Tried a rewording', 'reading-save':'Saved a reading correction', 'form:passage-find':'Looked for a passage', 'passage-pick':'Chose a passage for a question', 'correction-remove':'Removed a correction', 'teach-copy':'Copied the waiting questions', 'form:ask':'Asked a question', 'ask-try':'Used a suggested question', 'ask-go':'Opened a record from an answer', 'edit-shift':'Opened Edit names', 'form:edit-shift':'Saved names on a shift', matches:'Looked for a trade or coverage', 'form:request':'Sent a request',
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
@@ -419,7 +421,7 @@ function top() {
     'class="nav-item ' + (ui.tab === id ? 'active' : '') + '" ' + valueAttr(id) + (ui.tab === id ? ' aria-current="page"' : ''));
   return '<aside><div class="brand"><img src="' + h(asset('mark.svg')) + '" alt=""><div><b>Department Hub</b><small>WORKSPACE</small></div></div>' +
     '<div class="space-label">YOUR DEPARTMENT</div><div class="space-name">Respiratory Care</div><nav aria-label="Workspace">' +
-    nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Board') + nav('requests', '⇄', 'Requests') + nav('fairness', '⚖', 'Fairness') + nav('people', '☎', 'Directory') +
+    nav('schedule', '▦', 'Schedule') + nav('board', '▤', 'Board') + nav('requests', '⇄', 'Requests') + nav('fairness', '⚖', 'Fairness') + nav('people', '☎', 'Directory') + nav('handoff', '✎', 'Handoff') +
     '</nav><div class="my-links"><div class="space-label">YOUR LINKS</div>' +
     myLinks.map(link => '<a class="nav-item my-link" href="' + h(link.url) + '" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">↗</span>' + h(link.name) + '</a>').join('') +
     button(myLinks.length ? 'Edit your links' : 'Add a link for yourself', 'my-links', 'class="text-button"') + '</div><div class="aside-bottom"><span class="status-dot"></span>' + (publicDemo ? 'Public demo · fictional data' :
@@ -919,8 +921,11 @@ function render() {
   const playing = [...app.querySelectorAll('[data-media]')].filter(player => player.currentTime > 0 && !player.ended)
     .map(player => ({ id: player.dataset.media, time: player.currentTime, on: !player.paused }));
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
-  app.innerHTML = top() + '<main>' + button('<span class="wide"><b>Independent staff project—not an official hospital product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u></span>' +
-      '<span class="narrow"><b>Not an official hospital product.</b> No patient info. Activity is tracked. <u>More</u></span>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
+  app.innerHTML = top() + '<main>' + (ui.tab === 'handoff'
+    ? button('<span class="wide"><b>Independent staff project—not an official hospital product.</b> Handoff stays on this phone: not sent, not backed up, wiped at shift end. Bed numbers only, never names. <u>What is recorded</u></span>' +
+      '<span class="narrow"><b>Not an official hospital product.</b> This phone only. Bed numbers, never names. <u>More</u></span>', 'notice', 'class="unofficial handoff-banner"')
+    : button('<span class="wide"><b>Independent staff project—not an official hospital product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u></span>' +
+      '<span class="narrow"><b>Not an official hospital product.</b> No patient info. Activity is tracked. <u>More</u></span>', 'notice', 'class="unofficial"')) + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
     '<div class="top-tools">' + button('<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>', 'display', 'class="text-size menu" title="Settings" aria-label="Settings"') +
     button('Protocols', 'tab', 'class="protocols-trigger' + (ui.tab === 'protocols' ? ' active' : '') + '" ' + valueAttr('protocols') + (ui.tab === 'protocols' ? ' aria-current="page"' : '')) +
     button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board, the documents or the protocols"') +
@@ -928,7 +933,7 @@ function render() {
     (actorNames().length ? actorNames() : [state.actor]).map(name => '<option ' + (isSame(name, state.actor) ? 'selected' : '') + '>' + h(name) + '</option>').join('') +
     '</select></label></div></header><div class="content">' +
     (ui.notice ? '<div role="status" class="notice">' + h(ui.notice) + '</div>' : '') +
-    (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : ui.tab === 'protocols' ? protocolsScreen() : schedule()) +
+    (ui.tab === 'board' ? board() : ui.tab === 'requests' ? requests() : ui.tab === 'people' ? people() : ui.tab === 'fairness' ? fairness() : ui.tab === 'protocols' ? protocolsScreen() : ui.tab === 'handoff' ? handoffScreen(handoffTools()) : schedule()) +
     '<footer><span>' + (publicDemo ? 'Fictional data only' : 'Private local prototype') +
     ' · No payroll or official schedule changes · <span data-build="' + h(BUILD_INFO.fingerprint || '') + '" title="' + h(BUILD_INFO.fingerprint || 'No release fingerprint available') + '">' + h(BUILD_LABEL) + '</span></span><span>' + (publicDemo ? '' : button('Backup and restore', 'data', 'class="text-button"') + ' ') +
     button('Activity log', 'audit', 'class="text-button"') + '</span></footer></div></main>' + dialogMarkup();
@@ -942,16 +947,17 @@ function render() {
     if (sameDialog && focus?.id) document.getElementById(focus.id)?.focus();
   }
   if (ui.tab === 'protocols') paintPages();
+  afterHandoffRender();
   if (ui.tab === 'board') watchFeed(); else { feedWatcher?.disconnect(); feedWatcher = null; }
   // A citation is shown in both places at once: the passage in the reading, then its outline on the original's page.
   if (ui.scrollTo === '#cite-mark') app.querySelector('.reading-pane .cited')?.scrollIntoView({ block:'center' });
   if (ui.scrollTo) { app.querySelector(ui.scrollTo)?.scrollIntoView({ block:ui.scrollTo === '#cite-mark' ? 'center' : 'start' }); ui.scrollTo = null; }
 }
 
-function shell(title, body) {
+function shell(title, body, note) {
   return '<dialog data-dialog="' + ui.dialog.type + '" aria-labelledby="dialog-title"><div class="dialog-head"><h2 id="dialog-title">' +
     h(title) + '</h2>' + (ui.dialog.type === 'notice' && !noticeSeen ? '' : button('×', 'close', 'class="close" aria-label="Close dialog"')) + '</div><div class="dialog-body">' +
-    (ui.dialog.type === 'notice' ? '' : '<p class="subtle">Independent staff project—not an official hospital product. No patient information. Recorded actions use audit receipts.</p>') +
+    (ui.dialog.type === 'notice' ? '' : '<p class="subtle">' + h(note || 'Independent staff project—not an official hospital product. No patient information. Recorded actions use audit receipts.') + '</p>') +
     (ui.flash ? '<p class="flash" role="status">' + h(ui.flash) + '</p>' : '') + body + '</div></dialog>';
 }
 
@@ -976,6 +982,7 @@ function readNameLines(form, known) {
 function dialogMarkup() {
   if (!ui.dialog) return '';
   const { type, row, kind, id, chosen } = ui.dialog;
+  if (String(type).startsWith('handoff-')) return handoffDialog(type, handoffTools());
   if (type === 'import') {
     if (ui.busy) return shell('Reading the schedule', '<p role="status">' + h(ui.busy) + '</p><div class="progress"><i></i></div><p>Processing stays on this device.</p>');
     if (!ui.pending) return shell('Import schedule photos',
@@ -1276,8 +1283,9 @@ function dialogMarkup() {
     button('Keep it', 'close', 'class="secondary"') + button('Remove it', 'remove-post-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
   if (type === 'notice') return shell('Before you use this', '<p><b>This is not an official hospital product.</b> It is run by department staff to make the schedule and department news easier to follow. The hospital’s own systems stay the official record.</p>' +
     '<p><b>Never put patient information here.</b> No names, faces, monitors, charts, record numbers or anything that could point to a patient, in a post, a picture, a video, a recording or a question.</p>' +
+    '<p><b>The one exception is the Handoff tab</b>, for your report to the oncoming therapist. It stays on this phone only: never sent, never backed up, never on the server, and wiped at the end of the shift. Use bed numbers, never names. Check your hospital’s personal-device policy before using it with real patients.</p>' +
     '<p><b>Changes and exports use cryptographic audit receipts.</b> Agreements, rule changes and saved corrections are included. Ordinary browsing, Ask lookups and text-screen stops keep anonymous totals only, without names, question fingerprints, blocked text or opened-record details. Your last board visit is kept on this device to show what is new. Sending a reviewed question or remembering wording saves that text or its search words in this browser and in backups. Older browsing receipts remain in existing history.</p>' +
-    '<p><b>Hashing does not protect patient information.</b> It is not encryption, a patient-information detector, hospital approval or proof of who acted. The text screen checks only some patterns; it does not inspect uploaded images, video, audio or document-file contents. No one is actively monitoring this device. Deleted content cannot be recovered from its fingerprint.</p>' +
+    '<p><b>Hashing does not protect patient information.</b> It is not encryption, a patient-information detector, hospital approval or proof of who acted. The text screen checks only some patterns; it reads the words in board pictures, but not video, audio or document-file contents, and it cannot see a face. No one is actively monitoring this device. Deleted content cannot be recovered from its fingerprint.</p>' +
     '<p class="subtle">Receipts use the selected Viewing as profile and this device’s clock. Whoever controls this browser can replace the whole history; keep an independent checkpoint to detect replacement. Keep backups and exports private.</p>' +
     (noticeSeen ? '<p class="subtle">Acknowledged on this device ' + h(timeLabel(noticeSeen.at)) + ', viewing as ' + h(noticeSeen.by) + '.</p><div class="actions">' + button('Close', 'close', 'class="secondary"') + '</div>' :
       '<div class="actions">' + button('I understand', 'notice-ok', 'class="primary"') + '</div>'));
@@ -1607,6 +1615,7 @@ app.addEventListener('change', event => {
     saveState(storageKey, state);
     render();
   }
+  if (event.target.dataset.handoffField || event.target.dataset.handoffPhoto) { void handoffChange(event.target, handoffTools()).catch(fail); return; }
   if (event.target.id === 'staff-select') { ui.dialog = { type:'staff-setup', chosen:event.target.value }; render(); }
   if (event.target.dataset.link) {
     const key = normalizeName(event.target.dataset.link), value = event.target.value;
@@ -1716,6 +1725,8 @@ async function startVoice() {
   }
 }
 
+// What the Handoff tab may use of the page: drawing helpers and the redraw, nothing of the workspace.
+const handoffTools = () => ({ h, button, valueAttr, shell, ui, render });
 function fail(error) { ui.notice = error.message || String(error); ui.flash = ui.notice; ui.dialog = noticeSeen ? null : { type:'notice' }; render(); }
 
 async function act({action, value, kind}) {
@@ -1728,11 +1739,13 @@ async function act({action, value, kind}) {
   }
   ui.notice = '';
   ui.flash = '';
+  if (await handoffAct(action, value, handoffTools())) return;
   switch (action) {
     case 'tab':
       if (value === 'board' && ui.tab !== 'board') lastVisit = boardSeen;
       ui.tab = value;
       ui.dialog = null;
+      if (value === 'handoff') void openHandoff(render).catch(fail);
       if (value === 'board') markBoardSeen();
       break;
     case 'ask-open': ui.dialog = ui.lastAsk || { type:'ask' }; break;
@@ -2348,6 +2361,7 @@ app.addEventListener('submit', event => {
 async function submit(form) {
   ui.flash = '';
   const data = Object.fromEntries(new FormData(form));
+  if (await handoffSubmit(form, data, handoffTools())) { render(); return; }
   const body = (data.body || '').trim();
   const message = { author:state.actor, body, created:new Date().toISOString() };
   switch (form.dataset.form) {
