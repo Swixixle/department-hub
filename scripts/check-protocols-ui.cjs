@@ -67,7 +67,7 @@ const { JSDOM } = require('jsdom');
 
   // A visible, labelled destination from every main screen.
   for (const tab of ['schedule', 'board', 'requests', 'fairness', 'people']) { await click('tab', tab); assert.equal(document.querySelector('.app-top .protocols-trigger').textContent, 'Protocols', tab); }
-  assert.equal(document.querySelectorAll('nav .nav-item').length, 5, 'the five tabs are unchanged');
+  assert.equal(document.querySelectorAll('nav .nav-item').length, 6, 'six tabs: the five, and Handoff');
   await click('tab', 'protocols');
   assert.equal(document.querySelector('.protocols-trigger').getAttribute('aria-current'), 'page');
   assert.match(content(), /Blue Trainer Bellows Drill[\s\S]*Revision 1 · Added · reading not checked · effective 2026-06-01/);

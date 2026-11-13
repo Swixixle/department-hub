@@ -64,13 +64,13 @@ const step = async (name, work) => { try { await work(); results.push([true, nam
   await page.waitForSelector('#app main');
   if (await page.locator('[data-action="notice-ok"]').count()) await press('notice-ok');
 
-  await step('Protocols is a labelled button on every main screen, on a phone too, and the five tabs keep their size', async () => {
-    for (const tab of ['schedule', 'board', 'requests', 'fairness', 'people']) { await press('tab', tab); assert.equal(await page.locator('.protocols-trigger').innerText(), 'Protocols', tab); }
+  await step('Protocols is a labelled button on every main screen, on a phone too, and the six tabs keep their size', async () => {
+    for (const tab of ['schedule', 'board', 'requests', 'fairness', 'people', 'handoff']) { await press('tab', tab); assert.equal(await page.locator('.protocols-trigger').innerText(), 'Protocols', tab); }
     await page.setViewportSize({ width: 390, height: 844 });
     const before = await page.evaluate(() => [...document.querySelectorAll('nav .nav-item')].map(item => { const box = item.getBoundingClientRect(); return [Math.round(box.width), Math.round(box.height)]; }));
-    assert.equal(before.length, 5, 'the bottom bar still has five tabs');
+    assert.equal(before.length, 6, 'the bottom bar has six tabs, Handoff the sixth');
     assert.ok(before.every(([width, height]) => width >= 44 && height >= 44), 'tab targets: ' + JSON.stringify(before));
-    for (const tab of ['schedule', 'board', 'requests', 'fairness', 'people']) {
+    for (const tab of ['schedule', 'board', 'requests', 'fairness', 'people', 'handoff']) {
       await press('tab', tab);
       const box = await page.locator('.protocols-trigger').boundingBox(), view = page.viewportSize();
       assert.ok(box && box.height >= 44 && box.width >= 44 && box.x >= 0 && box.x + box.width <= view.width, tab + ': ' + JSON.stringify(box));
