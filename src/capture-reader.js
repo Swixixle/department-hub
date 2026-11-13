@@ -30,3 +30,25 @@ export async function readShots(images, onProgress = () => {}) {
     await worker.terminate();
   }
 }
+
+// The words in pictures attached to a post, for the patient-detail screen. Two passes per picture: as a page, and as
+// scattered words, which catches a wristband or a label on a photo that the page reading skips. Returns one text per
+// picture. Nothing read is kept.
+export async function readPictureText(pictures) {
+  const worker = await createWorker('eng', 1, { workerPath: asset('ocr/worker.min.js'), corePath: asset('ocr'), langPath: asset('ocr'), workerBlobURL: false, cacheMethod: 'none' });
+  try {
+    const texts = [];
+    for (const picture of pictures) {
+      const parts = [];
+      for (const mode of ['3', '11']) {
+        await worker.setParameters({ tessedit_pageseg_mode: mode });
+        const { data } = await worker.recognize(picture, {}, { text: true });
+        parts.push(data.text || '');
+      }
+      texts.push(parts.join('\n'));
+    }
+    return texts;
+  } finally {
+    await worker.terminate();
+  }
+}

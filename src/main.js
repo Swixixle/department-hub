@@ -11,7 +11,8 @@ import { sharedClient, joinTokenFrom } from './shared.js';
 import { SUGGESTIONS, ask, findPeople, pretty as prettyDate, readingProblem, searchDocuments } from './ask.js';
 import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, parties, shiftName } from './trades.js';
 import { keywords, qualifiers, tidyQuestion } from './words.js';
-import { LONG_NUMBER_HELP, patientShown, patientSigns } from './guard.js';
+import { LONG_NUMBER_HELP, patientFindings, patientShown, patientSigns } from './guard.js';
+import { isPicture, preparePictures } from './picture-safety.js';
 import { readPdf } from './pdftext.js';
 import { emptyLibrary, prepareLibrary, addRevision, checkExtraction, supplyText, markFigure, activate, withdraw, toggleMark, revisionOf, searchLibrary } from './protocols.js';
 import { addMapping, reviewBundle, markMappingsReviewed } from './bundles.js';
@@ -161,7 +162,7 @@ const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Boar
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
   import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
   over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog',
-  'text-screen-blocked':'Text screen stops (including repeats and false alarms)', 'my-links':'Opened your links', 'guideline-open':'Opened a restated guideline', 'guideline-compare':'Compared a guideline card with their copy', 'my-link-remove':'Removed one of their links', 'form:my-link':'Added one of their links' };
+  'text-screen-blocked':'Text screen stops (including repeats and false alarms)', 'picture-screen-blocked':'Pictures stopped for words that looked like patient information', 'my-links':'Opened your links', 'guideline-open':'Opened a restated guideline', 'guideline-compare':'Compared a guideline card with their copy', 'my-link-remove':'Removed one of their links', 'form:my-link':'Added one of their links' };
 // When the board was last opened on this device, so Ask can say what is new since then.
 const seenKey = storageKey + '-seen';
 // Links a person keeps for themselves (their own study rooms, say). Kept in this browser only: not in the workspace,
@@ -498,7 +499,7 @@ function board() {
     '<textarea id="post-text" name="body" maxlength="2000" placeholder="Write to the department…">' + h(ui.draftPost || '') + '</textarea>' +
     '<div class="composer-more"><div class="cell-when"><label>Does it have a date?<select name="whenKind"><option value="">No date</option><option value="due">Due by</option><option value="meeting">Meeting on</option><option value="event">Event on</option></select></label>' +
     '<label>Date<input name="whenDate" type="date"></label></div>' +
-    '<p class="subtle">A YouTube or Vimeo link plays right on the board.</p><label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple></label>' +
+    '<p class="subtle">A YouTube or Vimeo link plays right on the board.</p><label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple><span class="subtle">Photos are rebuilt without their hidden location and phone details, and their words are checked for patient information. Videos are sent as they are.</span></label>' +
     '<label><span><input type="checkbox" name="learning"> Add to Learning (instructional, CEU-type)</span></label>' +
     '<label><span><input type="checkbox" name="inside"> Keep inside the department (no Share button)</span></label>' +
     '<p class="subtle">' + RULE + '</p></div><p class="refusal" role="alert"></p><button class="primary">Post</button></form>' +
@@ -2156,14 +2157,33 @@ async function submit(form) {
       break;
     }
     case 'post': {
-      const files = [...(form.querySelector('#post-files')?.files || [])];
+      let files = [...(form.querySelector('#post-files')?.files || [])];
       if (!body && !files.length) return;
+      form.querySelector('.refusal').textContent = '';      // a refusal from the last try is not left standing over this one
       const refusal = refuseFiles(files);
       if (refusal) { form.querySelector('.refusal').textContent = refusal; return; }     // said in place, so nothing typed is lost
-      const media = files.map(file => ({ id:crypto.randomUUID(), name:file.name, type:file.type, size:file.size, kind:mediaKind(file.type, file.name) }));
       if (data.whenKind && !/^\d{4}-\d{2}-\d{2}$/.test(data.whenDate || '')) { form.querySelector('.refusal').textContent = 'Pick the date, or set it back to No date.'; return; }
       const warned = patientCheck(form, [body, ...files.map(file => file.name)].join('\n'));
       if (!warned) return;
+      // Pictures are rebuilt without their hidden details (location, phone) and their words are read and screened.
+      if (files.some(isPicture)) {
+        const button = form.querySelector('button.primary'), label = button.textContent;
+        button.disabled = true;
+        try {
+          const { readPictureText } = await import('./capture-reader.js');
+          const prepared = await preparePictures(files, { read: readPictureText, screen: patientFindings, onStep: words => { button.textContent = words; } });
+          if (!prepared.check.ok) {
+            countPress('picture-screen-blocked');
+            // What the reader saw is shown to the person who chose the picture, and kept nowhere.
+            form.querySelector('.refusal').textContent = 'Not posted. ' + prepared.check.found.map(entry => 'The words in “' + entry.name + '” look like they point to a patient: ' +
+              entry.findings.map(item => item.sign + ' (“' + item.words + '”)').join(', ') + '.').join(' ') + ' Crop or cover that part and attach it again. The reader can miss words, so look at the picture yourself too.';
+            return;
+          }
+          files = prepared.files;
+        } catch (error) { form.querySelector('.refusal').textContent = error.message || String(error); return; }
+        finally { button.disabled = false; button.textContent = label; }
+      }
+      const media = files.map(file => ({ id:crypto.randomUUID(), name:file.name, type:file.type, size:file.size, kind:mediaKind(file.type, file.name) }));
       const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}),
         ...(data.whenKind ? { when:{ kind:data.whenKind, date:data.whenDate } } : {}) };
       const send = form.querySelector('button.primary');
