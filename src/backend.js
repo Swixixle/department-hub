@@ -132,6 +132,9 @@ export function sharedBoard({ baseUrl, departmentId, token, fetch: send = global
           ...(post.when ? { when: post.when } : {}), ...(post.contest ? { contest: true } : {}), ...(post.voice && post.media?.[0]?.seconds ? { seconds: post.media[0].seconds } : {}) };
         const body = JSON.stringify({ body: post.body || '', clientId: post.id, media, extras });
         const saved = await (await ask('posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })).json();
+        // A retry of a post that had already arrived: the server returned the first one, so the files uploaded on this
+        // attempt belong to nothing. They are removed rather than left behind.
+        if (saved.duplicate) for (const id of media) await ask('files/' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
         settle('ready');
         return { ...fromServerPost(saved, names), duplicate: Boolean(saved.duplicate) };
       } catch (error) {

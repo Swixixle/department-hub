@@ -2,7 +2,7 @@ import './style.css';
 import './sizes.css';
 import './protocols.css';
 import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
-import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia } from './storage.js';
+import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia, putOutbox, listOutbox, deleteOutbox } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink, REACTIONS, CAPTION_LIMIT, reactionState, rankedCaptions, currentContest } from './board.js';
@@ -221,7 +221,42 @@ const localStore = localBoard({
 let boardStore = localStore;
 // The department server, when this page was opened from it. Opened from serve.py or the public demo there is none,
 // and everything stays the one-browser app. Signed in, only the board is shared; the schedule and the rest stay here.
-const shared = { client: publicDemo ? null : sharedClient(), available: false, posts: [], people: [], waiting: [], timer: null, joining: null };
+const shared = { client: publicDemo ? null : sharedClient(), available: false, posts: [], people: [], waiting: [], timer: null, joining: null, outbox: [], flushing: false };
+// No signal, or the server could not be reached: worth keeping and sending later. A refusal (signed out, not allowed,
+// a post the server will not take) is not; the person is told instead.
+const unreachable = error => error instanceof TypeError || !error?.status || error.status >= 500;
+async function loadOutbox() {
+  const me = sharedMe();
+  shared.outbox = me ? (await listOutbox().catch(() => [])).filter(entry => entry.personId === me.personId && entry.departmentId === me.departmentId) : [];
+}
+async function queuePost(post, files, record) {
+  const me = sharedMe();
+  await putOutbox({ id: post.id, personId: me.personId, departmentId: me.departmentId, post, files, record, queuedAt: new Date().toISOString(), problem: null });
+  await loadOutbox();
+}
+// Sends what is waiting, oldest first. The post keeps the id it was made with, so the server takes it once even if an
+// earlier attempt got through and only its answer was lost.
+async function flushOutbox() {
+  if (!boardStore.shared || shared.flushing) return;
+  await loadOutbox();
+  if (!shared.outbox.length) return;
+  shared.flushing = true;
+  let sent = 0;
+  try {
+    for (const entry of shared.outbox) {
+      if (entry.problem) continue;
+      try { await boardStore.publish(entry.post, entry.files, entry.record); await deleteOutbox(entry.id); sent += 1; }
+      catch (error) {
+        if (unreachable(error)) break;
+        await putOutbox({ ...entry, problem: sharedProblem(error) });
+      }
+    }
+  } finally { shared.flushing = false; }
+  await loadOutbox();
+  if (sent) { ui.notice = sent === 1 ? 'Your waiting post was sent.' : sent + ' waiting posts were sent.'; await refreshShared({ quiet:true }); }
+  render();
+}
+window.addEventListener('online', () => { void flushOutbox().catch(() => {}); });
 const boardPosts = () => boardStore.shared ? shared.posts : state.posts;
 const sharedMe = () => shared.client?.session || null;
 const isMyPost = post => boardStore.shared ? post.authorId === sharedMe()?.personId : Boolean(post.created) && isSame(post.author, state.actor);
@@ -244,8 +279,12 @@ async function connectShared() {
   boardStore = sharedBoard({ baseUrl: location.origin, departmentId: me.departmentId, token: me.token, names: id => names.get(id) || 'Former member',
     onState: () => {} });
   clearInterval(shared.timer);
-  shared.timer = setInterval(() => { if (document.visibilityState === 'visible' && ui.tab === 'board') void refreshShared({ quiet:true }).catch(() => {}); }, 30000);
+  shared.timer = setInterval(() => {
+    if (shared.outbox.length) void flushOutbox().catch(() => {});
+    if (document.visibilityState === 'visible' && ui.tab === 'board') void refreshShared({ quiet:true }).catch(() => {});
+  }, 30000);
   await refreshShared({ quiet:true });
+  void flushOutbox().catch(() => {});
   return true;
 }
 function leaveShared(notice) {
@@ -254,6 +293,7 @@ function leaveShared(notice) {
   boardStore = localStore;
   shared.posts = [];
   shared.people = [];
+  shared.outbox = [];          // still saved on this phone; sent only if the same person signs in again
   ui.notice = notice;
   render();
 }
@@ -513,6 +553,16 @@ function sharedProblem(error, during) {
   return 'That did not work: ' + (error?.message || error) + '.';
 }
 
+// Posts waiting on this phone for a signal, shown above the feed so nobody thinks theirs vanished.
+function outboxMarkup() {
+  if (!boardStore.shared || !shared.outbox.length) return '';
+  return '<div class="outbox">' + shared.outbox.map(entry => '<article class="panel post pending" data-pending="' + h(entry.id) + '"><div class="post-head">' + avatar(sharedMe()?.name || '') +
+    '<div><b>' + h(sharedMe()?.name || 'You') + '</b><small>' + (entry.problem ? 'Not sent' : '<span class="pending-dot" aria-hidden="true"></span>Waiting for signal · sends by itself') + '</small></div></div>' +
+    (entry.post.body ? '<p>' + h(entry.post.body) + '</p>' : '') + ((entry.post.media || []).length ? '<p class="subtle">' + h(entry.post.media.map(item => item.name).join(', ')) + '</p>' : '') +
+    (entry.problem ? '<p class="refusal">' + h(entry.problem) + '</p>' : '') +
+    '<div class="post-actions">' + (entry.problem ? '' : button('Try now', 'outbox-retry', 'class="post-action"')) + button('Cancel', 'outbox-cancel', 'class="post-action quiet" ' + valueAttr(entry.id)) + '</div></article>').join('') + '</div>';
+}
+
 function board() {
   const filter = ui.boardFilter || 'all', shown = feedPosts(), limit = ui.boardLimit || FEED_PAGE;
   return '<section class="intro board-intro"><div><div class="eyebrow">TEAM SPACE</div><h1>Department board</h1><p>News, pictures, files, video and voice for the whole department.</p></div>' +
@@ -528,6 +578,7 @@ function board() {
     '<label><span><input type="checkbox" name="contest"> Make it a caption contest (attach a picture)</span></label>' +
     '<p class="subtle">' + RULE + '</p></div><p class="refusal" role="alert"></p><button class="primary">Post</button></form>' +
     '<div class="calendar-toolbar board-bar"><div class="segments">' + FILTERS.map(([id, label]) => button(label, 'board-filter', 'class="' + (filter === id ? 'selected' : '') + '" ' + valueAttr(id))).join('') + '</div></div>' +
+    outboxMarkup() +
     '<div class="post-list">' + (shown.slice(0, limit).map(postMarkup).join('') || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>' + feedTail(shown, limit);
 }
 
@@ -1949,6 +2000,8 @@ async function act({action, value, kind}) {
       ui.dialog = { type:'account' };
       break;
     }
+    case 'outbox-retry': await flushOutbox(); break;
+    case 'outbox-cancel': await deleteOutbox(value); await loadOutbox(); ui.notice = 'That post was cancelled and will not be sent.'; break;
     case 'react': {
       const [postId, kindName] = String(value).split('|'), post = boardPosts().find(item => item.id === postId);
       if (!post) return;
@@ -2236,8 +2289,13 @@ async function submit(form) {
       const send = form.querySelector('button.primary');
       send.disabled = true;
       send.textContent = 'Posting…';
-      try { await boardStore.publish(post, media.map((item, index) => [item.id, files[index]]), { fingerprint:await sha256(body), postHash:await postVersion(post), files:await Promise.all(files.map(file => fileFingerprint(file))) }); }
-      catch (error) { throw error.name === 'QuotaExceededError' ? new Error('This browser is out of room for files. Remove an old post with a large file, or post a smaller one.') : error; }
+      const pairs = media.map((item, index) => [item.id, files[index]]);
+      const record = { fingerprint:await sha256(body), postHash:await postVersion(post), files:await Promise.all(files.map(file => fileFingerprint(file))) };
+      try { await boardStore.publish(post, pairs, record); }
+      catch (error) {
+        if (boardStore.shared && unreachable(error)) { await queuePost(post, pairs, record); ui.notice = 'No signal. Your post is saved on this phone and will send by itself when the connection is back.'; }
+        else throw error.name === 'QuotaExceededError' ? new Error('This browser is out of room for files. Remove an old post with a large file, or post a smaller one.') : error;
+      }
       media.forEach((item, index) => { mediaBlobs.set(item.id, files[index]); mediaUrls.set(item.id, URL.createObjectURL(files[index])); });
       ui.boardFilter = 'all';
       ui.draftPost = '';
@@ -2340,7 +2398,12 @@ async function submit(form) {
       const item = { id:crypto.randomUUID(), name:'voice-message-' + localToday() + (/mp4/.test(recording.blob.type) ? '.m4a' : '.webm'), type:recording.blob.type, size:recording.blob.size, kind:'audio', seconds:recording.seconds };
       const file = new File([recording.blob], item.name, { type:recording.blob.type });
       const post = { id:crypto.randomUUID(), author:state.actor, body:(data.caption || '').trim(), created:new Date().toISOString(), voice:true, media:[item], ...(data.inside ? { inside:true } : {}) };
-      await boardStore.publish(post, [[item.id, file]], { fingerprint:await sha256(post.body), postHash:await postVersion(post), files:[await fileFingerprint(file)] });
+      const voiceRecord = { fingerprint:await sha256(post.body), postHash:await postVersion(post), files:[await fileFingerprint(file)] };
+      try { await boardStore.publish(post, [[item.id, file]], voiceRecord); }
+      catch (error) {
+        if (!(boardStore.shared && unreachable(error))) throw error;
+        await queuePost(post, [[item.id, file]], voiceRecord);
+      }
       mediaBlobs.set(item.id, file);
       mediaUrls.set(item.id, recording.url);
       voice = null;
