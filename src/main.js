@@ -389,22 +389,47 @@ function postMarkup(post) {
     (post.created && isSame(post.author, state.actor) ? button('Remove', 'remove-post', 'class="post-action quiet" ' + valueAttr(post.id)) : '') + '</div></article>';
 }
 
+// The board is a feed: newest first, a page at a time. Older posts are added at the bottom as the reader nears it,
+// without redrawing the page, so a half-written post and a playing video are left alone.
+const FEED_PAGE = 10;
+const feedPosts = () => [...state.posts].reverse().filter(post => matchesFilter(post, ui.boardFilter || 'all'));
+function feedTail(shown, limit) {
+  if (shown.length > limit) return '<div class="feed-more" data-feed-more>' + button('Show older posts · ' + (shown.length - limit) + ' more', 'feed-more', 'class="secondary"') + '</div>';
+  return shown.length > FEED_PAGE ? '<p class="feed-end subtle" data-feed-end>That is everything on the board.</p>' : '';
+}
+function addOlderPosts() {
+  const list = app.querySelector('.post-list'), tail = app.querySelector('[data-feed-more]');
+  if (ui.tab !== 'board' || !list || !tail) return;
+  const shown = feedPosts(), limit = ui.boardLimit || FEED_PAGE;
+  list.insertAdjacentHTML('beforeend', shown.slice(limit, limit + FEED_PAGE).map(postMarkup).join(''));
+  ui.boardLimit = limit + FEED_PAGE;
+  tail.outerHTML = feedTail(shown, ui.boardLimit);
+  watchFeed();
+}
+let feedWatcher = null;
+function watchFeed() {
+  feedWatcher?.disconnect(); feedWatcher = null;
+  const tail = app.querySelector('[data-feed-more]');
+  if (!tail || typeof IntersectionObserver !== 'function') return;
+  feedWatcher = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) addOlderPosts(); }, { rootMargin:'600px 0px' });
+  feedWatcher.observe(tail);
+}
+
 function board() {
-  const filter = ui.boardFilter || 'all';
-  const shown = [...state.posts].reverse().filter(post => matchesFilter(post, filter));
-  return '<section class="intro"><div><div class="eyebrow">TEAM SPACE</div><h1>Department board</h1><p>News, pictures, files, video and voice for the whole department.</p></div>' +
+  const filter = ui.boardFilter || 'all', shown = feedPosts(), limit = ui.boardLimit || FEED_PAGE;
+  return '<section class="intro board-intro"><div><div class="eyebrow">TEAM SPACE</div><h1>Department board</h1><p>News, pictures, files, video and voice for the whole department.</p></div>' +
     button('🎙 Voice message to everyone', 'voice', 'class="primary voice-start"') + '</section>' +
     (boardStore.shared ? '' : '<div class="roster-status"><span class="status-dot"></span><b>Kept in ' + h(boardStore.where) + '</b><span>Nobody else sees a post until the shared version is switched on. Share sends one out now.</span></div>') +
-    '<form data-form="post" class="panel form-panel composer"><label for="post-text">Write to the department</label>' +
-    '<textarea id="post-text" name="body" maxlength="2000" placeholder="Share something with the department. A YouTube or Vimeo link plays right on the board.">' + h(ui.draftPost || '') + '</textarea>' +
-    '<div class="cell-when"><label>Does it have a date?<select name="whenKind"><option value="">No date</option><option value="due">Due by</option><option value="meeting">Meeting on</option><option value="event">Event on</option></select></label>' +
+    '<form data-form="post" class="panel form-panel composer' + (ui.draftPost ? ' open' : '') + '"><label for="post-text">Write to the department</label>' +
+    '<textarea id="post-text" name="body" maxlength="2000" placeholder="Write to the department…">' + h(ui.draftPost || '') + '</textarea>' +
+    '<div class="composer-more"><div class="cell-when"><label>Does it have a date?<select name="whenKind"><option value="">No date</option><option value="due">Due by</option><option value="meeting">Meeting on</option><option value="event">Event on</option></select></label>' +
     '<label>Date<input name="whenDate" type="date"></label></div>' +
-    '<label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple></label>' +
+    '<p class="subtle">A YouTube or Vimeo link plays right on the board.</p><label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple></label>' +
     '<label><span><input type="checkbox" name="learning"> Add to Learning (instructional, CEU-type)</span></label>' +
     '<label><span><input type="checkbox" name="inside"> Keep inside the department (no Share button)</span></label>' +
-    '<p class="subtle">' + RULE + '</p><p class="refusal" role="alert"></p><button class="primary">Post</button></form>' +
+    '<p class="subtle">' + RULE + '</p></div><p class="refusal" role="alert"></p><button class="primary">Post</button></form>' +
     '<div class="calendar-toolbar board-bar"><div class="segments">' + FILTERS.map(([id, label]) => button(label, 'board-filter', 'class="' + (filter === id ? 'selected' : '') + '" ' + valueAttr(id))).join('') + '</div></div>' +
-    '<div class="post-list">' + (shown.map(postMarkup).join('') || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>';
+    '<div class="post-list">' + (shown.slice(0, limit).map(postMarkup).join('') || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>' + feedTail(shown, limit);
 }
 
 // Fairness is a kept record. Everyone sees their own sheet and the department picture, without names. Whoever keeps the
@@ -703,6 +728,7 @@ function render() {
     if (sameDialog && focus?.id) document.getElementById(focus.id)?.focus();
   }
   if (ui.tab === 'protocols') paintPages();
+  if (ui.tab === 'board') watchFeed(); else { feedWatcher?.disconnect(); feedWatcher = null; }
   // A citation is shown in both places at once: the passage in the reading, then its outline on the original's page.
   if (ui.scrollTo === '#cite-mark') app.querySelector('.reading-pane .cited')?.scrollIntoView({ block:'center' });
   if (ui.scrollTo) { app.querySelector(ui.scrollTo)?.scrollIntoView({ block:ui.scrollTo === '#cite-mark' ? 'center' : 'start' }); ui.scrollTo = null; }
@@ -1269,6 +1295,9 @@ async function importFiles(files, sampleImport = false) {
   }
 }
 
+// The composer opens when it is used, and what is typed is kept, so a redraw (a picture finishing loading, say) loses nothing.
+app.addEventListener('focusin', event => { if (event.target.closest?.('.composer')) event.target.closest('.composer').classList.add('open'); });
+app.addEventListener('input', event => { if (event.target.id === 'post-text') ui.draftPost = event.target.value; });
 app.addEventListener('click', event => {
   const control = event.target.closest('[data-action]');
   if (!control || control.disabled) return;
@@ -1450,7 +1479,7 @@ async function act({action, value, kind}) {
       if (kind === 'options') { const target = state.assignments.find(item => item.key === String(value).slice(8)); if (target && isMine(target)) ui.dialog = { type:'options', row:target, found:optionsFor(target) }; break; }
       ui.dialog = null;
       if (kind === 'date') { ui.tab = 'schedule'; ui.view = 'week'; ui.date = first; ui.scrollTo = '.day-card[data-date="' + first + '"]'; }
-      else if (kind === 'post') { ui.tab = 'board'; ui.boardFilter = 'all'; ui.scrollTo = '[data-post="' + CSS.escape(first) + '"]'; markBoardSeen(); }
+      else if (kind === 'post') { ui.tab = 'board'; ui.boardFilter = 'all'; ui.boardLimit = Math.max(FEED_PAGE, feedPosts().findIndex(post => post.id === first) + 1); ui.scrollTo = '[data-post="' + CSS.escape(first) + '"]'; markBoardSeen(); }
       else if (kind === 'people' || kind === 'fairness') ui.tab = kind;
       break;
     }
@@ -1735,7 +1764,8 @@ async function act({action, value, kind}) {
     case 'teach-pick': if (isKeeper()) ui.dialog = { type:'teach', pick:value }; break;
     case 'teach-drop': if (isKeeper()) await commit('Question dismissed', { id:value }, previous => ({ ...previous, unanswered:previous.unanswered.filter(item => item.id !== value) })); break;
     case 'teach-remove': if (isKeeper()) await commit('Taught answer removed', { id:value }, previous => ({ ...previous, answers:previous.answers.filter(item => item.id !== value) })); break;
-    case 'board-filter': ui.boardFilter = value; break;
+    case 'board-filter': ui.boardFilter = value; ui.boardLimit = FEED_PAGE; break;
+    case 'feed-more': addOlderPosts(); return;
     case 'voice': void startVoice(); return;
     case 'voice-stop': if (voice?.recorder?.state === 'recording') voice.recorder.stop(); return;
     case 'share': {

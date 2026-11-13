@@ -340,6 +340,35 @@ const {JSDOM} = require('jsdom');
   await click('ask-open');
   assert.match(await ask('What did I miss on the board?'),/Nothing new since you last looked/);
 
+  // The board is a feed: ten posts at a time, newest first; older ones are added at the bottom without a redraw, and a
+  // half-written post survives a redraw.
+  await click('tab','board');
+  for(let i=0;i<24;i++) await submitForm('post',{body:'Feed post '+i});
+  const feedShown=()=>[...document.querySelectorAll('.post-list .post')];
+  const total=read().posts.length;
+  assert.equal(feedShown().length,10);
+  assert.match(feedShown()[0].textContent,/Feed post 23/);
+  assert.ok(document.querySelector('[data-feed-more]'),'the feed offers older posts');
+  assert.equal(document.querySelector('form[data-form="post"]').classList.contains('open'),false,'the composer starts closed');
+  const box=document.querySelector('#post-text'); box.dispatchEvent(new w.FocusEvent('focusin',{bubbles:true}));
+  assert.ok(document.querySelector('form[data-form="post"]').classList.contains('open'),'using the composer opens it');
+  box.value='half written'; box.dispatchEvent(new w.Event('input',{bubbles:true}));
+  await click('feed-more');
+  assert.equal(feedShown().length,20);
+  assert.equal(document.querySelector('#post-text'),box,'adding older posts does not redraw the page');
+  await click('board-filter','all');
+  assert.equal(feedShown().length,10,'a filter starts the feed from the top');
+  assert.equal(document.querySelector('#post-text').value,'half written','a redraw keeps what was typed');
+  assert.ok(document.querySelector('form[data-form="post"]').classList.contains('open'));
+  while(document.querySelector('[data-feed-more]')) await click('feed-more');
+  assert.equal(feedShown().length,total);
+  assert.ok(document.querySelector('[data-feed-end]'));
+  assert.match(feedShown().at(-1).textContent,/New filters are in the supply room/,'the oldest post is last');
+  const oldest=read().posts[0].id; await click('tab','schedule');
+  const go=document.createElement('button'); go.dataset.action='ask-go'; go.dataset.value='post|'+oldest; document.querySelector('#app').append(go); await click('ask-go','post|'+oldest);
+  assert.ok(document.querySelector('[data-post="'+oldest+'"]'),'opening an old post from Ask draws enough of the feed to show it');
+  await click('ask-open'); // the checks below start with the Ask sheet open, as before
+
   const usage=JSON.parse(localStorage.getItem('department-hub-usage-v1'));
   assert.ok(usage.counts['form:ask']>0);
   assert.ok(usage.counts.shift>0);
