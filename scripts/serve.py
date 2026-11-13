@@ -64,7 +64,19 @@ if in_use():
     if not stop_older_copy():
         sys.exit("The older copy could not be stopped. Close the Terminal window it is running in, then run this again.")
 
-handler = partial(SimpleHTTPRequestHandler, directory=root)
+class Handler(SimpleHTTPRequestHandler):
+    """Asks the browser to check for a newer page every time, so an updated app shows on the next load.
+
+    Files under assets/ have the build's hash in their names, so they never change and may be kept.
+    """
+
+    def end_headers(self):
+        path = self.path.split("?", 1)[0]
+        self.send_header("Cache-Control", "public, max-age=31536000, immutable" if path.startswith("/assets/") else "no-cache")
+        super().end_headers()
+
+
+handler = partial(Handler, directory=root)
 ThreadingHTTPServer.allow_reuse_address = True
 with ThreadingHTTPServer(("127.0.0.1", port), handler) as server:
     print(f"Department Hub is ready at {url}", flush=True)
