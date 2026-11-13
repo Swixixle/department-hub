@@ -4,6 +4,8 @@ Updated 2026-11-12. The parts of this that are now built are listed under **What
 
 **Clarification — decided:** passkey sign-in with no email typed at sign-in; members supply their own phone/email information; no app-sent email/text is authorized by this work. **Open:** email's purpose, collection requirements and app-sent notifications. `EMAIL-OPTIONS.md` records alternatives, not a selected design. The implementation stages below remain proposals, not built features.
 
+**Clarification — decided:** passkey sign-in with no email typed at sign-in; members supply their own phone/email information; no app-sent email/text is authorized by this work. **Open:** email's purpose, collection requirements and app-sent notifications. `EMAIL-OPTIONS.md` records alternatives, not a selected design. The implementation stages below remain proposals, not built features.
+
 ## The department is the workspace
 
 The owner will introduce the app to willing coworkers in his own department, ask for patience and feedback, and improve it around their actual use. He intends to fund a server in a few weeks. The next milestone is useful adoption in that department.

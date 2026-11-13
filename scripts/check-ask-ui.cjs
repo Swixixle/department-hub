@@ -36,6 +36,9 @@ const {JSDOM} = require('jsdom');
     policy:model.POLICY, revision:'ui-check', importedAt:'2026-11-08T09:00:00Z', holidayRules:{off:[],extra:[]},
     posts:[{id:'news',author:'Avery',body:'New filters are in the supply room.',created:'2001-01-01T09:00:00Z'}],
     documents:[{id:'leave',title:'Leave policy',kind:'Policy',effective:'2026-01-01',added:'2026-01-01T00:00:00Z',by:'Jordan',text:'Leave requests are due four weeks before publication. The lead reviews each request before approving leave.'}]};
+  // Synthetic metadata only: this does not add an email collection feature.
+  stored.directory[model.normalizeName('Avery')].email='private-avery@example.invalid';
+  stored.directory[model.normalizeName('Avery')].phone='3175550109';
   const key = 'department-hub-v1-local';
   const legacy = {id:'legacy-browsing',time:'2026-11-10T12:00:00Z',type:'Record access requested',previousHash:null,actor:'Avery',details:{action:'shift',reference:stored.assignments[0].key}};
   stored.events.push({...legacy,hash:await audit.sha256(JSON.stringify(legacy))});
@@ -101,6 +104,22 @@ const {JSDOM} = require('jsdom');
   };
   const read=()=>JSON.parse(localStorage.getItem(key));
   await click('close'); await click('tab','board');
+  // Share sends the chosen post, not structured coworker contacts or prefilled recipients.
+  let shared;
+  Object.defineProperty(navigator,'share',{configurable:true,value:async payload=>{shared=payload;}});
+  await click('share','news');
+  assert.deepEqual(Object.keys(shared).sort(),['text','title']);
+  assert.match(shared.text,/New filters are in the supply room/);
+  assert.doesNotMatch(JSON.stringify(shared),/private-avery@example\.invalid|3175550109/);
+  delete navigator.share;
+  await click('share','news');
+  for(const scheme of ['mailto:','sms:']) {
+    const link=document.querySelector('dialog a[href^="'+scheme+'"]'); assert.ok(link);
+    const destination=new URL(link.href); assert.equal(destination.pathname,'');
+    assert.match(destination.searchParams.get('body'),/New filters are in the supply room/);
+    assert.doesNotMatch(link.href,/private-avery|3175550109|[?&](to|cc|bcc)=/i);
+  }
+  await click('close');
   const count=read().posts.length;
   const beforeBlocked=read().events;
   const stopsBefore=JSON.parse(localStorage.getItem('department-hub-usage-v1')).counts['text-screen-blocked'] || 0;

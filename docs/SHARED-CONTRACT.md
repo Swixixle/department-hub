@@ -4,6 +4,8 @@ Status: the contract passes against a real server and a fresh seeder, run end to
 
 **Decided clarification:** sign-in uses a passkey with no email typed at sign-in; members enter their own phone/email information. **Open:** email as optional contact information, an administrator-only recovery-confirmation channel, or separate fields for both. Nothing here selects one, and this contract covers phone only.
 
+**Decided clarification:** sign-in uses a passkey with no email typed at sign-in; members enter their own phone/email information. **Open:** email as optional contact information, administrator-only recovery confirmation or separate fields for both. The candidate email contract below explores only the contact option; it does not settle that choice, select a production schema or authorize sending. See `EMAIL-OPTIONS.md`.
+
 ## Run against the actual backend
 
 Start an isolated server and seed only synthetic records, then have that server's test setup write a fresh manifest following `tests/shared/fixture.example.json`. Keep the generated manifest and its credentials in ignored `local-data/`; never use a coworker's session, schedule or contact data. Reset the fixture for every run because the suite creates/deletes a control post, records one participant acceptance, adds/changes contact sharing, removes a custodian role and revokes membership.

@@ -25,9 +25,9 @@
   },
   "fairness": { "memberWeekendTurns": 0, "partnerWeekendTurns": 1 },
   "contacts": {
-    "shared": { "personId": "test-ari", "name": "Ari", "phone": "3175550101" },
-    "private": { "personId": "test-bex", "name": "Bex", "phone": "3175550102" },
-    "defaultPrivate": { "personId": "test-cy", "name": "Cy", "phone": "3175550103" },
-    "newPrivate": { "personId": "test-dev", "name": "Dev", "phone": "3175550104" }
+    "shared": { "personId": "test-ari", "name": "Ari", "phone": "3175550101", "email": "ari+test-example-replace-with-fresh-run@example.invalid" },
+    "private": { "personId": "test-bex", "name": "Bex", "phone": "3175550102", "email": "bex+test-example-replace-with-fresh-run@example.invalid" },
+    "defaultPrivate": { "personId": "test-cy", "name": "Cy", "phone": "3175550103", "email": "cy+test-example-replace-with-fresh-run@example.invalid" },
+    "newPrivate": { "personId": "test-dev", "name": "Dev", "phone": "3175550104", "email": "dev+test-example-replace-with-fresh-run@example.invalid" }
   }
 }

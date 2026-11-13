@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-export function loadFixture(path) {
+export function loadFixture(path,{contactEmail=false}={}) {
   assert.ok(path,'A synthetic backend fixture manifest is required');
   const fixture = JSON.parse(readFileSync(path,'utf8'));
   assert.equal(fixture.version,1);
@@ -32,6 +32,14 @@ export function loadFixture(path) {
     assert.match(contact.phone,/^\d{3}55501\d{2}$/,name+' must use fictional 555-01xx numbers');
   }
   assert.equal(new Set(Object.values(fixture.contacts).map(contact=>contact.phone)).size,4);
+  if(contactEmail) {
+    const emails=Object.values(fixture.contacts).map(contact=>normalizeEmail(contact.email));
+    for(const email of emails) {
+      assert.match(email,/^[a-z0-9.+_-]+@example\.invalid$/,'Candidate email contacts must be synthetic');
+      assert.ok(email.includes(fixture.runId.toLowerCase()),'Candidate addresses must contain the fresh run ID');
+    }
+    assert.equal(new Set(emails).size,4,'Candidate contact emails must be distinct');
+  }
   return fixture;
 }
 
@@ -72,11 +80,14 @@ function visibleValues(result) {
   const visit=value=>{
     if(typeof value==='string' || typeof value==='number') values.push(String(value));
     else if(Array.isArray(value)) value.forEach(visit);
-    else if(value && typeof value==='object') Object.values(value).forEach(visit);
+    else if(value && typeof value==='object') Object.entries(value).forEach(([key,nested])=>{values.push(key); visit(nested);});
   };
   try { visit(JSON.parse(result.text)); } catch { values.push(result.text); }
   return values.flatMap(value=>{
-    try { return [value,decodeURIComponent(value)]; } catch { return [value]; }
+    const variants=[value];
+    try { variants.push(decodeURIComponent(value)); } catch {}
+    try { const url=new URL(value); variants.push(...url.searchParams.values(),...url.pathname.split('/')); } catch {}
+    return variants;
   });
 }
 
@@ -86,4 +97,20 @@ export function hasPhone(result,phone) {
 
 export function phoneHidden(result,phone) {
   assert.equal(hasPhone(result,phone),false,'An unshared phone number appeared in content or headers');
+}
+
+export function normalizeEmail(email) {
+  return String(email ?? '').trim().toLowerCase();
+}
+
+export function hasEmail(result,email) {
+  const needle=normalizeEmail(email);
+  assert.ok(needle,'An email assertion requires a nonempty address');
+  const escaped=needle.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const pattern=new RegExp("(^|[^a-z0-9.!#$%&'*+/=?^_`{|}~-])"+escaped+'(?![a-z0-9-]|\\.[a-z0-9-])','i');
+  return visibleValues(result).some(value=>pattern.test(normalizeEmail(value)));
+}
+
+export function emailHidden(result,email) {
+  assert.equal(hasEmail(result,email),false,'A withheld email appeared in content or headers');
 }
