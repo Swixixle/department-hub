@@ -6,12 +6,13 @@ const memory = () => { const map = new Map(); return { getItem: key => map.get(k
 
 test('sound starts off, vibration on, and the theme follows the phone until someone picks one', () => {
   const storage = memory();
-  assert.deepEqual(loadFeel(storage), { theme: 'system', sound: false, vibrate: true });
+  assert.deepEqual(loadFeel(storage), { theme: 'system', palette: 'green', sound: false, vibrate: true });
   assert.equal(resolvedTheme({ theme: 'system' }, true), 'dark');
   assert.equal(resolvedTheme({ theme: 'system' }, false), 'light');
   assert.equal(resolvedTheme({ theme: 'light' }, true), 'light', 'a choice beats the phone');
-  saveFeel({ theme: 'dark', sound: true, vibrate: false }, storage);
-  assert.deepEqual(loadFeel(storage), { theme: 'dark', sound: true, vibrate: false });
+  saveFeel({ theme: 'dark', palette: 'warm', sound: true, vibrate: false }, storage);
+  assert.deepEqual(loadFeel(storage), { theme: 'dark', palette: 'warm', sound: true, vibrate: false });
+  assert.equal(saveFeel({ palette: 'neon' }, storage).palette, 'green', 'an unknown color falls back to green');
   assert.equal(saveFeel({ theme: 'neon' }, storage).theme, 'system', 'an unknown theme falls back to the phone');
 });
 
@@ -22,6 +23,10 @@ test('applying a theme marks the page, and follows the phone when left to it', (
   assert.equal(root.style.colorScheme, 'dark');
   assert.equal(applyTheme({ theme: 'light' }, root, { matches: true }), 'light');
   assert.equal(classes.has('dark'), false);
+  applyTheme({ theme: 'light', palette: 'warm' }, root, { matches: false });
+  assert.ok(classes.has('warm'), 'the chosen color marks the page too');
+  applyTheme({ theme: 'light', palette: 'green' }, root, { matches: false });
+  assert.equal(classes.has('warm'), false);
 });
 
 test('feedback vibrates by weight where allowed, and makes no sound unless sound is on', () => {

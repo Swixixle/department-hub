@@ -7,14 +7,17 @@
 // sound files to download and nothing to wait for.
 
 const KEY = 'department-hub-feel';
-const DEFAULTS = { theme: 'system', sound: false, vibrate: true };
+const DEFAULTS = { theme: 'system', palette: 'green', sound: false, vibrate: true };
 export const THEMES = [['system', 'Same as the phone'], ['light', 'Light'], ['dark', 'Dark']];
+// Colors each person can pick for themselves. Green is the department's own and the default.
+export const PALETTES = [['green', 'Green'], ['warm', 'Warm charcoal']];
 
 export function loadFeel(storage = globalThis.localStorage) {
   try { return { ...DEFAULTS, ...JSON.parse(storage?.getItem(KEY) || '{}') }; } catch { return { ...DEFAULTS }; }
 }
 export function saveFeel(feel, storage = globalThis.localStorage) {
-  const clean = { theme: THEMES.some(([id]) => id === feel.theme) ? feel.theme : 'system', sound: Boolean(feel.sound), vibrate: feel.vibrate !== false };
+  const clean = { theme: THEMES.some(([id]) => id === feel.theme) ? feel.theme : 'system', palette: PALETTES.some(([id]) => id === feel.palette) ? feel.palette : 'green',
+    sound: Boolean(feel.sound), vibrate: feel.vibrate !== false };
   try { storage?.setItem(KEY, JSON.stringify(clean)); } catch { /* a private window keeps it for this visit */ }
   return clean;
 }
@@ -26,9 +29,10 @@ export function applyTheme(feel, root = globalThis.document?.documentElement, me
   if (!root) return 'light';
   const theme = resolvedTheme(feel, Boolean(media?.matches));
   root.classList.toggle('dark', theme === 'dark');
+  root.classList.toggle('warm', feel.palette === 'warm');
   root.style.colorScheme = theme;
   const meta = globalThis.document?.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', theme === 'dark' ? '#0d1714' : '#133b34');
+  if (meta) meta.setAttribute('content', feel.palette === 'warm' ? (theme === 'dark' ? '#171719' : '#2a2622') : theme === 'dark' ? '#0d1714' : '#133b34');
   return theme;
 }
 

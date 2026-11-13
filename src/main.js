@@ -3,6 +3,7 @@ import './sizes.css';
 import './protocols.css';
 import './dark.css';
 import './studio.css';
+import './warm.css';
 import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes, shiftInterval } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia, putOutbox, listOutbox, deleteOutbox } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
@@ -15,7 +16,7 @@ import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, p
 import { keywords, qualifiers, tidyQuestion } from './words.js';
 import { LONG_NUMBER_HELP, patientFindings, patientShown, patientSigns } from './guard.js';
 import { isPicture, preparePictures } from './picture-safety.js';
-import { THEMES, applyTheme, feedback, loadFeel, saveFeel } from './feel.js';
+import { PALETTES, THEMES, applyTheme, feedback, loadFeel, saveFeel } from './feel.js';
 import { readPdf } from './pdftext.js';
 import { emptyLibrary, prepareLibrary, addRevision, checkExtraction, supplyText, markFigure, activate, withdraw, toggleMark, revisionOf, searchLibrary } from './protocols.js';
 import { addMapping, reviewBundle, markMappingsReviewed } from './bundles.js';
@@ -920,7 +921,7 @@ function render() {
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
   app.innerHTML = top() + '<main>' + button('<span class="wide"><b>Independent staff project—not an official hospital product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u></span>' +
       '<span class="narrow"><b>Not an official hospital product.</b> No patient info. Activity is tracked. <u>More</u></span>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
-    '<div class="top-tools">' + button('Aa', 'display', 'class="text-size" title="Text size, theme and sound" aria-label="Text size, theme and sound"') +
+    '<div class="top-tools">' + button('<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>', 'display', 'class="text-size menu" title="Settings" aria-label="Settings"') +
     button('Protocols', 'tab', 'class="protocols-trigger' + (ui.tab === 'protocols' ? ' active' : '') + '" ' + valueAttr('protocols') + (ui.tab === 'protocols' ? ' aria-current="page"' : '')) +
     button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board, the documents or the protocols"') +
     '<label class="actor">Viewing as <select id="actor" aria-label="Viewing as">' +
@@ -1206,10 +1207,12 @@ function dialogMarkup() {
   }
   if (type === 'display') {
     const choice = (label, action, value, on) => button(label, action, 'class="' + (on ? 'selected' : '') + '" aria-pressed="' + on + '" ' + valueAttr(value));
-    return shell('Text size, theme and sound', '<p class="subtle">These stay on this device.</p>' +
+    return shell('Settings', '<p class="subtle">Your choices, kept on this device. Nobody else’s screen changes.</p>' +
       '<h3>Text size</h3><div class="segments">' + TEXT_NAMES.map((name, index) => choice(name[0].toUpperCase() + name.slice(1), 'text-size', index, index === textSize)).join('') + '</div>' +
       '<h3>Theme</h3><div class="segments">' + THEMES.map(([id, label]) => choice(label, 'theme', id, feel.theme === id)).join('') + '</div>' +
       '<p class="subtle">Dark is easier on the eyes on a dim unit at night.</p>' +
+      '<h3>Color</h3><div class="segments">' + PALETTES.map(([id, label]) => choice(label, 'palette', id, feel.palette === id)).join('') + '</div>' +
+      '<p class="subtle">Green is the department’s color. Warm charcoal is softer, with lavender buttons.</p>' +
       '<h3>Sound and vibration</h3><div class="segments">' + choice(feel.sound ? 'Tap sounds on' : 'Tap sounds off', 'feel-sound', 'sound', feel.sound) + choice(feel.vibrate ? 'Vibration on' : 'Vibration off', 'feel-vibrate', 'vibrate', feel.vibrate) + '</div>' +
       '<p class="subtle">Sounds start off: phones sit in pockets near sleeping patients. Vibration works on Android phones; iPhones do not let a web page vibrate.</p>');
   }
@@ -1897,6 +1900,7 @@ async function act({action, value, kind}) {
       touch('medium');
       break;
     case 'theme': feel = saveFeel({ ...feel, theme: value }); applyTheme(feel); touch('medium'); break;
+    case 'palette': feel = saveFeel({ ...feel, palette: value }); applyTheme(feel); touch('medium'); break;
     case 'feel-sound': feel = saveFeel({ ...feel, sound: !feel.sound }); touch('light'); break;
     case 'feel-vibrate': feel = saveFeel({ ...feel, vibrate: !feel.vibrate }); touch('light'); break;
     case 'usage-reset': localStorage.removeItem(usageKey); ui.flash = 'Counts reset.'; break;

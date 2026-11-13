@@ -1,0 +1,84 @@
+/* Warm charcoal: a palette each person can choose in Settings. Green stays the department's default. Light first, then
+   dark. Meaningful colors keep their meaning: charge, ICU and extra keep the paper schedule's colors, warnings stay amber,
+   refusals stay red, and post kinds keep their blue, violet and amber edges. */
+
+/* ---- light ---- */
+html.warm { --line: #e6dfd5; --muted: #6d655c; --green: #2a2622; }
+html.warm, html.warm body { background: #f7f4ef; color: #2a2622; }
+html.warm h1, html.warm h2, html.warm h3 { color: #2a2622; }
+html.warm p, html.warm .subtle, html.warm small, html.warm .breadcrumbs, html.warm .actor, html.warm footer { color: #6d655c; }
+html.warm .eyebrow, html.warm .next-when { color: #a35a2c; }
+html.warm a, html.warm .text-button { color: #5a47b8; }
+html.warm aside, html.warm nav { background: #2a2622; }
+html.warm .nav-item { color: #d8d0c6; }
+html.warm .nav-item.active { background: #3b3530; color: #fffaf3; }
+@media (hover: hover) { html.warm .nav-item:hover { background: #3b3530; color: #fffaf3; } }
+@media (hover: none) { html.warm .nav-item:hover:not(.active) { background: transparent; color: #d8d0c6; } }
+html.warm .app-top, html.warm .panel, html.warm .day-card, html.warm dialog, html.warm .segments, html.warm .post-action, html.warm .secondary,
+html.warm .contact-link, html.warm .text-size, html.warm .protocols-trigger { background: #fffdf9; border-color: #e6dfd5; }
+html.warm .secondary, html.warm .post-action, html.warm .text-size, html.warm .protocols-trigger { color: #3a332d; }
+html.warm .primary { background: #6c58c9; border-color: #6c58c9; color: #fff; }
+html.warm .primary:hover { background: #5d4ab8; }
+html.warm .ask-trigger { background: #ddd3fb; color: #2a1f55; }
+html.warm .ask-trigger span { background: #2a1f55; color: #ddd3fb; }
+html.warm .segments button { color: #4a423b; }
+html.warm .segments button.selected, html.warm .segments button:hover, html.warm .reaction.mine { background: #eeeafc; color: #2a1f55; border-color: #c9bdf3; }
+html.warm .roster-status, html.warm .notice { background: #f1ede6; border-color: #e2d9cc; color: #4a423b; }
+html.warm .status-dot { background: #a35a2c; }
+html.warm .unofficial { background: #fbecdf; border-color: #e7c3a3; color: #6b3a17; }
+html.warm .badge, html.warm .badge.learning { background: #eeeafc; color: #3b2f86; }
+html.warm .staff:hover, html.warm .staff.mine { background: #f3eee6; border-color: #e2d9cc; }
+html.warm .avatar { background: #efe8de; color: #4a423b; }
+html.warm .shift-label.day { background: #f6eedc; color: #6b5420; }
+html.warm .shift-label.night { background: #eceaf6; color: #3b3a6e; }
+html.warm input:not([type=file]):not([type=checkbox]):not([type=radio]), html.warm textarea, html.warm select { background: #fffdf9; border-color: #e2d9cc; color: #2a2622; }
+html.warm .next-shift { border-left-color: #e9ad85; }
+html.warm .next-shift.night { border-left-color: #8f7fdc; }
+html.warm .board-bar { background: #f7f4ef; }
+html.warm .caught-up span, html.warm .caught-up-top { color: #5a47b8; }
+html.warm .new-posts { background: #2a2622; }
+
+/* ---- dark ---- */
+html.warm.dark { --line: #34343a; --muted: #b9b4ae; --white: #222225; }
+html.warm.dark, html.warm.dark body { background: #171719; color: #f3efe8; }
+html.warm.dark h1, html.warm.dark h2, html.warm.dark h3, html.warm.dark b, html.warm.dark strong { color: #f3efe8; }
+html.warm.dark p, html.warm.dark .subtle, html.warm.dark small, html.warm.dark .actor, html.warm.dark footer { color: #b9b4ae; }
+html.warm.dark .eyebrow, html.warm.dark .next-when { color: #e9ad85; }
+html.warm.dark a, html.warm.dark .text-button { color: #c9bbff; }
+html.warm.dark aside, html.warm.dark nav { background: #1d1d20; }
+html.warm.dark .nav-item { color: #c9c3bb; }
+html.warm.dark .nav-item.active { background: #2b2b30; color: #f3efe8; }
+@media (hover: hover) { html.warm.dark .nav-item:hover { background: #2b2b30; color: #f3efe8; } }
+@media (hover: none) { html.warm.dark .nav-item:hover:not(.active) { background: transparent; color: #c9c3bb; } }
+html.warm.dark .app-top { background: #1d1d20; border-color: #34343a; }
+html.warm.dark .panel, html.warm.dark .day-card, html.warm.dark dialog, html.warm.dark .segments, html.warm.dark .staff, html.warm.dark .post-file,
+html.warm.dark .actions, html.warm.dark .ask-answer, html.warm.dark .option { background: #222225; border-color: #34343a; color: #f3efe8; }
+html.warm.dark .contest, html.warm.dark .post.pending, html.warm.dark .attach, html.warm.dark .drop, html.warm.dark .match, html.warm.dark .thread article { background: #1d1d20; border-color: #3a3a41; }
+html.warm.dark .secondary, html.warm.dark .post-action, html.warm.dark .contact-link, html.warm.dark .text-size, html.warm.dark .close,
+html.warm.dark .protocols-trigger { background: #2b2b30; border-color: #3a3a41; color: #ece6dd; }
+html.warm.dark .primary { background: #b8a6f5; border-color: #b8a6f5; color: #1b1630; }
+html.warm.dark .primary:hover { background: #c7b8fa; }
+html.warm.dark .ask-trigger { background: #b8a6f5; color: #1b1630; }
+html.warm.dark .ask-trigger span { background: #1b1630; color: #b8a6f5; }
+html.warm.dark .segments button { color: #cfc8bf; }
+html.warm.dark .segments button.selected, html.warm.dark .segments button:hover, html.warm.dark .reaction.mine { background: #2e2a3d; color: #e6defd; border-color: #57507a; }
+html.warm.dark .roster-status, html.warm.dark .notice { background: #26232f; border-color: #3d3750; color: #d9d0f7; }
+html.warm.dark .status-dot { background: #e9ad85; }
+html.warm.dark .unofficial { background: #2a231d; border-color: #5a4635; color: #f0d2bb; }
+html.warm.dark .unofficial b { color: #ffe0c7; }
+html.warm.dark .badge, html.warm.dark .badge.learning, html.warm.dark .import-stats b { background: #2e2a3d; color: #d9d0f7; }
+html.warm.dark .staff:hover, html.warm.dark .staff.mine { background: #2b2b30; border-color: #4a4a52; }
+html.warm.dark .avatar { background: #2e2a3d; color: #e6defd; }
+html.warm.dark .shift-label.day { background: #2b2620; color: #f0d2bb; }
+html.warm.dark .shift-label.night { background: #25233a; color: #cfc6f7; }
+html.warm.dark .edit-shift { color: #c9c3bb; border-color: #4a4a52; }
+html.warm.dark input:not([type=file]):not([type=checkbox]):not([type=radio]), html.warm.dark textarea, html.warm.dark select { background: #1d1d20; border-color: #3a3a41; color: #f3efe8; }
+html.warm.dark .next-shift { border-left-color: #e9ad85; }
+html.warm.dark .next-shift.night { border-left-color: #b8a6f5; }
+html.warm.dark .board-bar { background: #171719; }
+html.warm.dark .caught-up span, html.warm.dark .caught-up-top { color: #c9bbff; }
+html.warm.dark .new-posts { background: #b8a6f5; color: #1b1630; }
+html.warm.dark .join-code { background: #26232f; color: #e6defd; }
+html.warm nav { border-top-color: #3b3530; }
+html.warm.dark nav { border-top-color: #2b2b30; }
+html.warm.dark .breadcrumbs, html.warm.dark .breadcrumbs span { color: #b9b4ae; }
