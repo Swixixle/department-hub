@@ -1,0 +1,104 @@
+/* Feel: a firmer press, a pop on a reaction, a shake on a refusal, and a colored edge for each kind of post. */
+@media (prefers-reduced-motion: no-preference) {
+  button { transition: transform .12s cubic-bezier(.175, .885, .32, 1.275), background-color .15s ease; }
+  button:active:not(:disabled) { transform: scale(.97); }
+  .pop { animation: pop .28s cubic-bezier(.175, .885, .32, 1.275); }
+  .shake { animation: shake .3s ease-in-out; }
+  dialog[open] { animation: rise .22s cubic-bezier(.175, .885, .32, 1.275); }
+}
+@keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.12); } 100% { transform: scale(1); } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+@keyframes rise { from { transform: translateY(14px); opacity: .6; } to { transform: none; opacity: 1; } }
+.post-learning { border-left: 4px solid #6aa7c9; }
+.post-fun { border-left: 4px solid #8c7ae6; }
+.post-dated { border-left: 4px solid #d9a03a; }
+
+/* Dark: for dim units at night. Set on <html> by feel.js, from the phone's setting or the person's choice. */
+html.dark {
+  --line: #2a3a34; --muted: #9db2a7; --white: #16211e; color-scheme: dark;
+}
+html.dark, html.dark body { background: #0d1714; color: #e2ebe5; }
+html.dark :root, html.dark { color: #e2ebe5; }
+html.dark h1, html.dark h2, html.dark h3, html.dark b, html.dark strong, html.dark .day-card header strong, html.dark .request h3 { color: #edf4ef; }
+html.dark p, html.dark .subtle, html.dark small, html.dark .empty-shift, html.dark footer, html.dark .breadcrumbs, html.dark .actor, html.dark .calendar-foot { color: #9db2a7; }
+html.dark .eyebrow { color: #8fb9a0; }
+html.dark a { color: #9fd3a8; }
+
+/* Surfaces */
+html.dark .app-top { background: #121e1a; border-color: var(--line); }
+html.dark .panel, html.dark .day-card, html.dark dialog, html.dark .segments, html.dark .page-frame, html.dark .passage, html.dark .reading-table,
+html.dark .source-quote, html.dark .capture-frame, html.dark .post-file, html.dark .actions { background: #16211e; border-color: var(--line); color: #e2ebe5; }
+html.dark .dialog-head { border-color: var(--line); }
+html.dark dialog::backdrop { background: #000000b8; }
+html.dark .day-card header, html.dark .shift + .shift, html.dark .post-actions, html.dark .caption { border-color: var(--line); }
+html.dark .contest, html.dark .post.pending, html.dark .thread article, html.dark .flag, html.dark .drop, html.dark .attach, html.dark .match { background: #121c19; border-color: #33463f; }
+
+/* Text fields */
+html.dark input:not([type=file]):not([type=checkbox]):not([type=radio]), html.dark textarea, html.dark select, html.dark form select,
+html.dark .actor select { background: #0f1a17; border-color: #33463f; color: #e2ebe5; }
+html.dark input::placeholder, html.dark textarea::placeholder { color: #6f857a; }
+html.dark form label { color: #c6d6cc; }
+
+/* Buttons */
+html.dark .secondary, html.dark .post-action, html.dark .contact-link, html.dark .text-size, html.dark .close, html.dark .protocols-trigger { background: #1b2824; border-color: #33463f; color: #d8e6dd; }
+html.dark .secondary:hover, html.dark .post-action:hover { background: #22322c; }
+html.dark .primary { background: #2f7a5c; border-color: #2f7a5c; color: #fff; }
+html.dark .primary:hover { background: #378a69; }
+html.dark .text-button { color: #9fd3a8; }
+html.dark .segments button { color: #b9cbc0; }
+html.dark .segments button.selected, html.dark .segments button:hover { background: #24372f; color: #e7f3eb; }
+html.dark .reaction.mine { background: #24372f; border-color: #4f7d63; color: #e7f3eb; }
+html.dark .danger { background: #3a1d1d; border-color: #8a4646; color: #f1c2c2; }
+html.dark .ask-trigger { background: #c8e79a; color: #102e2a; }
+
+/* Notices, badges, warnings */
+html.dark .roster-status, html.dark .notice { background: #142a20; border-color: #2c4a3a; color: #bfe0c9; }
+html.dark .unofficial { background: #2e2512; border-color: #6a5420; color: #f0d9a6; }
+html.dark .unofficial b { color: #ffe7b0; }
+html.dark .flash, html.dark .check, html.dark .waiting, html.dark .over, html.dark .chip, html.dark .dated, html.dark .not-yet, html.dark .contest-badge { background: #33290f; border-color: #6a5420; color: #f0d9a6; }
+html.dark .withdrawn { background: #3a1d1d; color: #f1c2c2; }
+html.dark .refusal { color: #ff9e9e; }
+html.dark .badge, html.dark .badge.learning, html.dark .import-stats b { background: #1f3129; color: #bfe0c9; }
+html.dark .join-code { background: #142a20; color: #d9f2c4; }
+
+/* The schedule */
+html.dark .shift-label.day { background: #26301a; color: #d3e3a8; }
+html.dark .shift-label.night { background: #1c2536; color: #b9c8ea; }
+html.dark .staff, html.dark .match { color: #d8e6dd; }
+html.dark .staff:hover, html.dark .staff.mine, html.dark .match:hover { background: #1f3129; border-color: #2f4a3c; }
+html.dark .avatar { background: #22332c; color: #bfe0c9; }
+html.dark .staff em, html.dark .match em { color: #9fd3a8; }
+
+/* Accents read on dark too */
+html.dark .post-learning { border-left-color: #6fb4dc; }
+html.dark .post-fun { border-left-color: #a394f0; }
+html.dark .post-dated { border-left-color: #e2ad4a; }
+
+/* Pictures and the source pages keep a light ground, so a captured page looks like the page it is. */
+html.dark .page-frame, html.dark .capture-frame { background: #f4f6f3; }
+
+/* Second pass: the remaining light grounds found by listing every light background in the stylesheets. */
+html.dark .ask-answer, html.dark .option, html.dark .doc-text, html.dark .mark, html.dark .passage.running, html.dark .passage.figure,
+html.dark .line-list > div.current, html.dark .fair tr.mine, html.dark .edit-shift:hover, html.dark .count-note, html.dark dialog form > .actions,
+html.dark .reading-table thead th { background: #121c19; border-color: var(--line); color: #e2ebe5; }
+html.dark .board-bar { background: #0d1714; }
+html.dark .progress { background: #22332c; }
+html.dark .staff .tag, html.dark .badge.standing.superseded, html.dark .chip.plain { background: #22332c; color: #c6d6cc; }
+html.dark .badge.standing, html.dark .badge.standing.added, html.dark .badge.standing.checked, html.dark .badge.standing.reviewed,
+html.dark .badge.standing.pending, html.dark .badge.standing.scheduled { background: #1f3129; color: #bfe0c9; }
+html.dark .badge.standing.not-yet, html.dark .badge.dated, html.dark .person-row.check, html.dark .roster-status.waiting, html.dark .cite-note,
+html.dark .passage.cited, html.dark .reading-table tr.cited > *, html.dark button.count-note.over, html.dark .doc-text mark { background: #33290f; border-color: #6a5420; color: #f0d9a6; }
+html.dark .badge.standing.conflict, html.dark .badge.standing.none, html.dark .badge.standing.withdrawn { background: #3a1d1d; color: #f1c2c2; }
+html.dark .play-link { background: #c8e79a; color: #102e2a; }
+html.dark .source-crop { background: #f4f6f3; }
+html.dark .ask-answer .subtle, html.dark .option .subtle { color: #9db2a7; }
+/* Charge, ICU and extra keep the paper schedule's colors; the name on them stays dark so it can be read. */
+html.dark .staff.charge .name, html.dark .staff.icu .name, html.dark .staff.extra .name,
+html.dark .legend .name.charge, html.dark .legend .name.icu, html.dark .legend .name.extra { color: #13201b; }
+html.dark .staff { background: #16211e; border-color: #2a3a34; }
+html.dark .staff:hover, html.dark .staff.mine { background: #1f3129; border-color: #3b5a4a; }
+html.dark .edit-shift { color: #b9cbc0; border-color: #3b4e46; background: transparent; }
+
+/* On a touch screen the last tapped spot keeps :hover, so a tab under the finger looked selected. Only a real
+   pointer gets the hover color. */
+@media (hover: none) { .nav-item:hover:not(.active) { background: transparent; color: #c0d2c9; } }
