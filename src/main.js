@@ -5,7 +5,7 @@ import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, ass
 import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
-import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
+import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink, REACTIONS, CAPTION_LIMIT, reactionState, rankedCaptions, currentContest } from './board.js';
 import { localBoard, sharedBoard } from './backend.js';
 import { sharedClient, joinTokenFrom } from './shared.js';
 import { SUGGESTIONS, ask, findPeople, pretty as prettyDate, readingProblem, searchDocuments } from './ask.js';
@@ -215,7 +215,8 @@ const mediaBlobs = new Map(), mediaUrls = new Map();
 // The one place the board keeps posts and files: this browser, or the department server once a person signs in to it.
 const localStore = localBoard({
   getPosts: () => state.posts,
-  change: (type, details, update) => commit(type, details, previous => ({ ...previous, posts: update(previous.posts) }))
+  change: (type, details, update) => commit(type, details, previous => ({ ...previous, posts: update(previous.posts) })),
+  same: (a, b) => isSame(a, b)
 });
 let boardStore = localStore;
 // The department server, when this page was opened from it. Opened from serve.py or the public demo there is none,
@@ -226,12 +227,13 @@ const sharedMe = () => shared.client?.session || null;
 const isMyPost = post => boardStore.shared ? post.authorId === sharedMe()?.personId : Boolean(post.created) && isSame(post.author, state.actor);
 async function refreshShared({ quiet = false } = {}) {
   if (!boardStore.shared) return;
-  const before = shared.posts.map(post => post.id + (post.media || []).length).join();
+  const signature = posts => JSON.stringify(posts.map(post => [post.id, (post.media || []).length, post.reactions, (post.captions || []).map(caption => [caption.id, caption.reactions])]));
+  const before = signature(shared.posts);
   shared.posts = await boardStore.list();
   if (!sharedMe()) { leaveShared('Your session ended. Sign in again to see the department board.'); return; }
   await hydrateMedia({ redraw: false });
   // A redraw while someone is writing would cost them attached files, so new posts wait until the composer is shut.
-  const changed = before !== shared.posts.map(post => post.id + (post.media || []).length).join();
+  const changed = before !== signature(shared.posts);
   if ((changed || !quiet) && !(quiet && app.querySelector('.composer.open'))) render();
 }
 async function connectShared() {
@@ -420,6 +422,18 @@ const WRONG = { misread:'reported as misread', passage:'reported as quoting the 
 const sameAsk = (item, text) => item.asks.some(asked => asked.trim().toLowerCase() === text.trim().toLowerCase());
 const liveDocuments = () => state.documents.filter(doc => doc.status !== 'withdrawn' && (!doc.effective || doc.effective <= localToday()));
 const RULE = 'No patient information: no names, faces, monitors, charts or record numbers. Saved posts and uploads leave a fingerprint and the name in use. Ordinary questions are not logged.';
+// A caption contest: the picture is the post; captions underneath, funniest first, and a box to add one.
+function contestMarkup(post) {
+  const ranked = rankedCaptions(post, reactionWho(), isSame);
+  const mine = caption => boardStore.shared ? caption.authorId === sharedMe()?.personId : isSame(caption.author, state.actor);
+  return '<div class="contest"><p class="contest-title"><span class="badge contest-badge">Caption this</span>' + (ranked.length ? ' ' + ranked.length + ' caption' + (ranked.length === 1 ? '' : 's') : ' Be the first') + '</p>' +
+    ranked.map(caption => '<div class="caption' + (caption.leading ? ' leading' : '') + '"><p>' + (caption.leading ? '<span class="badge">Leading</span> ' : '') + '“' + h(caption.text) + '”<small> · ' + h(caption.author) + '</small></p><span>' +
+      button('<span aria-hidden="true">😂</span>' + (caption.laugh.count ? ' ' + caption.laugh.count : ''), 'caption-laugh', 'class="post-action reaction' + (caption.laugh.mine ? ' mine' : '') + '" aria-pressed="' + caption.laugh.mine + '" aria-label="Funny' + (caption.laugh.count ? ', ' + caption.laugh.count : '') + '" ' + valueAttr(post.id + '|' + caption.id)) +
+      (mine(caption) ? button('Remove', 'caption-remove', 'class="post-action quiet" ' + valueAttr(post.id + '|' + caption.id)) : '') + '</span></div>').join('') +
+    '<form data-form="caption" class="caption-form"><input type="hidden" name="post" value="' + h(post.id) + '"><label class="visually-hidden" for="caption-' + h(post.id) + '">Your caption</label>' +
+    '<input id="caption-' + h(post.id) + '" name="text" maxlength="' + CAPTION_LIMIT + '" placeholder="Your caption…" autocomplete="off" required><button class="secondary">Add</button><p class="refusal" role="alert"></p></form></div>';
+}
+
 function postMarkup(post) {
   const link = videoLink(post.body);
   const words = post.body ? '<p>' + linkParts(post.body).map(part => part.href ?
@@ -440,14 +454,23 @@ function postMarkup(post) {
     (post.when ? '<p><span class="badge dated">' + ({ due:'Due', meeting:'Meeting', event:'Event' }[post.when.kind] || 'Date') + ' · ' + h(prettyDate(post.when.date)) + '</span></p>' : '') + words +
     (post.media?.length ? '<div class="post-media">' + post.media.map(piece).join('') + '</div>' : '') +
     (link ? '<div class="link-player" data-embed="' + h(link.embed) + '">' + button('▶ Play here · ' + h(link.site), 'play-link', 'class="play-link"') + '</div>' : '') +
-    '<div class="post-actions">' + (post.inside ? '<span class="subtle">Department only</span>' : button('↗ Share', 'share', 'class="post-action" ' + valueAttr(post.id))) +
+    (post.contest ? contestMarkup(post) : '') +
+    '<div class="post-actions">' + REACTIONS.map(([kind, face, label]) => { const now = reactionState(post, kind, reactionWho(), isSame);
+      return button('<span aria-hidden="true">' + face + '</span>' + (now.count ? ' ' + now.count : ''), 'react', 'class="post-action reaction' + (now.mine ? ' mine' : '') + '" aria-pressed="' + now.mine + '" aria-label="' + label + (now.count ? ', ' + now.count : '') + '" ' + valueAttr(post.id + '|' + kind)); }).join('') +
+    (post.inside ? '<span class="subtle">Department only</span>' : button('↗ Share', 'share', 'class="post-action" ' + valueAttr(post.id))) +
     (isMyPost(post) ? button('Remove', 'remove-post', 'class="post-action quiet" ' + valueAttr(post.id)) : '') + '</div></article>';
 }
 
 // The board is a feed: newest first, a page at a time. Older posts are added at the bottom as the reader nears it,
 // without redrawing the page, so a half-written post and a playing video are left alone.
 const FEED_PAGE = 10;
-const feedPosts = () => [...boardPosts()].reverse().filter(post => matchesFilter(post, ui.boardFilter || 'all'));
+// Newest first; on All, this week's caption contest sits at the top.
+const feedPosts = () => {
+  const shown = [...boardPosts()].reverse().filter(post => matchesFilter(post, ui.boardFilter || 'all'));
+  const contest = (ui.boardFilter || 'all') === 'all' ? currentContest(boardPosts()) : null;
+  return contest ? [contest, ...shown.filter(post => post.id !== contest.id)] : shown;
+};
+const reactionWho = () => boardStore.shared ? (sharedMe()?.name || '') : state.actor;
 function feedTail(shown, limit) {
   if (shown.length > limit) return '<div class="feed-more" data-feed-more>' + button('Show older posts · ' + (shown.length - limit) + ' more', 'feed-more', 'class="secondary"') + '</div>';
   return shown.length > FEED_PAGE ? '<p class="feed-end subtle" data-feed-end>That is everything on the board.</p>' : '';
@@ -502,6 +525,7 @@ function board() {
     '<p class="subtle">A YouTube or Vimeo link plays right on the board.</p><label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple><span class="subtle">Photos are rebuilt without their hidden location and phone details, and their words are checked for patient information. Videos are sent as they are.</span></label>' +
     '<label><span><input type="checkbox" name="learning"> Add to Learning (instructional, CEU-type)</span></label>' +
     '<label><span><input type="checkbox" name="inside"> Keep inside the department (no Share button)</span></label>' +
+    '<label><span><input type="checkbox" name="contest"> Make it a caption contest (attach a picture)</span></label>' +
     '<p class="subtle">' + RULE + '</p></div><p class="refusal" role="alert"></p><button class="primary">Post</button></form>' +
     '<div class="calendar-toolbar board-bar"><div class="segments">' + FILTERS.map(([id, label]) => button(label, 'board-filter', 'class="' + (filter === id ? 'selected' : '') + '" ' + valueAttr(id))).join('') + '</div></div>' +
     '<div class="post-list">' + (shown.slice(0, limit).map(postMarkup).join('') || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>' + feedTail(shown, limit);
@@ -1925,6 +1949,28 @@ async function act({action, value, kind}) {
       ui.dialog = { type:'account' };
       break;
     }
+    case 'react': {
+      const [postId, kindName] = String(value).split('|'), post = boardPosts().find(item => item.id === postId);
+      if (!post) return;
+      const now = reactionState(post, kindName, reactionWho(), isSame);
+      await boardStore.react(postId, kindName, reactionWho(), !now.mine);
+      await refreshShared({ quiet:true });
+      break;
+    }
+    case 'caption-laugh': {
+      const [postId, captionId] = String(value).split('|'), post = boardPosts().find(item => item.id === postId);
+      const caption = (post?.captions || []).find(item => item.id === captionId);
+      if (!caption) return;
+      await boardStore.laughCaption(postId, captionId, reactionWho(), !reactionState(caption, 'laugh', reactionWho(), isSame).mine);
+      await refreshShared({ quiet:true });
+      break;
+    }
+    case 'caption-remove': {
+      const [postId, captionId] = String(value).split('|');
+      await boardStore.uncaption(postId, captionId);
+      await refreshShared({ quiet:true });
+      break;
+    }
     case 'board-filter': ui.boardFilter = value; ui.boardLimit = FEED_PAGE; break;
     case 'feed-more': addOlderPosts(); return;
     case 'voice': void startVoice(); return;
@@ -2184,7 +2230,8 @@ async function submit(form) {
         finally { button.disabled = false; button.textContent = label; }
       }
       const media = files.map(file => ({ id:crypto.randomUUID(), name:file.name, type:file.type, size:file.size, kind:mediaKind(file.type, file.name) }));
-      const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}),
+      if (data.contest && !media.some(item => item.kind === 'image' || item.kind === 'video')) { form.querySelector('.refusal').textContent = 'A caption contest needs a picture or a video to caption.'; return; }
+      const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}), ...(data.contest ? { contest:true } : {}),
         ...(data.whenKind ? { when:{ kind:data.whenKind, date:data.whenDate } } : {}) };
       const send = form.querySelector('button.primary');
       send.disabled = true;
@@ -2203,6 +2250,15 @@ async function submit(form) {
       shared.joining = { token };
       try { const joined = await shared.client.join(token); shared.joining = { code: joined.activated ? null : joined.code, activated: joined.activated }; }
       catch (error) { form.querySelector('.refusal').textContent = sharedProblem(error, 'join'); shared.joining = null; return; }
+      break;
+    }
+    case 'caption': {
+      const text = String(data.text || '').trim();
+      if (!text) return;
+      if (!patientCheck(form, text)) return;
+      try { await boardStore.caption(data.post, text, reactionWho()); }
+      catch (error) { form.querySelector('.refusal').textContent = error.message || String(error); return; }
+      await refreshShared({ quiet:true });
       break;
     }
     case 'invite': {

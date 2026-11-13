@@ -24,11 +24,13 @@ const badRequest = message => { throw new Refused(400, message); };
 
 // What kind of post it is, as the phone's board shows it. Only these keys, each checked, and nothing free-form.
 const WHEN_KINDS = ['due', 'meeting', 'event'];
+const REACTION_KINDS = ['laugh', 'thanks'];
 export function postExtras(value = {}) {
   const extras = {};
   if (value.learning === true) extras.learning = true;
   if (value.inside === true) extras.inside = true;
   if (value.voice === true) extras.voice = true;
+  if (value.contest === true) extras.contest = true;
   if (value.seconds !== undefined) {
     const seconds = Number(value.seconds);
     if (!Number.isFinite(seconds) || seconds < 0 || seconds > 3600) badRequest('seconds is a recording length');
@@ -72,11 +74,26 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
   const json = value => ({ status: 200, body: value });
 
   const mediaOf = postId => db.prepare('SELECT id, name, content_type, LENGTH(bytes) AS size FROM files WHERE post_id = ? ORDER BY created_at').all(postId);
+  // How many laughed or thanked, and whether the caller did. Never who: a count is enough, and it ranks nobody.
+  const reactionsOf = targetId => Object.fromEntries(REACTION_KINDS.map(kind => [kind, {
+    count: db.prepare('SELECT COUNT(*) AS n FROM reactions WHERE target_id = ? AND kind = ?').get(targetId, kind).n,
+    mine: Boolean(db.prepare('SELECT 1 FROM reactions WHERE target_id = ? AND kind = ? AND person_id = ?').get(targetId, kind, session.personId)) }]));
+  const captionsOf = postId => db.prepare('SELECT * FROM captions WHERE post_id = ? AND deleted_at IS NULL ORDER BY created_at').all(postId)
+    .map(row => ({ id: row.id, authorId: row.author_id, body: row.body, createdAt: row.created_at, reactions: { laugh: reactionsOf(row.id).laugh } }));
+  const full = row => ({ ...postJson(row, mediaOf(row.id)), reactions: reactionsOf(row.id), captions: captionsOf(row.id) });
+  // PUT gives a reaction, DELETE takes it back. Both are safe to repeat, so a retry on a bad signal does no harm.
+  // A reaction leaves no receipt: it is a tap, not a record.
+  const react = (targetId, kind, allowed = REACTION_KINDS) => {
+    if (!allowed.includes(kind)) notFound();
+    if (method === 'PUT') db.prepare('INSERT OR IGNORE INTO reactions (target_id, department_id, person_id, kind, created_at) VALUES (?,?,?,?,?)').run(targetId, dept, session.personId, kind, now());
+    else if (method === 'DELETE') db.prepare('DELETE FROM reactions WHERE target_id = ? AND person_id = ? AND kind = ?').run(targetId, session.personId, kind);
+    else forbidden();
+    return json(reactionsOf(targetId)[kind]);
+  };
 
   if (kind === 'posts') {
     if (!first) {
-      if (method === 'GET') return json(db.prepare('SELECT * FROM posts WHERE department_id = ? AND deleted_at IS NULL ORDER BY created_at').all(dept)
-        .map(row => postJson(row, mediaOf(row.id))));
+      if (method === 'GET') return json(db.prepare('SELECT * FROM posts WHERE department_id = ? AND deleted_at IS NULL ORDER BY created_at').all(dept).map(full));
       if (method === 'POST') {
         const text = String(body?.body ?? '').trim();
         const media = Array.isArray(body.media) ? body.media.map(String) : [];
@@ -93,7 +110,7 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
         // A retry of a post that already arrived returns the post, not a second one.
         if (clientId !== null) {
           const already = db.prepare('SELECT * FROM posts WHERE department_id = ? AND client_id = ?').get(dept, clientId);
-          if (already) return { status: 200, body: { ...postJson(already, mediaOf(already.id)), duplicate: true } };
+          if (already) return { status: 200, body: { ...full(already), duplicate: true } };
         }
         const row = transact(db, () => {
           const id = newId('post'), at = now();
@@ -109,13 +126,43 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
           recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Board update', details: { id, length: text.length, attachments: media.length }, build });
           return db.prepare('SELECT * FROM posts WHERE id = ?').get(id);
         });
-        return { status: 201, body: postJson(row, mediaOf(row.id)) };
+        return { status: 201, body: full(row) };
       }
       forbidden();
     }
     const row = db.prepare('SELECT * FROM posts WHERE id = ?').get(first);
     if (!row || row.department_id !== dept || row.deleted_at) notFound();
-    if (method === 'GET') return json(postJson(row, mediaOf(row.id)));
+    if (method === 'GET' && !second) return json(full(row));
+    // Reactions and captions belong to everyone in the department, not only the post's author.
+    if (second === 'reactions') return react(row.id, parts[3]);
+    if (second === 'captions') {
+      if (!parts[3] && method === 'POST') {
+        const text = String(body?.body ?? '').trim().replace(/\s+/g, ' ');
+        if (!text) badRequest('a caption needs words');
+        if (text.length > 140) badRequest('a caption is at most 140 characters');
+        if (!readExtras(row.extras).contest) badRequest('that post is not a caption contest');
+        const id = newId('caption');
+        transact(db, () => {
+          db.prepare('INSERT INTO captions (id, post_id, department_id, author_id, body, created_at) VALUES (?,?,?,?,?,?)').run(id, row.id, dept, session.personId, text, now());
+          recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Caption added', details: { post: row.id, caption: id, length: text.length }, build });
+        });
+        return { status: 201, body: full(row) };
+      }
+      const caption = db.prepare('SELECT * FROM captions WHERE id = ? AND post_id = ? AND deleted_at IS NULL').get(String(parts[3] || ''), row.id);
+      if (!caption) notFound();
+      if (parts[4] === 'reactions') return react(caption.id, parts[5], ['laugh']);
+      if (!parts[4] && method === 'DELETE') {
+        if (caption.author_id !== session.personId) forbidden();
+        transact(db, () => {
+          db.prepare('UPDATE captions SET deleted_at = ? WHERE id = ?').run(now(), caption.id);
+          db.prepare('DELETE FROM reactions WHERE target_id = ?').run(caption.id);
+          recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Caption removed', details: { post: row.id, caption: caption.id }, build });
+        });
+        return { status: 204, body: null };
+      }
+      notFound();
+    }
+    if (second) notFound();
     if (row.author_id !== session.personId) forbidden();
     if (method === 'PATCH') {
       const text = String(body?.body ?? '').trim();
@@ -125,7 +172,7 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
         recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Board post edited', details: { id: row.id }, build });
         return db.prepare('SELECT * FROM posts WHERE id = ?').get(row.id);
       });
-      return json(postJson(updated, mediaOf(updated.id)));
+      return json(full(updated));
     }
     if (method === 'DELETE') {
       transact(db, () => {
@@ -133,6 +180,8 @@ export function handle(db, { session, departmentId, parts, method, query, body, 
         db.prepare('UPDATE posts SET deleted_at = ? WHERE id = ?').run(now(), row.id);
         // The post's own attachments go with it. Nothing else is touched.
         db.prepare('DELETE FROM files WHERE post_id = ?').run(row.id);
+        db.prepare('DELETE FROM reactions WHERE target_id = ? OR target_id IN (SELECT id FROM captions WHERE post_id = ?)').run(row.id, row.id);
+        db.prepare('UPDATE captions SET deleted_at = ? WHERE post_id = ? AND deleted_at IS NULL').run(now(), row.id);
         recordReceipt(db, { departmentId: dept, actorId: session.personId, type: 'Board post removed', details: { id: row.id, attachments: attached.length }, build });
       });
       return { status: 204, body: null };

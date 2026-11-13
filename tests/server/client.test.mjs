@@ -135,3 +135,43 @@ test('the server serves the built app from the same address, checking for a newe
     assert.equal(joinLink('a b', 'https://hub.example'), 'https://hub.example/#join=a%20b');
   } finally { running.server.close(); running.db.close(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('reactions are safe to repeat and show counts, never names; captions only on a contest, removable only by their author', async () => {
+  const unit = await department();
+  try {
+    const admin = unit.phone();
+    await admin.client.join(unit.first.token);
+    await admin.client.signIn();
+    const invite = await admin.client.invite('Jordan Test');
+    const jordan = unit.phone();
+    const claim = await jordan.client.join(invite.token);
+    await admin.client.approve(claim.claimId, claim.code, 'in-person');
+    await jordan.client.signIn();
+    const board = who => sharedBoard({ baseUrl: unit.running.url, departmentId: who.client.session.departmentId, token: who.client.session.token });
+    const plain = await board(jordan).publish({ id: 'fun-1', body: 'tanks again', media: [] });
+    const picture = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
+    const contest = await board(jordan).publish({ id: 'fun-2', body: 'Caption this', contest: true, media: [{ id: 'l', name: 'meme.png' }] }, [['l', picture]]);
+    assert.equal(contest.contest, true);
+
+    await board(admin).react(plain.id, 'laugh', null, true);
+    await board(admin).react(plain.id, 'laugh', null, true);          // a repeat on a bad signal changes nothing
+    let seen = (await board(jordan).list()).find(post => post.id === plain.id);
+    assert.deepEqual(seen.reactions.laugh, { count: 1, mine: false }, 'a count and whether it is mine, not who');
+    assert.equal(JSON.stringify(seen.reactions).includes('Admin'), false);
+    await board(admin).react(plain.id, 'laugh', null, false);
+    seen = (await board(jordan).list()).find(post => post.id === plain.id);
+    assert.equal(seen.reactions.laugh.count, 0);
+    await assert.rejects(() => board(admin).react(plain.id, 'angry', null, true), error => error.status === 404, 'only the two kinds exist');
+
+    await assert.rejects(() => board(admin).caption(plain.id, 'not a contest'), error => error.status === 400);
+    await board(admin).caption(contest.id, 'me finding the last full tank');
+    const withCaption = (await board(jordan).list()).find(post => post.id === contest.id);
+    assert.deepEqual(withCaption.captions.map(caption => caption.text), ['me finding the last full tank']);
+    const captionId = withCaption.captions[0].id;
+    await board(jordan).laughCaption(contest.id, captionId, null, true);
+    assert.deepEqual((await board(admin).list()).find(post => post.id === contest.id).captions[0].reactions.laugh, { count: 1, mine: false });
+    await assert.rejects(() => board(jordan).uncaption(contest.id, captionId), error => error.status === 403, 'only the caption\'s author removes it');
+    await board(admin).uncaption(contest.id, captionId);
+    assert.deepEqual((await board(jordan).list()).find(post => post.id === contest.id).captions, []);
+  } finally { unit.stop(); }
+});
