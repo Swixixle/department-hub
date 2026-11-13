@@ -11,10 +11,15 @@
 //   remove(postId)    takes a post and its files away
 //   file(mediaId)     the Blob for one attachment, or nothing if it is not available
 //   clear()           forget every file (used when the workspace is erased)
+//   react(postId, kind, who, on)             a laugh or a thanks, given (on) or taken back
+//   caption(postId, text, who)               a caption on a caption-contest post
+//   laughCaption(postId, captionId, who, on) a laugh on a caption
+//   uncaption(postId, captionId)             takes the caller's own caption back
 import { clearMedia, deleteMedia, getMedia, putMedia } from './storage.js';
+import { addCaption, removeCaption, toggleCaptionLaugh, toggleReaction } from './board.js';
 
 // getPosts(): the posts in the workspace. change(type, details, update): records a receipt and saves update(posts).
-export function localBoard({ getPosts, change }) {
+export function localBoard({ getPosts, change, same = (a, b) => a === b }) {
   return {
     shared: false,
     where: 'this browser only',
@@ -37,7 +42,14 @@ export function localBoard({ getPosts, change }) {
       for (const item of post.media || []) await deleteMedia(item.id).catch(() => {});
     },
     async file(mediaId) { return (await getMedia(mediaId)) || null; },
-    async clear() { await clearMedia(); }
+    async clear() { await clearMedia(); },
+    async react(postId, kind, who) { await change('Board reaction', { id: postId, kind }, posts => toggleReaction(posts, postId, kind, who, same)); },
+    async caption(postId, text, who) {
+      const caption = { id: crypto.randomUUID(), author: who, text, created: new Date().toISOString() };
+      await change('Caption added', { post: postId, caption: caption.id, length: String(text).length }, posts => addCaption(posts, postId, caption));
+    },
+    async laughCaption(postId, captionId, who) { await change('Board reaction', { id: captionId, kind: 'laugh' }, posts => toggleCaptionLaugh(posts, postId, captionId, who, same)); },
+    async uncaption(postId, captionId) { await change('Caption removed', { post: postId, caption: captionId }, posts => removeCaption(posts, postId, captionId)); }
   };
 }
 
@@ -59,7 +71,9 @@ export function fromServerPost(post, names = id => id) {
   const extras = post.extras || {};
   return { id: post.id, author: names(post.authorId), authorId: post.authorId, body: post.body, created: post.createdAt,
     ...(extras.learning ? { learning: true } : {}), ...(extras.inside ? { inside: true } : {}), ...(extras.voice ? { voice: true } : {}),
-    ...(extras.when ? { when: extras.when } : {}),
+    ...(extras.when ? { when: extras.when } : {}), ...(extras.contest ? { contest: true } : {}),
+    reactions: post.reactions || {},
+    captions: (post.captions || []).map(caption => ({ id: caption.id, author: names(caption.authorId), authorId: caption.authorId, text: caption.body, created: caption.createdAt, reactions: caption.reactions || {} })),
     media: (post.media || []).map((item, index) => ({ id: item.id, name: item.name, type: item.contentType, size: item.bytes ?? undefined,
       kind: kindOf(item.contentType, item.name), ...(index === 0 && extras.seconds ? { seconds: extras.seconds } : {}) })) };
 }
@@ -115,9 +129,12 @@ export function sharedBoard({ baseUrl, departmentId, token, fetch: send = global
           media.push(uploaded.id);
         }
         const extras = { ...(post.learning ? { learning: true } : {}), ...(post.inside ? { inside: true } : {}), ...(post.voice ? { voice: true } : {}),
-          ...(post.when ? { when: post.when } : {}), ...(post.voice && post.media?.[0]?.seconds ? { seconds: post.media[0].seconds } : {}) };
+          ...(post.when ? { when: post.when } : {}), ...(post.contest ? { contest: true } : {}), ...(post.voice && post.media?.[0]?.seconds ? { seconds: post.media[0].seconds } : {}) };
         const body = JSON.stringify({ body: post.body || '', clientId: post.id, media, extras });
         const saved = await (await ask('posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })).json();
+        // A retry of a post that had already arrived: the server returned the first one, so the files uploaded on this
+        // attempt belong to nothing. They are removed rather than left behind.
+        if (saved.duplicate) for (const id of media) await ask('files/' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
         settle('ready');
         return { ...fromServerPost(saved, names), duplicate: Boolean(saved.duplicate) };
       } catch (error) {
@@ -139,6 +156,16 @@ export function sharedBoard({ baseUrl, departmentId, token, fetch: send = global
     },
 
     // Deliberately nothing. Erasing this device does not erase the department.
-    async clear() { return undefined; }
+    async clear() { return undefined; },
+
+    // On the server a reaction is set or cleared outright (PUT or DELETE), so tapping twice on a bad signal is harmless.
+    async react(postId, kind, who, on) { await ask('posts/' + encodeURIComponent(postId) + '/reactions/' + encodeURIComponent(kind), { method: on ? 'PUT' : 'DELETE' }); },
+    async caption(postId, text) {
+      await ask('posts/' + encodeURIComponent(postId) + '/captions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: text }) });
+    },
+    async laughCaption(postId, captionId, who, on) {
+      await ask('posts/' + encodeURIComponent(postId) + '/captions/' + encodeURIComponent(captionId) + '/reactions/laugh', { method: on ? 'PUT' : 'DELETE' });
+    },
+    async uncaption(postId, captionId) { await ask('posts/' + encodeURIComponent(postId) + '/captions/' + encodeURIComponent(captionId), { method: 'DELETE' }); }
   };
 }

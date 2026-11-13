@@ -254,6 +254,15 @@ export function open(path) {
   // Added after the first pilot schema: what kind of post it is (Learning, kept inside, dated, voice). A database made
   // before the column existed gets it here, empty, and its posts read as plain posts.
   if (!db.prepare('PRAGMA table_info(posts)').all().some(column => column.name === 'extras')) db.exec('ALTER TABLE posts ADD COLUMN extras TEXT');
+  // Reactions (a laugh or a thanks, on a post or a caption) and caption-contest captions. Added with the board's fun
+  // layer; CREATE IF NOT EXISTS so an older database gains them on its next start.
+  db.exec(`CREATE TABLE IF NOT EXISTS reactions (
+    target_id TEXT NOT NULL, department_id TEXT NOT NULL REFERENCES departments(id), person_id TEXT NOT NULL REFERENCES people(id),
+    kind TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (target_id, person_id, kind));
+  CREATE TABLE IF NOT EXISTS captions (
+    id TEXT PRIMARY KEY, post_id TEXT NOT NULL REFERENCES posts(id), department_id TEXT NOT NULL REFERENCES departments(id),
+    author_id TEXT NOT NULL REFERENCES people(id), body TEXT NOT NULL, created_at TEXT NOT NULL, deleted_at TEXT);
+  CREATE INDEX IF NOT EXISTS captions_post ON captions (post_id, created_at);`);
   return db;
 }
 

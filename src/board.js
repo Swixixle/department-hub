@@ -77,3 +77,54 @@ export function refuseFiles(files, limit = FILE_LIMIT) {
   if (files.some(file => !file.size)) return 'One of those files is empty.';
   return '';
 }
+
+// ---- reactions and caption contests ---------------------------------------------------------------------------
+// Two reactions, no more: a laugh and a thanks. No counts of who reacts most, and nothing ranks people.
+export const REACTIONS = [['laugh', '😂', 'Funny'], ['thanks', '👍', 'Thanks']];
+const KINDS = REACTIONS.map(([kind]) => kind);
+export const CAPTION_LIMIT = 140;
+
+// Kept in the browser, a reaction is the list of names who gave it. From the server it arrives as { count, mine }.
+// Either way the screen asks the same question.
+export function reactionState(entry, kind, me, same = (a, b) => a === b) {
+  const value = entry?.reactions?.[kind];
+  if (Array.isArray(value)) return { count: value.length, mine: value.some(name => same(name, me)) };
+  return { count: value?.count || 0, mine: Boolean(value?.mine) };
+}
+
+const toggled = (list = [], who, same) => list.some(name => same(name, who)) ? list.filter(name => !same(name, who)) : [...list, who];
+
+export function toggleReaction(posts, postId, kind, who, same = (a, b) => a === b) {
+  if (!KINDS.includes(kind)) throw new Error('unknown reaction');
+  return posts.map(post => post.id !== postId ? post : { ...post, reactions: { ...(post.reactions || {}), [kind]: toggled(post.reactions?.[kind], who, same) } });
+}
+
+export function addCaption(posts, postId, caption) {
+  const text = String(caption.text || '').trim().replace(/\s+/g, ' ');
+  if (!text) throw new Error('A caption needs words.');
+  if (text.length > CAPTION_LIMIT) throw new Error('A caption is at most ' + CAPTION_LIMIT + ' characters.');
+  return posts.map(post => post.id !== postId ? post : { ...post, captions: [...(post.captions || []), { ...caption, text, reactions: {} }] });
+}
+
+export function toggleCaptionLaugh(posts, postId, captionId, who, same = (a, b) => a === b) {
+  return posts.map(post => post.id !== postId ? post : { ...post, captions: (post.captions || []).map(caption => caption.id !== captionId ? caption
+    : { ...caption, reactions: { laugh: toggled(caption.reactions?.laugh, who, same) } }) });
+}
+
+export function removeCaption(posts, postId, captionId) {
+  return posts.map(post => post.id !== postId ? post : { ...post, captions: (post.captions || []).filter(caption => caption.id !== captionId) });
+}
+
+// Funniest first; ties go to whoever was first. The leader is marked only once someone has laughed.
+export function rankedCaptions(post, me, same) {
+  const list = (post.captions || []).map(caption => ({ ...caption, laugh: reactionState(caption, 'laugh', me, same) }));
+  list.sort((a, b) => b.laugh.count - a.laugh.count || String(a.created).localeCompare(String(b.created)));
+  return list.map((caption, index) => ({ ...caption, leading: index === 0 && caption.laugh.count > 0 }));
+}
+
+// The contest at the top of the board: the newest caption post from the last seven days, if there is one.
+export function currentContest(posts, now = new Date()) {
+  const week = 7 * 24 * 60 * 60 * 1000;
+  return [...posts].filter(post => post.contest && post.created && now - new Date(post.created) < week)
+    .sort((a, b) => String(b.created).localeCompare(String(a.created)))[0] || null;
+}

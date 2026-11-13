@@ -2,16 +2,17 @@ import './style.css';
 import './sizes.css';
 import './protocols.css';
 import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
-import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia } from './storage.js';
+import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia, putOutbox, listOutbox, deleteOutbox } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
-import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
+import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink, REACTIONS, CAPTION_LIMIT, reactionState, rankedCaptions, currentContest } from './board.js';
 import { localBoard, sharedBoard } from './backend.js';
 import { sharedClient, joinTokenFrom } from './shared.js';
 import { SUGGESTIONS, ask, findPeople, pretty as prettyDate, readingProblem, searchDocuments } from './ask.js';
 import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, parties, shiftName } from './trades.js';
 import { keywords, qualifiers, tidyQuestion } from './words.js';
-import { LONG_NUMBER_HELP, patientShown, patientSigns } from './guard.js';
+import { LONG_NUMBER_HELP, patientFindings, patientShown, patientSigns } from './guard.js';
+import { isPicture, preparePictures } from './picture-safety.js';
 import { readPdf } from './pdftext.js';
 import { emptyLibrary, prepareLibrary, addRevision, checkExtraction, supplyText, markFigure, activate, withdraw, toggleMark, revisionOf, searchLibrary } from './protocols.js';
 import { addMapping, reviewBundle, markMappingsReviewed } from './bundles.js';
@@ -161,7 +162,7 @@ const USAGE_NAMES = { 'tab:schedule':'Opened Schedule', 'tab:board':'Opened Boar
   voice:'Started a voice message', 'form:voice':'Sent a voice message', 'form:post':'Posted to the board', share:'Pressed Share', backup:'Saved a backup', restore:'Restored a backup',
   import:'Opened Import', publish:'Published a schedule', 'form:correct':'Saved a checked shift', 'view:week':'Chose Week', 'view:weekend':'Chose Weekend', today:'Pressed Today', navigate:'Changed week',
   over:'Opened an over-staffed shift', release:'Opened low census', 'form:release':'Recorded low census', 'text-size':'Changed text size', close:'Closed a dialog',
-  'text-screen-blocked':'Text screen stops (including repeats and false alarms)', 'my-links':'Opened your links', 'guideline-open':'Opened a restated guideline', 'guideline-compare':'Compared a guideline card with their copy', 'my-link-remove':'Removed one of their links', 'form:my-link':'Added one of their links' };
+  'text-screen-blocked':'Text screen stops (including repeats and false alarms)', 'picture-screen-blocked':'Pictures stopped for words that looked like patient information', 'my-links':'Opened your links', 'guideline-open':'Opened a restated guideline', 'guideline-compare':'Compared a guideline card with their copy', 'my-link-remove':'Removed one of their links', 'form:my-link':'Added one of their links' };
 // When the board was last opened on this device, so Ask can say what is new since then.
 const seenKey = storageKey + '-seen';
 // Links a person keeps for themselves (their own study rooms, say). Kept in this browser only: not in the workspace,
@@ -214,23 +215,60 @@ const mediaBlobs = new Map(), mediaUrls = new Map();
 // The one place the board keeps posts and files: this browser, or the department server once a person signs in to it.
 const localStore = localBoard({
   getPosts: () => state.posts,
-  change: (type, details, update) => commit(type, details, previous => ({ ...previous, posts: update(previous.posts) }))
+  change: (type, details, update) => commit(type, details, previous => ({ ...previous, posts: update(previous.posts) })),
+  same: (a, b) => isSame(a, b)
 });
 let boardStore = localStore;
 // The department server, when this page was opened from it. Opened from serve.py or the public demo there is none,
 // and everything stays the one-browser app. Signed in, only the board is shared; the schedule and the rest stay here.
-const shared = { client: publicDemo ? null : sharedClient(), available: false, posts: [], people: [], waiting: [], timer: null, joining: null };
+const shared = { client: publicDemo ? null : sharedClient(), available: false, posts: [], people: [], waiting: [], timer: null, joining: null, outbox: [], flushing: false };
+// No signal, or the server could not be reached: worth keeping and sending later. A refusal (signed out, not allowed,
+// a post the server will not take) is not; the person is told instead.
+const unreachable = error => error instanceof TypeError || !error?.status || error.status >= 500;
+async function loadOutbox() {
+  const me = sharedMe();
+  shared.outbox = me ? (await listOutbox().catch(() => [])).filter(entry => entry.personId === me.personId && entry.departmentId === me.departmentId) : [];
+}
+async function queuePost(post, files, record) {
+  const me = sharedMe();
+  await putOutbox({ id: post.id, personId: me.personId, departmentId: me.departmentId, post, files, record, queuedAt: new Date().toISOString(), problem: null });
+  await loadOutbox();
+}
+// Sends what is waiting, oldest first. The post keeps the id it was made with, so the server takes it once even if an
+// earlier attempt got through and only its answer was lost.
+async function flushOutbox() {
+  if (!boardStore.shared || shared.flushing) return;
+  await loadOutbox();
+  if (!shared.outbox.length) return;
+  shared.flushing = true;
+  let sent = 0;
+  try {
+    for (const entry of shared.outbox) {
+      if (entry.problem) continue;
+      try { await boardStore.publish(entry.post, entry.files, entry.record); await deleteOutbox(entry.id); sent += 1; }
+      catch (error) {
+        if (unreachable(error)) break;
+        await putOutbox({ ...entry, problem: sharedProblem(error) });
+      }
+    }
+  } finally { shared.flushing = false; }
+  await loadOutbox();
+  if (sent) { ui.notice = sent === 1 ? 'Your waiting post was sent.' : sent + ' waiting posts were sent.'; await refreshShared({ quiet:true }); }
+  render();
+}
+window.addEventListener('online', () => { void flushOutbox().catch(() => {}); });
 const boardPosts = () => boardStore.shared ? shared.posts : state.posts;
 const sharedMe = () => shared.client?.session || null;
 const isMyPost = post => boardStore.shared ? post.authorId === sharedMe()?.personId : Boolean(post.created) && isSame(post.author, state.actor);
 async function refreshShared({ quiet = false } = {}) {
   if (!boardStore.shared) return;
-  const before = shared.posts.map(post => post.id + (post.media || []).length).join();
+  const signature = posts => JSON.stringify(posts.map(post => [post.id, (post.media || []).length, post.reactions, (post.captions || []).map(caption => [caption.id, caption.reactions])]));
+  const before = signature(shared.posts);
   shared.posts = await boardStore.list();
   if (!sharedMe()) { leaveShared('Your session ended. Sign in again to see the department board.'); return; }
   await hydrateMedia({ redraw: false });
   // A redraw while someone is writing would cost them attached files, so new posts wait until the composer is shut.
-  const changed = before !== shared.posts.map(post => post.id + (post.media || []).length).join();
+  const changed = before !== signature(shared.posts);
   if ((changed || !quiet) && !(quiet && app.querySelector('.composer.open'))) render();
 }
 async function connectShared() {
@@ -241,8 +279,12 @@ async function connectShared() {
   boardStore = sharedBoard({ baseUrl: location.origin, departmentId: me.departmentId, token: me.token, names: id => names.get(id) || 'Former member',
     onState: () => {} });
   clearInterval(shared.timer);
-  shared.timer = setInterval(() => { if (document.visibilityState === 'visible' && ui.tab === 'board') void refreshShared({ quiet:true }).catch(() => {}); }, 30000);
+  shared.timer = setInterval(() => {
+    if (shared.outbox.length) void flushOutbox().catch(() => {});
+    if (document.visibilityState === 'visible' && ui.tab === 'board') void refreshShared({ quiet:true }).catch(() => {});
+  }, 30000);
   await refreshShared({ quiet:true });
+  void flushOutbox().catch(() => {});
   return true;
 }
 function leaveShared(notice) {
@@ -251,6 +293,7 @@ function leaveShared(notice) {
   boardStore = localStore;
   shared.posts = [];
   shared.people = [];
+  shared.outbox = [];          // still saved on this phone; sent only if the same person signs in again
   ui.notice = notice;
   render();
 }
@@ -419,6 +462,18 @@ const WRONG = { misread:'reported as misread', passage:'reported as quoting the 
 const sameAsk = (item, text) => item.asks.some(asked => asked.trim().toLowerCase() === text.trim().toLowerCase());
 const liveDocuments = () => state.documents.filter(doc => doc.status !== 'withdrawn' && (!doc.effective || doc.effective <= localToday()));
 const RULE = 'No patient information: no names, faces, monitors, charts or record numbers. Saved posts and uploads leave a fingerprint and the name in use. Ordinary questions are not logged.';
+// A caption contest: the picture is the post; captions underneath, funniest first, and a box to add one.
+function contestMarkup(post) {
+  const ranked = rankedCaptions(post, reactionWho(), isSame);
+  const mine = caption => boardStore.shared ? caption.authorId === sharedMe()?.personId : isSame(caption.author, state.actor);
+  return '<div class="contest"><p class="contest-title"><span class="badge contest-badge">Caption this</span>' + (ranked.length ? ' ' + ranked.length + ' caption' + (ranked.length === 1 ? '' : 's') : ' Be the first') + '</p>' +
+    ranked.map(caption => '<div class="caption' + (caption.leading ? ' leading' : '') + '"><p>' + (caption.leading ? '<span class="badge">Leading</span> ' : '') + '“' + h(caption.text) + '”<small> · ' + h(caption.author) + '</small></p><span>' +
+      button('<span aria-hidden="true">😂</span>' + (caption.laugh.count ? ' ' + caption.laugh.count : ''), 'caption-laugh', 'class="post-action reaction' + (caption.laugh.mine ? ' mine' : '') + '" aria-pressed="' + caption.laugh.mine + '" aria-label="Funny' + (caption.laugh.count ? ', ' + caption.laugh.count : '') + '" ' + valueAttr(post.id + '|' + caption.id)) +
+      (mine(caption) ? button('Remove', 'caption-remove', 'class="post-action quiet" ' + valueAttr(post.id + '|' + caption.id)) : '') + '</span></div>').join('') +
+    '<form data-form="caption" class="caption-form"><input type="hidden" name="post" value="' + h(post.id) + '"><label class="visually-hidden" for="caption-' + h(post.id) + '">Your caption</label>' +
+    '<input id="caption-' + h(post.id) + '" name="text" maxlength="' + CAPTION_LIMIT + '" placeholder="Your caption…" autocomplete="off" required><button class="secondary">Add</button><p class="refusal" role="alert"></p></form></div>';
+}
+
 function postMarkup(post) {
   const link = videoLink(post.body);
   const words = post.body ? '<p>' + linkParts(post.body).map(part => part.href ?
@@ -439,14 +494,23 @@ function postMarkup(post) {
     (post.when ? '<p><span class="badge dated">' + ({ due:'Due', meeting:'Meeting', event:'Event' }[post.when.kind] || 'Date') + ' · ' + h(prettyDate(post.when.date)) + '</span></p>' : '') + words +
     (post.media?.length ? '<div class="post-media">' + post.media.map(piece).join('') + '</div>' : '') +
     (link ? '<div class="link-player" data-embed="' + h(link.embed) + '">' + button('▶ Play here · ' + h(link.site), 'play-link', 'class="play-link"') + '</div>' : '') +
-    '<div class="post-actions">' + (post.inside ? '<span class="subtle">Department only</span>' : button('↗ Share', 'share', 'class="post-action" ' + valueAttr(post.id))) +
+    (post.contest ? contestMarkup(post) : '') +
+    '<div class="post-actions">' + REACTIONS.map(([kind, face, label]) => { const now = reactionState(post, kind, reactionWho(), isSame);
+      return button('<span aria-hidden="true">' + face + '</span>' + (now.count ? ' ' + now.count : ''), 'react', 'class="post-action reaction' + (now.mine ? ' mine' : '') + '" aria-pressed="' + now.mine + '" aria-label="' + label + (now.count ? ', ' + now.count : '') + '" ' + valueAttr(post.id + '|' + kind)); }).join('') +
+    (post.inside ? '<span class="subtle">Department only</span>' : button('↗ Share', 'share', 'class="post-action" ' + valueAttr(post.id))) +
     (isMyPost(post) ? button('Remove', 'remove-post', 'class="post-action quiet" ' + valueAttr(post.id)) : '') + '</div></article>';
 }
 
 // The board is a feed: newest first, a page at a time. Older posts are added at the bottom as the reader nears it,
 // without redrawing the page, so a half-written post and a playing video are left alone.
 const FEED_PAGE = 10;
-const feedPosts = () => [...boardPosts()].reverse().filter(post => matchesFilter(post, ui.boardFilter || 'all'));
+// Newest first; on All, this week's caption contest sits at the top.
+const feedPosts = () => {
+  const shown = [...boardPosts()].reverse().filter(post => matchesFilter(post, ui.boardFilter || 'all'));
+  const contest = (ui.boardFilter || 'all') === 'all' ? currentContest(boardPosts()) : null;
+  return contest ? [contest, ...shown.filter(post => post.id !== contest.id)] : shown;
+};
+const reactionWho = () => boardStore.shared ? (sharedMe()?.name || '') : state.actor;
 function feedTail(shown, limit) {
   if (shown.length > limit) return '<div class="feed-more" data-feed-more>' + button('Show older posts · ' + (shown.length - limit) + ' more', 'feed-more', 'class="secondary"') + '</div>';
   return shown.length > FEED_PAGE ? '<p class="feed-end subtle" data-feed-end>That is everything on the board.</p>' : '';
@@ -489,6 +553,16 @@ function sharedProblem(error, during) {
   return 'That did not work: ' + (error?.message || error) + '.';
 }
 
+// Posts waiting on this phone for a signal, shown above the feed so nobody thinks theirs vanished.
+function outboxMarkup() {
+  if (!boardStore.shared || !shared.outbox.length) return '';
+  return '<div class="outbox">' + shared.outbox.map(entry => '<article class="panel post pending" data-pending="' + h(entry.id) + '"><div class="post-head">' + avatar(sharedMe()?.name || '') +
+    '<div><b>' + h(sharedMe()?.name || 'You') + '</b><small>' + (entry.problem ? 'Not sent' : '<span class="pending-dot" aria-hidden="true"></span>Waiting for signal · sends by itself') + '</small></div></div>' +
+    (entry.post.body ? '<p>' + h(entry.post.body) + '</p>' : '') + ((entry.post.media || []).length ? '<p class="subtle">' + h(entry.post.media.map(item => item.name).join(', ')) + '</p>' : '') +
+    (entry.problem ? '<p class="refusal">' + h(entry.problem) + '</p>' : '') +
+    '<div class="post-actions">' + (entry.problem ? '' : button('Try now', 'outbox-retry', 'class="post-action"')) + button('Cancel', 'outbox-cancel', 'class="post-action quiet" ' + valueAttr(entry.id)) + '</div></article>').join('') + '</div>';
+}
+
 function board() {
   const filter = ui.boardFilter || 'all', shown = feedPosts(), limit = ui.boardLimit || FEED_PAGE;
   return '<section class="intro board-intro"><div><div class="eyebrow">TEAM SPACE</div><h1>Department board</h1><p>News, pictures, files, video and voice for the whole department.</p></div>' +
@@ -498,11 +572,13 @@ function board() {
     '<textarea id="post-text" name="body" maxlength="2000" placeholder="Write to the department…">' + h(ui.draftPost || '') + '</textarea>' +
     '<div class="composer-more"><div class="cell-when"><label>Does it have a date?<select name="whenKind"><option value="">No date</option><option value="due">Due by</option><option value="meeting">Meeting on</option><option value="event">Event on</option></select></label>' +
     '<label>Date<input name="whenDate" type="date"></label></div>' +
-    '<p class="subtle">A YouTube or Vimeo link plays right on the board.</p><label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple></label>' +
+    '<p class="subtle">A YouTube or Vimeo link plays right on the board.</p><label class="attach"><b>＋ Photos, video or files</b><input id="post-files" name="files" type="file" multiple><span class="subtle">Photos are rebuilt without their hidden location and phone details, and their words are checked for patient information. Videos are sent as they are.</span></label>' +
     '<label><span><input type="checkbox" name="learning"> Add to Learning (instructional, CEU-type)</span></label>' +
     '<label><span><input type="checkbox" name="inside"> Keep inside the department (no Share button)</span></label>' +
+    '<label><span><input type="checkbox" name="contest"> Make it a caption contest (attach a picture)</span></label>' +
     '<p class="subtle">' + RULE + '</p></div><p class="refusal" role="alert"></p><button class="primary">Post</button></form>' +
     '<div class="calendar-toolbar board-bar"><div class="segments">' + FILTERS.map(([id, label]) => button(label, 'board-filter', 'class="' + (filter === id ? 'selected' : '') + '" ' + valueAttr(id))).join('') + '</div></div>' +
+    outboxMarkup() +
     '<div class="post-list">' + (shown.slice(0, limit).map(postMarkup).join('') || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>' + feedTail(shown, limit);
 }
 
@@ -1924,6 +2000,30 @@ async function act({action, value, kind}) {
       ui.dialog = { type:'account' };
       break;
     }
+    case 'outbox-retry': await flushOutbox(); break;
+    case 'outbox-cancel': await deleteOutbox(value); await loadOutbox(); ui.notice = 'That post was cancelled and will not be sent.'; break;
+    case 'react': {
+      const [postId, kindName] = String(value).split('|'), post = boardPosts().find(item => item.id === postId);
+      if (!post) return;
+      const now = reactionState(post, kindName, reactionWho(), isSame);
+      await boardStore.react(postId, kindName, reactionWho(), !now.mine);
+      await refreshShared({ quiet:true });
+      break;
+    }
+    case 'caption-laugh': {
+      const [postId, captionId] = String(value).split('|'), post = boardPosts().find(item => item.id === postId);
+      const caption = (post?.captions || []).find(item => item.id === captionId);
+      if (!caption) return;
+      await boardStore.laughCaption(postId, captionId, reactionWho(), !reactionState(caption, 'laugh', reactionWho(), isSame).mine);
+      await refreshShared({ quiet:true });
+      break;
+    }
+    case 'caption-remove': {
+      const [postId, captionId] = String(value).split('|');
+      await boardStore.uncaption(postId, captionId);
+      await refreshShared({ quiet:true });
+      break;
+    }
     case 'board-filter': ui.boardFilter = value; ui.boardLimit = FEED_PAGE; break;
     case 'feed-more': addOlderPosts(); return;
     case 'voice': void startVoice(); return;
@@ -2156,21 +2256,46 @@ async function submit(form) {
       break;
     }
     case 'post': {
-      const files = [...(form.querySelector('#post-files')?.files || [])];
+      let files = [...(form.querySelector('#post-files')?.files || [])];
       if (!body && !files.length) return;
+      form.querySelector('.refusal').textContent = '';      // a refusal from the last try is not left standing over this one
       const refusal = refuseFiles(files);
       if (refusal) { form.querySelector('.refusal').textContent = refusal; return; }     // said in place, so nothing typed is lost
-      const media = files.map(file => ({ id:crypto.randomUUID(), name:file.name, type:file.type, size:file.size, kind:mediaKind(file.type, file.name) }));
       if (data.whenKind && !/^\d{4}-\d{2}-\d{2}$/.test(data.whenDate || '')) { form.querySelector('.refusal').textContent = 'Pick the date, or set it back to No date.'; return; }
       const warned = patientCheck(form, [body, ...files.map(file => file.name)].join('\n'));
       if (!warned) return;
-      const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}),
+      // Pictures are rebuilt without their hidden details (location, phone) and their words are read and screened.
+      if (files.some(isPicture)) {
+        const button = form.querySelector('button.primary'), label = button.textContent;
+        button.disabled = true;
+        try {
+          const { readPictureText } = await import('./capture-reader.js');
+          const prepared = await preparePictures(files, { read: readPictureText, screen: patientFindings, onStep: words => { button.textContent = words; } });
+          if (!prepared.check.ok) {
+            countPress('picture-screen-blocked');
+            // What the reader saw is shown to the person who chose the picture, and kept nowhere.
+            form.querySelector('.refusal').textContent = 'Not posted. ' + prepared.check.found.map(entry => 'The words in “' + entry.name + '” look like they point to a patient: ' +
+              entry.findings.map(item => item.sign + ' (“' + item.words + '”)').join(', ') + '.').join(' ') + ' Crop or cover that part and attach it again. The reader can miss words, so look at the picture yourself too.';
+            return;
+          }
+          files = prepared.files;
+        } catch (error) { form.querySelector('.refusal').textContent = error.message || String(error); return; }
+        finally { button.disabled = false; button.textContent = label; }
+      }
+      const media = files.map(file => ({ id:crypto.randomUUID(), name:file.name, type:file.type, size:file.size, kind:mediaKind(file.type, file.name) }));
+      if (data.contest && !media.some(item => item.kind === 'image' || item.kind === 'video')) { form.querySelector('.refusal').textContent = 'A caption contest needs a picture or a video to caption.'; return; }
+      const post = { id:crypto.randomUUID(), ...message, ...(media.length ? { media } : {}), ...(data.learning ? { learning:true } : {}), ...(data.inside ? { inside:true } : {}), ...(data.contest ? { contest:true } : {}),
         ...(data.whenKind ? { when:{ kind:data.whenKind, date:data.whenDate } } : {}) };
       const send = form.querySelector('button.primary');
       send.disabled = true;
       send.textContent = 'Posting…';
-      try { await boardStore.publish(post, media.map((item, index) => [item.id, files[index]]), { fingerprint:await sha256(body), postHash:await postVersion(post), files:await Promise.all(files.map(file => fileFingerprint(file))) }); }
-      catch (error) { throw error.name === 'QuotaExceededError' ? new Error('This browser is out of room for files. Remove an old post with a large file, or post a smaller one.') : error; }
+      const pairs = media.map((item, index) => [item.id, files[index]]);
+      const record = { fingerprint:await sha256(body), postHash:await postVersion(post), files:await Promise.all(files.map(file => fileFingerprint(file))) };
+      try { await boardStore.publish(post, pairs, record); }
+      catch (error) {
+        if (boardStore.shared && unreachable(error)) { await queuePost(post, pairs, record); ui.notice = 'No signal. Your post is saved on this phone and will send by itself when the connection is back.'; }
+        else throw error.name === 'QuotaExceededError' ? new Error('This browser is out of room for files. Remove an old post with a large file, or post a smaller one.') : error;
+      }
       media.forEach((item, index) => { mediaBlobs.set(item.id, files[index]); mediaUrls.set(item.id, URL.createObjectURL(files[index])); });
       ui.boardFilter = 'all';
       ui.draftPost = '';
@@ -2183,6 +2308,15 @@ async function submit(form) {
       shared.joining = { token };
       try { const joined = await shared.client.join(token); shared.joining = { code: joined.activated ? null : joined.code, activated: joined.activated }; }
       catch (error) { form.querySelector('.refusal').textContent = sharedProblem(error, 'join'); shared.joining = null; return; }
+      break;
+    }
+    case 'caption': {
+      const text = String(data.text || '').trim();
+      if (!text) return;
+      if (!patientCheck(form, text)) return;
+      try { await boardStore.caption(data.post, text, reactionWho()); }
+      catch (error) { form.querySelector('.refusal').textContent = error.message || String(error); return; }
+      await refreshShared({ quiet:true });
       break;
     }
     case 'invite': {
@@ -2264,7 +2398,12 @@ async function submit(form) {
       const item = { id:crypto.randomUUID(), name:'voice-message-' + localToday() + (/mp4/.test(recording.blob.type) ? '.m4a' : '.webm'), type:recording.blob.type, size:recording.blob.size, kind:'audio', seconds:recording.seconds };
       const file = new File([recording.blob], item.name, { type:recording.blob.type });
       const post = { id:crypto.randomUUID(), author:state.actor, body:(data.caption || '').trim(), created:new Date().toISOString(), voice:true, media:[item], ...(data.inside ? { inside:true } : {}) };
-      await boardStore.publish(post, [[item.id, file]], { fingerprint:await sha256(post.body), postHash:await postVersion(post), files:[await fileFingerprint(file)] });
+      const voiceRecord = { fingerprint:await sha256(post.body), postHash:await postVersion(post), files:[await fileFingerprint(file)] };
+      try { await boardStore.publish(post, [[item.id, file]], voiceRecord); }
+      catch (error) {
+        if (!(boardStore.shared && unreachable(error))) throw error;
+        await queuePost(post, [[item.id, file]], voiceRecord);
+      }
       mediaBlobs.set(item.id, file);
       mediaUrls.set(item.id, recording.url);
       voice = null;
