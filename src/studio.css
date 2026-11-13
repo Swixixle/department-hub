@@ -1,0 +1,51 @@
+/* Quiet character: the top of each screen gets out of the way, your next shift leads, and new posts wait to be asked for. */
+
+/* The standing notice: the full wording on wide screens, a short line on phones. Both say all three things. */
+.unofficial .narrow { display: none; }
+@media (max-width: 780px) {
+  .unofficial .wide { display: none; }
+  .unofficial .narrow { display: inline; }
+  .unofficial { min-height: 0; padding: .45rem 14px; font-size: .8125rem; }
+
+  /* One row of tools; "Viewing as" stays for screen readers. The breadcrumb says nothing new on a phone. */
+  .breadcrumbs { display: none; }
+  .app-top { min-height: 0; padding-top: .35rem; padding-bottom: .35rem; }
+  .top-tools { flex-wrap: nowrap; gap: .35rem; width: 100%; justify-content: flex-end; }
+  .ask-trigger, .protocols-trigger { min-height: 44px; padding: 0 .7rem; font-size: .95rem; }
+  .text-size { min-height: 44px; min-width: 44px; }
+  .actor { font-size: 0; gap: 0; min-width: 0; }
+  .actor select { font-size: .9rem; max-width: 7.2rem; min-height: 44px; padding: .35rem .5rem; }
+
+  /* The brand row and the page titles, smaller on phones. */
+  aside .brand img { width: 30px; height: 30px; }
+  .intro { margin-bottom: 10px; }
+  .intro h1 { font-size: 1.75rem; margin: 2px 0 4px; }
+  .content { padding-top: 14px; }
+}
+
+/* Your next shift. */
+.next-shift { max-width: 740px; margin: 0 0 12px; display: grid; gap: 4px; border-left: 4px solid #8fb84a; }
+.next-shift.night { border-left-color: #6f86c4; }
+.next-when { font-size: .75rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #446453; }
+.next-shift h2 { font-size: 1.5rem; margin: 0; }
+.next-time { color: #24413a; font-weight: 600; }
+.next-crew { margin-bottom: 6px; }
+.next-shift .secondary { justify-self: start; }
+
+/* New posts wait behind a button that floats, so nothing moves under a reading finger. */
+.new-posts { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 20; border: 0; border-radius: 999px; padding: .55rem 1.1rem;
+  background: #133b34; color: #fff; font-weight: 750; box-shadow: 0 6px 18px #0e2d2a40; }
+@media (max-width: 780px) { .new-posts { top: auto; bottom: calc(84px + env(safe-area-inset-bottom)); } }
+
+/* You're caught up. */
+.caught-up { max-width: 740px; display: grid; justify-items: center; gap: 2px; margin: 14px 0; padding: 10px 0; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); text-align: center; }
+.caught-up span { font-weight: 750; color: #2f6a46; }
+.caught-up small { color: var(--muted); }
+.caught-up-top { max-width: 740px; margin: 0 0 10px; color: #2f6a46; font-weight: 650; font-size: .9rem; }
+
+html.dark .next-when { color: #8fb9a0; }
+html.dark .next-time { color: #d8e6dd; }
+html.dark .next-shift { border-left-color: #a8cf6a; }
+html.dark .next-shift.night { border-left-color: #8fa4e0; }
+html.dark .new-posts { background: #2f7a5c; box-shadow: 0 6px 18px #00000080; }
+html.dark .caught-up span, html.dark .caught-up-top { color: #9fd3a8; }

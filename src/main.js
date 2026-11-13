@@ -2,7 +2,8 @@ import './style.css';
 import './sizes.css';
 import './protocols.css';
 import './dark.css';
-import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
+import './studio.css';
+import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes, shiftInterval } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia, putOutbox, listOutbox, deleteOutbox } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
@@ -181,6 +182,8 @@ const saveLinks = () => { try { localStorage.setItem(linksKey, JSON.stringify(my
 let sourceVersions = {};
 const versionsFor = async documents => Object.fromEntries(await Promise.all(documents.map(async doc => [doc.id, await documentVersion(doc)])));
 let boardSeen = loadState(seenKey, null);
+// When the person last looked before this visit: where the "You're caught up" line goes.
+let lastVisit = boardSeen;
 function markBoardSeen(value = new Date().toISOString()) {
   boardSeen = value;
   try { value ? localStorage.setItem(seenKey, JSON.stringify(value)) : localStorage.removeItem(seenKey); } catch { /* only affects what is new */ }
@@ -228,7 +231,8 @@ const localStore = localBoard({
 let boardStore = localStore;
 // The department server, when this page was opened from it. Opened from serve.py or the public demo there is none,
 // and everything stays the one-browser app. Signed in, only the board is shared; the schedule and the rest stay here.
-const shared = { client: publicDemo ? null : sharedClient(), available: false, posts: [], people: [], waiting: [], timer: null, joining: null, outbox: [], flushing: false };
+const shared = { client: publicDemo ? null : sharedClient(), available: false, posts: [], people: [], waiting: [], timer: null, joining: null, outbox: [], flushing: false,
+  known: null, held: new Set() };
 // No signal, or the server could not be reached: worth keeping and sending later. A refusal (signed out, not allowed,
 // a post the server will not take) is not; the person is told instead.
 const unreachable = error => error instanceof TypeError || !error?.status || error.status >= 500;
@@ -264,7 +268,8 @@ async function flushOutbox() {
   render();
 }
 window.addEventListener('online', () => { void flushOutbox().catch(() => {}); });
-const boardPosts = () => boardStore.shared ? shared.posts : state.posts;
+// Posts that arrived while someone was reading wait behind a "new posts" button instead of pushing the feed down.
+const boardPosts = () => boardStore.shared ? shared.posts.filter(post => !shared.held.has(post.id)) : state.posts;
 const sharedMe = () => shared.client?.session || null;
 const isMyPost = post => boardStore.shared ? post.authorId === sharedMe()?.personId : Boolean(post.created) && isSame(post.author, state.actor);
 async function refreshShared({ quiet = false } = {}) {
@@ -273,6 +278,11 @@ async function refreshShared({ quiet = false } = {}) {
   const before = signature(shared.posts);
   shared.posts = await boardStore.list();
   if (!sharedMe()) { leaveShared('Your session ended. Sign in again to see the department board.'); return; }
+  // On a background refresh, someone else's new post is held; the person's own posts and the first load show at once.
+  if (shared.known && quiet) for (const post of shared.posts) if (!shared.known.has(post.id) && post.authorId !== sharedMe()?.personId) shared.held.add(post.id);
+  if (!quiet) shared.held.clear();
+  for (const id of [...shared.held]) if (!shared.posts.some(post => post.id === id)) shared.held.delete(id);
+  shared.known = new Set(shared.posts.map(post => post.id));
   await hydrateMedia({ redraw: false });
   // A redraw while someone is writing would cost them attached files, so new posts wait until the composer is shut.
   const changed = before !== signature(shared.posts);
@@ -300,6 +310,8 @@ function leaveShared(notice) {
   boardStore = localStore;
   shared.posts = [];
   shared.people = [];
+  shared.known = null;
+  shared.held.clear();
   shared.outbox = [];          // still saved on this phone; sent only if the same person signs in again
   ui.notice = notice;
   render();
@@ -422,6 +434,24 @@ function displayDates() {
 const countNote = item => item.people.length + ' listed · ' + Math.abs(item.extra) + (item.extra > 0 ? ' over' : ' short');
 const firstInLine = order => order.filter(item => item.first).map(item => item.person);
 
+// The first thing on the schedule: your shift, now or next, and who is on it with you. The same timing rule Ask uses.
+function nextShiftCard() {
+  const now = Date.now();
+  const mine = state.assignments.filter(row => isMine(row)).sort((a, b) => a.date.localeCompare(b.date) || a.shift.localeCompare(b.shift));
+  const next = mine.find(row => { const [, end] = shiftInterval(row); return end > now; });
+  if (!next) return '';
+  const [start] = shiftInterval(next), onNow = start <= now, night = next.shift === 'N';
+  const days = Math.round((Date.parse(next.date + 'T12:00:00Z') - Date.parse(localToday() + 'T12:00:00Z')) / 86400000);
+  const when = onNow ? 'On shift now' : days === 0 ? (night ? 'Tonight' : 'Today') : days === 1 ? (night ? 'Tomorrow night' : 'Tomorrow') : 'In ' + days + ' days';
+  const crew = state.assignments.filter(row => row.date === next.date && row.shift === next.shift && !isMine(row)).map(row => row.person);
+  const list = crew.length > 2 ? crew.slice(0, -1).join(', ') + ' and ' + crew.at(-1) : crew.join(' and ');
+  return '<section class="panel next-shift' + (night ? ' night' : '') + '"><div class="next-when">' + h(when) + '</div>' +
+    '<h2>' + h(dayLabel(next.date, { weekday:'long', month:'short', day:'numeric' })) + '</h2>' +
+    '<p class="next-time">' + (night ? 'Night · 7 PM – 7 AM' : 'Day · 7 AM – 7 PM') + (next.role ? ' · ' + h(ROLE_LABELS[next.role] || next.role) : '') + '</p>' +
+    (crew.length ? '<p class="next-crew">With ' + h(list) + '</p>' : '<p class="next-crew">Nobody else is listed yet.</p>') +
+    button('Open this shift', 'shift', 'class="secondary" ' + valueAttr(next.key)) + '</section>';
+}
+
 function schedule() {
   const dates = displayDates();
   const usual = { D: staffing(state.assignments, 'D', state.directory), N: staffing(state.assignments, 'N', state.directory) };
@@ -443,7 +473,7 @@ function schedule() {
         button(rows.length ? 'Edit names' : 'Add names', 'edit-shift', 'class="edit-shift" ' + valueAttr(date + '|' + shift)) + '</section>';
     }).join('') + '</article>').join('');
   return '<section class="intro"><div><div class="eyebrow">TEAM ROSTER</div><h1>Schedule</h1><p>See who’s working. Start a trade or find coverage from your shift.</p></div>' +
-    button('＋ Import schedule', 'import', 'class="secondary"') + '</section>' +
+    button('＋ Import schedule', 'import', 'class="secondary"') + '</section>' + nextShiftCard() +
     '<div class="roster-status"><span class="status-dot"></span><b>' + (state.mode === 'sample' ? 'Fictional practice roster' : 'Imported roster') +
     '</b><span>' + h(state.mode !== 'sample' ? 'Published ' + timeLabel(state.importedAt) : publicDemo ? 'Try the full flow with sample staff' :
       'No schedule is saved in this browser at ' + location.host + '. These are sample names.') +
@@ -531,11 +561,25 @@ function feedTail(shown, limit) {
   if (shown.length > limit) return '<div class="feed-more" data-feed-more>' + button('Show older posts · ' + (shown.length - limit) + ' more', 'feed-more', 'class="secondary"') + '</div>';
   return shown.length > FEED_PAGE ? '<p class="feed-end subtle" data-feed-end>That is everything on the board.</p>' : '';
 }
+// Where "You're caught up" goes: before the first post that was already here at the last visit, if anything newer
+// from someone else came first. The pinned contest is left out of the count.
+function caughtUpAt(shown) {
+  if (!lastVisit || (ui.boardFilter || 'all') !== 'all') return -1;
+  const fresh = post => post.created && post.created > lastVisit && !isMyPost(post);
+  const pinned = shown[0]?.contest && currentContest(boardPosts())?.id === shown[0].id ? 1 : 0;
+  const at = shown.findIndex((post, index) => index >= pinned && !fresh(post));
+  return at > pinned && shown.slice(pinned, at).some(fresh) ? at : -1;
+}
+const CAUGHT_UP = '<div class="caught-up" role="note"><span>You’re caught up</span><small>Everything below was here the last time you looked.</small></div>';
+function feedSlice(shown, from, to) {
+  const at = caughtUpAt(shown);
+  return shown.slice(from, to).map((post, index) => (from + index === at ? CAUGHT_UP : '') + postMarkup(post)).join('');
+}
 function addOlderPosts() {
   const list = app.querySelector('.post-list'), tail = app.querySelector('[data-feed-more]');
   if (ui.tab !== 'board' || !list || !tail) return;
   const shown = feedPosts(), limit = ui.boardLimit || FEED_PAGE;
-  list.insertAdjacentHTML('beforeend', shown.slice(limit, limit + FEED_PAGE).map(postMarkup).join(''));
+  list.insertAdjacentHTML('beforeend', feedSlice(shown, limit, limit + FEED_PAGE));
   ui.boardLimit = limit + FEED_PAGE;
   tail.outerHTML = feedTail(shown, ui.boardLimit);
   watchFeed();
@@ -595,7 +639,9 @@ function board() {
     '<p class="subtle">' + RULE + '</p></div><p class="refusal" role="alert"></p><button class="primary">Post</button></form>' +
     '<div class="calendar-toolbar board-bar"><div class="segments">' + FILTERS.map(([id, label]) => button(label, 'board-filter', 'class="' + (filter === id ? 'selected' : '') + '" ' + valueAttr(id))).join('') + '</div></div>' +
     outboxMarkup() +
-    '<div class="post-list">' + (shown.slice(0, limit).map(postMarkup).join('') || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>' + feedTail(shown, limit);
+    (shared.held.size && boardStore.shared ? button('↑ ' + shared.held.size + ' new post' + (shared.held.size === 1 ? '' : 's'), 'show-new', 'class="new-posts"') : '') +
+    (lastVisit && shown.length && (ui.boardFilter || 'all') === 'all' && caughtUpAt(shown) < 0 && !shown.some(post => post.created > lastVisit && !isMyPost(post)) ? '<p class="caught-up-top">You’re caught up. Nothing new since you last looked.</p>' : '') +
+    '<div class="post-list">' + (feedSlice(shown, 0, limit) || '<div class="panel empty"><strong>Nothing here yet.</strong></div>') + '</div>' + feedTail(shown, limit);
 }
 
 // Fairness is a kept record. Everyone sees their own sheet and the department picture, without names. Whoever keeps the
@@ -872,7 +918,8 @@ function render() {
   const playing = [...app.querySelectorAll('[data-media]')].filter(player => player.currentTime > 0 && !player.ended)
     .map(player => ({ id: player.dataset.media, time: player.currentTime, on: !player.paused }));
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
-  app.innerHTML = top() + '<main>' + button('<b>Independent staff project—not an official hospital product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
+  app.innerHTML = top() + '<main>' + button('<span class="wide"><b>Independent staff project—not an official hospital product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u></span>' +
+      '<span class="narrow"><b>Not an official hospital product.</b> No patient info. Activity is tracked. <u>More</u></span>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
     '<div class="top-tools">' + button('Aa', 'display', 'class="text-size" title="Text size, theme and sound" aria-label="Text size, theme and sound"') +
     button('Protocols', 'tab', 'class="protocols-trigger' + (ui.tab === 'protocols' ? ' active' : '') + '" ' + valueAttr('protocols') + (ui.tab === 'protocols' ? ' aria-current="page"' : '')) +
     button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board, the documents or the protocols"') +
@@ -1680,6 +1727,7 @@ async function act({action, value, kind}) {
   ui.flash = '';
   switch (action) {
     case 'tab':
+      if (value === 'board' && ui.tab !== 'board') lastVisit = boardSeen;
       ui.tab = value;
       ui.dialog = null;
       if (value === 'board') markBoardSeen();
@@ -2041,6 +2089,7 @@ async function act({action, value, kind}) {
       break;
     }
     case 'outbox-retry': await flushOutbox(); break;
+    case 'show-new': shared.held.clear(); ui.boardLimit = FEED_PAGE; ui.scrollTo = '.board-bar'; touch('medium'); break;
     case 'outbox-cancel': await deleteOutbox(value); await loadOutbox(); ui.notice = 'That post was cancelled and will not be sent.'; break;
     case 'react':
     case 'caption-laugh': {
@@ -2339,16 +2388,17 @@ async function submit(form) {
       send.disabled = true;
       send.textContent = 'Posting…';
       const pairs = media.map((item, index) => [item.id, files[index]]);
+      let queued = false;
       const record = { fingerprint:await sha256(body), postHash:await postVersion(post), files:await Promise.all(files.map(file => fileFingerprint(file))) };
       try { await boardStore.publish(post, pairs, record); }
       catch (error) {
-        if (boardStore.shared && unreachable(error)) { await queuePost(post, pairs, record); ui.notice = 'No signal. Your post is saved on this phone and will send by itself when the connection is back.'; }
+        if (boardStore.shared && unreachable(error)) { await queuePost(post, pairs, record); queued = true; ui.notice = 'No signal. Your post is saved on this phone and will send by itself when the connection is back.'; }
         else throw error.name === 'QuotaExceededError' ? new Error('This browser is out of room for files. Remove an old post with a large file, or post a smaller one.') : error;
       }
       media.forEach((item, index) => { mediaBlobs.set(item.id, files[index]); mediaUrls.set(item.id, URL.createObjectURL(files[index])); });
       ui.boardFilter = 'all';
       ui.draftPost = '';
-      touch('heavy');
+      touch(queued ? 'medium' : 'heavy');      // "sent" and "waiting to send" do not feel the same
       await refreshShared({ quiet:true });
       break;
     }
