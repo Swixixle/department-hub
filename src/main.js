@@ -1,6 +1,7 @@
 import './style.css';
 import './sizes.css';
 import './protocols.css';
+import './dark.css';
 import { SHIFTS, POLICY, AGREED_STATUS, EXCHANGE_AGREED, addDays, weekStart, assignmentKey, normalizeName, mergeAssignments, verifyRoster, committedKeys, projectRoster, tidyNames, tidyNotes } from './model.js';
 import { putSource, getSource, clearSources, loadState, saveState, putMedia, getMedia, putOutbox, listOutbox, deleteOutbox } from './storage.js';
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
@@ -13,6 +14,7 @@ import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, p
 import { keywords, qualifiers, tidyQuestion } from './words.js';
 import { LONG_NUMBER_HELP, patientFindings, patientShown, patientSigns } from './guard.js';
 import { isPicture, preparePictures } from './picture-safety.js';
+import { THEMES, applyTheme, feedback, loadFeel, saveFeel } from './feel.js';
 import { readPdf } from './pdftext.js';
 import { emptyLibrary, prepareLibrary, addRevision, checkExtraction, supplyText, markFigure, activate, withdraw, toggleMark, revisionOf, searchLibrary } from './protocols.js';
 import { addMapping, reviewBundle, markMappingsReviewed } from './bundles.js';
@@ -142,6 +144,11 @@ let ui ={ tab: 'schedule', date: startDate(), view: 'weekend', dialog: noticeSee
 const TEXT_SIZES = [1, 1.15, 1.3], TEXT_NAMES = ['normal', 'large', 'larger'], textKey = 'department-hub-text-size';
 let textSize = Math.max(0, TEXT_SIZES.indexOf(Number(loadState(textKey, 1))));
 const applyTextSize = () => document.documentElement.style.setProperty('--scale', TEXT_SIZES[textSize]);
+// Theme, sound and vibration, kept on this device. The theme follows the phone unless the person picks one.
+let feel = loadFeel();
+applyTheme(feel);
+globalThis.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => applyTheme(feel));
+const touch = kind => feedback(kind, feel);
 applyTextSize();
 // Which buttons get pressed, as fixed button names and totals only. Never a person's name, a shift, a typed word or a
 // recording: a value is kept only for the few controls whose values are fixed words, such as the tab that was opened.
@@ -487,7 +494,8 @@ function postMarkup(post) {
     if (item.kind === 'audio') return '<audio class="post-audio" data-media="' + h(item.id) + '" src="' + url + '" controls preload="metadata"></audio>' + (post.voice ? '' : '<small>' + h(item.name) + '</small>');
     return '<a class="post-file" href="' + url + '" download="' + h(item.name) + '"><b>' + h(item.name) + '</b><span>' + fileSize(item.size) + ' · Download</span></a>';
   };
-  return '<article class="panel post" data-post="' + h(post.id) + '"><div class="post-head">' + avatar(post.author) +
+  const accent = post.contest ? ' post-fun' : post.learning ? ' post-learning' : post.when ? ' post-dated' : '';
+  return '<article class="panel post' + accent + '" data-post="' + h(post.id) + '"><div class="post-head">' + avatar(post.author) +
     '<div><b>' + h(post.author) + '</b><small>' + h(post.created ? timeLabel(post.created) : 'Sample announcement') +
     (post.voice ? ' · Voice message' + (post.media?.[0]?.seconds ? ' · ' + clock(post.media[0].seconds) : '') : '') + '</small></div>' +
     (post.learning ? '<span class="badge learning">Learning</span>' : '') + '</div>' +
@@ -511,6 +519,14 @@ const feedPosts = () => {
   return contest ? [contest, ...shown.filter(post => post.id !== contest.id)] : shown;
 };
 const reactionWho = () => boardStore.shared ? (sharedMe()?.name || '') : state.actor;
+const sending = new Set();
+// The server's shape ({ count, mine }) changed in place, for showing a tap before the server has answered.
+function showReaction(posts, postId, captionId, kind, on) {
+  const flip = value => { const now = value || { count: 0, mine: false }; return now.mine === on ? now : { count: Math.max(0, now.count + (on ? 1 : -1)), mine: on }; };
+  return posts.map(post => post.id !== postId ? post : captionId
+    ? { ...post, captions: (post.captions || []).map(caption => caption.id !== captionId ? caption : { ...caption, reactions: { ...caption.reactions, laugh: flip(caption.reactions?.laugh) } }) }
+    : { ...post, reactions: { ...post.reactions, [kind]: flip(post.reactions?.[kind]) } });
+}
 function feedTail(shown, limit) {
   if (shown.length > limit) return '<div class="feed-more" data-feed-more>' + button('Show older posts · ' + (shown.length - limit) + ' more', 'feed-more', 'class="secondary"') + '</div>';
   return shown.length > FEED_PAGE ? '<p class="feed-end subtle" data-feed-end>That is everything on the board.</p>' : '';
@@ -857,7 +873,7 @@ function render() {
     .map(player => ({ id: player.dataset.media, time: player.currentTime, on: !player.paused }));
   const sameDialog = app.querySelector('dialog')?.dataset.dialog === ui.dialog?.type;
   app.innerHTML = top() + '<main>' + button('<b>Independent staff project—not an official hospital product.</b> No patient information. Actions use cryptographic audit receipts. <u>What is recorded</u>', 'notice', 'class="unofficial"') + '<header class="app-top"><div class="breadcrumbs">Workspace <span>›</span> Respiratory Care</div>' +
-    '<div class="top-tools">' + button('Aa', 'text-size', 'class="text-size" title="Text size" aria-label="Text size: ' + TEXT_NAMES[textSize] + '. Press to change."') +
+    '<div class="top-tools">' + button('Aa', 'display', 'class="text-size" title="Text size, theme and sound" aria-label="Text size, theme and sound"') +
     button('Protocols', 'tab', 'class="protocols-trigger' + (ui.tab === 'protocols' ? ' active' : '') + '" ' + valueAttr('protocols') + (ui.tab === 'protocols' ? ' aria-current="page"' : '')) +
     button('<span aria-hidden="true">?</span> Ask', 'ask-open', 'class="ask-trigger" aria-label="Ask a question about the schedule, the board, the documents or the protocols"') +
     '<label class="actor">Viewing as <select id="actor" aria-label="Viewing as">' +
@@ -1140,6 +1156,15 @@ function dialogMarkup() {
         '<p class="subtle">' + clock(voice.seconds) + ' recorded. ' + RULE + '</p><p class="refusal" role="alert"></p>' +
         '<div class="actions">' + button('Record again', 'voice', 'class="secondary"') + '<button class="primary">Send to the department</button></div></form>';
     return shell('Voice message to everyone', body);
+  }
+  if (type === 'display') {
+    const choice = (label, action, value, on) => button(label, action, 'class="' + (on ? 'selected' : '') + '" aria-pressed="' + on + '" ' + valueAttr(value));
+    return shell('Text size, theme and sound', '<p class="subtle">These stay on this device.</p>' +
+      '<h3>Text size</h3><div class="segments">' + TEXT_NAMES.map((name, index) => choice(name[0].toUpperCase() + name.slice(1), 'text-size', index, index === textSize)).join('') + '</div>' +
+      '<h3>Theme</h3><div class="segments">' + THEMES.map(([id, label]) => choice(label, 'theme', id, feel.theme === id)).join('') + '</div>' +
+      '<p class="subtle">Dark is easier on the eyes on a dim unit at night.</p>' +
+      '<h3>Sound and vibration</h3><div class="segments">' + choice(feel.sound ? 'Tap sounds on' : 'Tap sounds off', 'feel-sound', 'sound', feel.sound) + choice(feel.vibrate ? 'Vibration on' : 'Vibration off', 'feel-vibrate', 'vibrate', feel.vibrate) + '</div>' +
+      '<p class="subtle">Sounds start off: phones sit in pockets near sleeping patients. Vibration works on Android phones; iPhones do not let a web page vibrate.</p>');
   }
   if (type === 'join') {
     const joining = shared.joining || {};
@@ -1492,6 +1517,17 @@ async function importFiles(files, sampleImport = false) {
 // The composer opens when it is used, and what is typed is kept, so a redraw (a picture finishing loading, say) loses nothing.
 app.addEventListener('focusin', event => { if (event.target.closest?.('.composer')) event.target.closest('.composer').classList.add('open'); });
 app.addEventListener('input', event => { if (event.target.id === 'post-text') ui.draftPost = event.target.value; });
+// A refusal shakes once and buzzes, so it registers before it is read. Clearing one does nothing.
+new MutationObserver(records => {
+  for (const record of records) {
+    const note = record.target.nodeType === 1 ? record.target.closest?.('.refusal') : record.target.parentElement?.closest?.('.refusal');
+    if (!note || !note.textContent.trim()) continue;
+    note.classList.remove('shake'); void note.offsetWidth; note.classList.add('shake');
+    touch('error');
+    break;
+  }
+}).observe(app, { childList: true, characterData: true, subtree: true });
+
 app.addEventListener('click', event => {
   const control = event.target.closest('[data-action]');
   if (!control || control.disabled) return;
@@ -1805,12 +1841,16 @@ async function act({action, value, kind}) {
       ui.notice = 'The record was saved to your downloads as ' + link.download + '. It lists people by name. Keep it private.';
       break;
     }
+    case 'display': ui.dialog = { type:'display' }; break;
     case 'text-size':
-      textSize = (textSize + 1) % TEXT_SIZES.length;
+      textSize = Math.max(0, Math.min(TEXT_SIZES.length - 1, Number(value)));
       try { localStorage.setItem(textKey, JSON.stringify(TEXT_SIZES[textSize])); } catch { /* still applies for this visit */ }
       applyTextSize();
-      ui.notice = 'Text size: ' + TEXT_NAMES[textSize] + '.';
+      touch('medium');
       break;
+    case 'theme': feel = saveFeel({ ...feel, theme: value }); applyTheme(feel); touch('medium'); break;
+    case 'feel-sound': feel = saveFeel({ ...feel, sound: !feel.sound }); touch('light'); break;
+    case 'feel-vibrate': feel = saveFeel({ ...feel, vibrate: !feel.vibrate }); touch('light'); break;
     case 'usage-reset': localStorage.removeItem(usageKey); ui.flash = 'Counts reset.'; break;
     case 'usage-copy': {
       const usage = loadState(usageKey, null);
@@ -2002,19 +2042,28 @@ async function act({action, value, kind}) {
     }
     case 'outbox-retry': await flushOutbox(); break;
     case 'outbox-cancel': await deleteOutbox(value); await loadOutbox(); ui.notice = 'That post was cancelled and will not be sent.'; break;
-    case 'react': {
-      const [postId, kindName] = String(value).split('|'), post = boardPosts().find(item => item.id === postId);
-      if (!post) return;
-      const now = reactionState(post, kindName, reactionWho(), isSame);
-      await boardStore.react(postId, kindName, reactionWho(), !now.mine);
-      await refreshShared({ quiet:true });
-      break;
-    }
+    case 'react':
     case 'caption-laugh': {
-      const [postId, captionId] = String(value).split('|'), post = boardPosts().find(item => item.id === postId);
-      const caption = (post?.captions || []).find(item => item.id === captionId);
-      if (!caption) return;
-      await boardStore.laughCaption(postId, captionId, reactionWho(), !reactionState(caption, 'laugh', reactionWho(), isSame).mine);
+      // Shown at once, sent behind it. While one is on its way, another tap on the same button waits its turn, so two
+      // quick taps cannot cross on a slow signal. If the send fails, the screen goes back to what is true.
+      if (sending.has(value)) return;
+      const [postId, second] = String(value).split('|'), post = boardPosts().find(item => item.id === postId);
+      const caption = action === 'caption-laugh' ? (post?.captions || []).find(item => item.id === second) : null;
+      if (!post || (action === 'caption-laugh' && !caption)) return;
+      const kindName = action === 'react' ? second : 'laugh';
+      const on = !reactionState(caption || post, kindName, reactionWho(), isSame).mine;
+      touch('light');
+      sending.add(value);
+      if (boardStore.shared) {
+        shared.posts = showReaction(shared.posts, postId, caption?.id, kindName, on);
+        render();
+        app.querySelector('[data-value="' + CSS.escape(value) + '"]')?.classList.add('pop');
+      }
+      try {
+        if (action === 'react') await boardStore.react(postId, kindName, reactionWho(), on);
+        else await boardStore.laughCaption(postId, caption.id, reactionWho(), on);
+      } catch (error) { ui.notice = sharedProblem(error); }
+      finally { sending.delete(value); }
       await refreshShared({ quiet:true });
       break;
     }
@@ -2024,7 +2073,7 @@ async function act({action, value, kind}) {
       await refreshShared({ quiet:true });
       break;
     }
-    case 'board-filter': ui.boardFilter = value; ui.boardLimit = FEED_PAGE; break;
+    case 'board-filter': ui.boardFilter = value; ui.boardLimit = FEED_PAGE; touch('medium'); break;
     case 'feed-more': addOlderPosts(); return;
     case 'voice': void startVoice(); return;
     case 'voice-stop': if (voice?.recorder?.state === 'recording') voice.recorder.stop(); return;
@@ -2299,6 +2348,7 @@ async function submit(form) {
       media.forEach((item, index) => { mediaBlobs.set(item.id, files[index]); mediaUrls.set(item.id, URL.createObjectURL(files[index])); });
       ui.boardFilter = 'all';
       ui.draftPost = '';
+      touch('heavy');
       await refreshShared({ quiet:true });
       break;
     }
