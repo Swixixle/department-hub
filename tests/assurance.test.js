@@ -31,12 +31,16 @@ test('every reference answer names each check it passed and each it has not, sep
   assert.equal(factAnswer('normal paco2', { protocols: facts, today: '2028-01-05' }).items[0].checks.at(-1).done, false, 'an old check shows as not done');
   const lib = ok(await addGuideline(emptyLibrary(), SBT(), 'Avery', '2026-11-12T12:00:00Z')).library;
   const fresh = guidelineAnswer('should I turn up fio2 during sbt', { protocols: lib, today: '2026-11-12' }).items[0].checks;
-  assert.deepEqual(fresh.map(one => [one.label, one.done]), [['Every number checked against an exact capture of the guideline', true], ['Restated in fixed wording, not the guideline’s text', true],
-    ['Not yet found in a member’s own copy', false], ['Not yet compared with the guideline by a member', false], ['Checked as the newest edition on 2026-11-12', true]]);
-  // After a member's copy has the passage and they compare it, those two checks turn done, under their name.
+  assert.deepEqual(fresh.map(one => [one.label, one.done]), [['Every number checked against an exact capture of the guideline', true], ['Every word of the card found in its passage, negations kept', true],
+    ['Restated in fixed wording, not the guideline’s text', true], ['Checked as the newest edition on 2026-11-12', true]]);
+  // A member's own copy and comparison are extra witnesses: listed once they exist, never listed as a gap.
   const marked = { ...lib, guidelines: lib.guidelines.map(set => ({ ...set, cards: set.cards.map(card => card.id === 'r4-fio2' ? { ...card, matched: [{ by: 'Morgan' }] } : card) })) };
   const card = marked.guidelines[0].cards.find(one => one.id === 'r4-fio2');
-  assert.deepEqual(checksForGuideline(marked.guidelines[0], card, () => ['Morgan'], '2026-11-12').slice(2, 4).map(one => [one.label, one.done]), [['Passage found in a member’s own copy', true], ['Compared with the guideline by Morgan', true]]);
+  assert.deepEqual(checksForGuideline(marked.guidelines[0], card, () => ['Morgan'], '2026-11-12').slice(3, 5).map(one => [one.label, one.done]), [['Passage also found in a member’s own copy', true], ['Compared with the guideline by Morgan', true]]);
+  // A card built before the word check says so; a replaced guideline says what replaced it.
+  const old = { ...card, passage: { ...card.passage, checked: undefined } };
+  assert.deepEqual(checksForGuideline(lib.guidelines[0], old, () => [], '2026-11-12')[1], { label: 'Words not checked against the passage (built before that check)', done: false, note: '' });
+  assert.ok(checksForGuideline({ ...lib.guidelines[0], replacedBy: { id: 'n', title: 'A newer one' } }, card, () => [], '2026-11-12').some(one => one.label === 'Replaced by a newer guideline: A newer one' && !one.done));
 });
 
 test('a card set has one fingerprint: the same from the file, from the app after adding, and on the published page', async () => {

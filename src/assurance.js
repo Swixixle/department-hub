@@ -23,10 +23,15 @@ export function checksForFact(set, card, today) {
 }
 
 export function checksForGuideline(set, card, comparedBy, today) {
-  const fresh = freshness(set.source, today), found = (card.matched || []).length > 0, by = comparedBy(set, card);
-  return [check('Every number checked against an exact capture of the guideline', true), check('Restated in fixed wording, not the guideline’s text', true),
-    check(found ? 'Passage found in a member’s own copy' : 'Not yet found in a member’s own copy', found),
-    check(by.length ? 'Compared with the guideline by ' + by.join(' and ') : 'Not yet compared with the guideline by a member', by.length), check(fresh.label, fresh.state === 'current')];
+  // A member's own copy and their comparison are extra witnesses: shown when they exist, never shown as a gap. The word
+  // check is what stands in for a second reader. A card built before that check says so, as a check not passed.
+  const fresh = freshness(set.source, today), found = (card.matched || []).length > 0, by = comparedBy(set, card), worded = (card.passage?.checked || []).includes('words');
+  return [check('Every number checked against an exact capture of the guideline', true),
+    check(worded ? 'Every word of the card found in its passage, negations kept' : 'Words not checked against the passage (built before that check)', worded),
+    check('Restated in fixed wording, not the guideline’s text', true),
+    ...(set.replacedBy ? [check('Replaced by a newer guideline: ' + set.replacedBy.title, false)] : []),
+    ...(found ? [check('Passage also found in a member’s own copy', true)] : []), ...(by.length ? [check('Compared with the guideline by ' + by.join(' and '), true)] : []),
+    check(fresh.label, fresh.state === 'current')];
 }
 
 // A card set as it ships: the file's own fields, not what the app adds when it holds the set (checks, who compared

@@ -63,3 +63,45 @@ guideline does not set those thresholds.
 It does not quote the guideline, so a reader still opens their own copy to read a recommendation in full. It does
 not judge whether a recommendation fits a patient. It does not know a guideline's tables when the page collapsed them.
 It is not the hospital's protocol; a held protocol always answers first.
+
+## The word check, added 2026-11-13
+
+The owner does not want answers to depend on a second person reading every card against the guideline. The numbers
+were already checked by machine; what was not checked was whether a card's words say what its passage says. Now the
+build refuses a card that uses any content word its passage does not contain (compared by stem, so "trials" finds
+"trial"), or that drops a negation its passage has ("not", "no", "against", "avoid", "never", "cannot", "nor").
+
+Only articles, prepositions and plain conjunctions may be added. Modal and direction words may not: a card cannot turn
+"we suggest" into "should", or "may be considered" into "is". Abbreviations come from one fixed list in
+`src/guidelines.js` (`SAME_AS`: SBT for spontaneous breathing trial, RSBI, NIV, PEEP and so on), never per card. A
+value card may also carry one of four fixed framing phrases (`FRAMINGS`, such as "as the guideline describes common
+practice") that say where its claim stands.
+
+What this does and does not settle. It settles that a card says nothing its passage does not say in the passage's own
+words, with every negation kept. It does not settle that the words were put together in the same sense: "FIO2 should
+not be increased during an SBT" and "an SBT should not be increased during FIO2" use the same words. The card titles
+and the wording Ask recognises a card by (`said`) are navigation labels, not claims, and are not word-checked.
+
+The cost: cards now read closer to the guideline's own wording. Each is still one short fragment from one passage,
+and no passage ships.
+
+A member's own copy, and their comparison, are still offered. They are extra witnesses, listed on an answer once they
+exist, and no longer listed as a missing check. A card built before the word check says "Words not checked against
+the passage" until it is rebuilt.
+
+The SBT cards were rebuilt under the check on 2026-11-13 from the same capture (`803dce3b-…`). Every card had to be
+reworded; the old wording used words like "decide", "raised" and "done" that the passages do not contain.
+
+## Replaced guidelines
+
+A set may name the guideline that replaced it (`replacedBy` in its spec). Ask answers from a replaced set only when no
+newer set covers the question, and the answer says what replaced it. Which guidelines count as replaced is a
+judgement recorded in `scripts/guideline-specs/aarc-catalog.json`; AARC's own page lists old and new side by side.
+
+## The rest of AARC's guidelines
+
+`scripts/guideline-specs/aarc-catalog.json` lists all 38 guidelines on AARC's page as of 2026-11-13 (checked against
+https://www.aarc.org/resource/clinical-practice-guidelines/ and PubMed), plus the 2026 one AARC has not yet added: for
+each, the web page to capture with Blinders where one was found, AARC's PDF, and its status. 18 have a full-text page
+(PubMed Central or the journal at journals.sagepub.com); 10 have only a PubMed record so far; 10 have no web page
+found, only AARC's PDF, which Blinders' text capture cannot read.

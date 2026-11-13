@@ -45,8 +45,37 @@ const LIMITS = { what: 80, value: 60, unit: 20, when: 120, number: 4, strength: 
 // The numbers a card states and its passage must hold. A recommendation's own number is checked against its heading instead.
 const statedNumbers = card => numbersIn(Object.entries(card.fields || {}).filter(([key]) => key !== 'number').map(([, value]) => value).join(' '));
 
-// Checks one card against its passage of the owner's capture: the passage exists, and every number the card states
-// is in it. A recommendation card's `about` names a subject, so it may hold no number at all.
+// The word check: what a card says must be made of its passage's own words. Every content word in every field must be
+// in the passage (by stem, so "trials" finds "trial"), and a negation in the passage must carry through to the card.
+// Only articles, prepositions and plain conjunctions may be added; modal and direction words ("should", "can", "not",
+// "recommend") may not, so a card cannot turn "may be considered" into "should" or drop a "not". This is what stands
+// in for a second person reading the card against the passage: it cannot judge clinical sense, but a card can no
+// longer say anything its passage does not say in its own words.
+const FUNCTION_WORDS = new Set('a an the of for to in on at by with or and as is are be been being it its this that these those than then from into per each which'.split(' '));
+const NEGATIONS = ['not', 'no', 'against', 'avoid', 'avoided', 'never', 'cannot', 'nor'];
+// Abbreviations a card may use for a phrase its passage spells out, or the reverse. Fixed here, never per card.
+export const SAME_AS = [['sbt', 'spontaneous breathing trial'], ['sbts', 'spontaneous breathing trials'], ['rsbi', 'rapid shallow breathing index'], ['niv', 'noninvasive ventilation'],
+  ['psv', 'pressure support ventilation'], ['hfnc', 'high flow nasal cannula'], ['hfo', 'high flow oxygen'], ['peep', 'positive end expiratory pressure'],
+  ['cpap', 'continuous positive airway pressure'], ['pbw', 'predicted body weight'], ['copd', 'chronic obstructive pulmonary disease'], ['ett', 'endotracheal tube'],
+  ['abg', 'arterial blood gas'], ['icu', 'intensive care unit'], ['vap', 'ventilator associated pneumonia'], ['hme', 'heat and moisture exchanger'], ['ltot', 'long term oxygen therapy']];
+// Framing a card may carry that its passage does not: fixed phrases, each saying where the card's claim stands.
+export const FRAMINGS = ['as the guideline describes common practice', 'it does not set this threshold', 'in the trials it reviewed', 'described by the guideline as anecdotal'];
+const contentWords = text => { let rest = String(text || '').toLowerCase().replace(/[’]/g, "'"); for (const framing of FRAMINGS) rest = rest.split(framing).join(' '); return words(rest).filter(word => !FUNCTION_WORDS.has(word) && !isNumber(bare(word)) && !/^[<>≤≥]$/.test(word)); };
+export function wordCheck(card, passageText) {
+  const problems = [], name = '"' + (card.title || card.id) + '"', seen = words(passageText), sequence = seen.map(word => stem(word.replace(/'/g, '')));
+  const known = new Set([...seen, ...sequence]);
+  for (const [short, long] of SAME_AS) { if (known.has(short)) stems(long).forEach(word => known.add(word)); if (has(sequence, long)) known.add(short); }
+  const found = word => known.has(word) || known.has(stem(word.replace(/'/g, ''))) || (word.includes('/') && word.split('/').filter(Boolean).every(part => known.has(part) || known.has(stem(part))));
+  const fields = Object.entries(card.fields || {}).filter(([key]) => key !== 'number'), cardWords = fields.flatMap(([, value]) => contentWords(value));
+  const strangers = [...new Set(cardWords.filter(word => !found(word)))];
+  if (strangers.length) problems.push('Card ' + name + ' uses words its passage does not: ' + strangers.join(', ') + '.');
+  const dropped = NEGATIONS.filter(word => seen.includes(word) && !cardWords.some(other => NEGATIONS.includes(other)));
+  if (dropped.length) problems.push('Card ' + name + ' drops a negation its passage has: ' + dropped.join(', ') + '.');
+  return problems;
+}
+
+// Checks one card against its passage of the owner's capture: the passage exists, every number the card states is
+// in it, and every word (above). A recommendation card's `about` names a subject, so it may hold no number at all.
 export function checkCard(card, text) {
   const problems = [], name = '"' + (card.title || card.id) + '"', f = card.fields || {};
   if (!FIELDS[card.kind]) return ['Card ' + name + ' is of no known kind.'];
@@ -58,6 +87,7 @@ export function checkCard(card, text) {
   if (!passage.length) problems.push('Card ' + name + ' cites blank lines.');
   const missing = statedNumbers(card).filter(number => !present.has(number));
   if (missing.length) problems.push('Card ' + name + ' states ' + missing.join(', ') + ', which its passage does not contain.');
+  problems.push(...wordCheck(card, passage.join(' ')));
   if (card.kind === 'recommendation') {
     // The recommendation's number is the number of the section heading above it ("PICO 2", "Recommendation 2").
     const heading = text.split('\n').slice(0, range[0]).reverse().map(line => line.trim().match(/^(?:PICO|Recommendation|Question)\s+(\d+)\b/i)).find(Boolean);
@@ -82,9 +112,9 @@ export async function buildSet(spec, text, receipt) {
   for (const card of spec.cards) {
     const tokens = tokensOf(linesOf(text, card.passage).join(' '));
     cards.push({ id: card.id, kind: card.kind, title: card.title, said: card.said, where: card.where, fields: card.fields,
-      passage: { words: tokens.length, starts: tokens[0], fingerprint: await passageFingerprint(tokens), numbers: statedNumbers(card) } });
+      passage: { words: tokens.length, starts: tokens[0], fingerprint: await passageFingerprint(tokens), numbers: statedNumbers(card), checked: ['numbers', 'words'] } });
   }
-  return { ok: true, set: { format: GUIDELINE_FORMAT, id: spec.id, title: spec.title, applies: spec.applies, source: { ...spec.source, capture: { tool: receipt.tool || 'Blinders', id: receipt.id, sha256: receipt.sha256, bytes: receipt.bytes, savedAt: receipt.saved_at || receipt.savedAt } }, cards } };
+  return { ok: true, set: { format: GUIDELINE_FORMAT, id: spec.id, title: spec.title, applies: spec.applies, ...(spec.replacedBy ? { replacedBy: spec.replacedBy } : {}), source: { ...spec.source, capture: { tool: receipt.tool || 'Blinders', id: receipt.id, sha256: receipt.sha256, bytes: receipt.bytes, savedAt: receipt.saved_at || receipt.savedAt } }, cards } };
 }
 
 // Finds a card's passage in a member's own capture: any run of that many words, wherever its lines break, whose
@@ -111,7 +141,7 @@ export async function addGuideline(library, set, who, at) {
   const fingerprint = await setFingerprint(set), taken = { ...set, cards: set.cards.map(({ compared, matched, ...card }) => card), fingerprint, added: { by: who, at }, withdrawn: null };
   return { ok: true, library: { ...library, guidelines: [...setsOf(library).filter(other => other.id !== set.id), taken] },
     receipt: { type: 'Guideline cards added', details: { set: set.id, title: set.title, cards: set.cards.length, capture: set.source.capture.id, sha256: set.source.capture.sha256, fingerprint,
-      note: 'Restated in fixed wording; every number was found in its passage of the owner’s capture. Not yet compared by anyone with their own copy.' } } };
+      note: 'Restated in fixed wording; every number, and every word of each card, was found in its passage of the owner’s capture.' } } };
 }
 
 // A member gives the app their own capture of the guideline. Each card whose passage is found, word for word, with
@@ -157,6 +187,8 @@ export function guidelineAnswer(question, world) {
   const read = words(question).map(word => { if (word.length < 5 || /\d/.test(word) || known.has(word) || COMMON.has(word)) return word; const fixed = nearest(word, known); if (fixed && fixed !== word) { changes.push([word, fixed]); return fixed; } return word; }).join(' '), sequence = stems(read);
   const hits = live.flatMap(set => set.cards.map(card => ({ set, card, score: Math.max(0, ...card.said.filter(phrase => has(sequence, phrase)).map(phrase => stems(phrase).length)) }))).filter(hit => hit.score > 0).sort((a, b) => b.score - a.score);
   if (!hits.length) return null;
+  // A guideline AARC has replaced answers only where no newer one covers the question, and then says it was replaced.
+  if (hits.some(hit => !hit.set.replacedBy)) hits.splice(0, hits.length, ...hits.filter(hit => !hit.set.replacedBy));
   const best = hits.filter(hit => hit.score === hits[0].score).slice(0, 3), first = best[0].set;
   return { kind: 'guideline', empty: false, read: changes.length ? read : '', changes, next: [], context: { kind: 'guideline' },
     title: best.length === 1 ? sentenceOf(best[0].card) : first.source.issuer + ' ' + first.source.year + ' on this:',
@@ -165,7 +197,7 @@ export function guidelineAnswer(question, world) {
     items: [...best.map(({ set, card }) => { const by = comparedBy(set, card);
       return { text: set.source.title + ' · ' + card.where, href: set.source.url, card: card.id, checks: checksForGuideline(set, card, comparedBy, world.today),
         sub: [set.source.issuer + ', ' + set.source.year, 'every number checked against an exact capture of the guideline',
-          by.length ? 'compared with the guideline by ' + by.join(' and ') : 'not yet compared with the guideline by a second person', 'read it in your own copy'].join(' · ') }; }),
+          (card.passage?.checked || []).includes('words') ? 'every word found in its passage' : 'words not checked against the passage', ...(by.length ? ['compared with the guideline by ' + by.join(' and ')] : []), ...(set.replacedBy ? ['replaced by ' + set.replacedBy.title] : []), 'read it in your own copy'].join(' · ') }; }),
       { text: 'See these cards, and check them against your own copy', sub: 'Every card from this guideline, and who has compared it', go: 'guideline|' + first.id }],
     source: first.source.title + ' (' + first.source.issuer + ', ' + first.source.year + '). ' + first.source.rights,
     guideline: { set: first.id, cards: best.map(hit => hit.card.id) } };

@@ -29,7 +29,7 @@
    "fields": {
     "number": "1",
     "strength": "conditional, moderate certainty",
-    "about": "a rapid shallow breathing index is not needed to decide readiness for a breathing trial"
+    "about": "an RSBI is not needed to determine readiness for an SBT"
    },
    "said": [
     "rsbi",
@@ -49,7 +49,7 @@
    "fields": {
     "number": "2",
     "strength": "conditional, moderate certainty",
-    "about": "a breathing trial can be done with or without low-level pressure support of 8 cm H2O or less"
+    "about": "SBTs can be conducted with or without low-level PSV, ≤ 8 cm H2O"
    },
    "said": [
     "pressure support during sbt",
@@ -73,7 +73,7 @@
    "fields": {
     "number": "3",
     "strength": "conditional, very low certainty",
-    "about": "a standard daily assessment of readiness, and the trial itself when appropriate, done before noon"
+    "about": "a standardized approach to assessment and, if appropriate, completion of an SBT before noon each day"
    },
    "said": [
     "sbt before noon",
@@ -96,7 +96,7 @@
    "fields": {
     "number": "4",
     "strength": "conditional, very low certainty",
-    "about": "FIO2 should not be raised during a breathing trial"
+    "about": "FIO2 should not be increased during an SBT"
    },
    "said": [
     "fio2 during sbt",
@@ -116,8 +116,8 @@
     166
    ],
    "fields": {
-    "what": "Oxygenation commonly required before a breathing trial",
-    "value": "SpO2 > 90% on FIO2 0.40, or PaO2/FIO2 > 200 mm Hg",
+    "what": "Common criteria for adequate oxygenation prior to initiation of SBT",
+    "value": "SpO2 > 90% with an FIO2 of 0.40, or PaO2/FIO2 > 200 mm Hg",
     "when": "as the guideline describes common practice; it does not set this threshold"
    },
    "said": [
@@ -138,9 +138,9 @@
     166
    ],
    "fields": {
-    "what": "Commonly, a breathing trial is stopped and support resumed if",
+    "what": "Commonly, an SBT is terminated with resumption of ventilator support if",
     "value": "SpO2 falls < 90%",
-    "when": "as the guideline describes common practice in the trials it reviewed"
+    "when": "as the guideline describes common practice"
    },
    "said": [
     "stop sbt",
@@ -161,9 +161,9 @@
     124
    ],
    "fields": {
-    "what": "Common post-extubation NIV settings, described by the guideline as anecdotal",
-    "value": "PSV 5–8 cm H2O and PEEP 5 cm H2O",
-    "when": "for these patients the guideline finds it reasonable to run the trial on those settings"
+    "what": "Anecdotally, common postextubation NIV settings",
+    "value": "PSV of 5–8 cm H2O and PEEP 5 cm H2O",
+    "when": "it is reasonable that the SBT be performed on the settings that will be used postextubation"
    },
    "said": [
     "niv after extubation",

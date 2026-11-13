@@ -38,13 +38,17 @@
    "fields": {
     "number": "1",
     "strength": "conditional, moderate certainty",
-    "about": "a rapid shallow breathing index is not needed to decide readiness for a breathing trial"
+    "about": "an RSBI is not needed to determine readiness for an SBT"
    },
    "passage": {
     "words": 18,
     "starts": "we",
     "fingerprint": "6fd8148b792669f6ed169816e3103489",
-    "numbers": []
+    "numbers": [],
+    "checked": [
+     "numbers",
+     "words"
+    ]
    }
   },
   {
@@ -64,7 +68,7 @@
    "fields": {
     "number": "2",
     "strength": "conditional, moderate certainty",
-    "about": "a breathing trial can be done with or without low-level pressure support of 8 cm H2O or less"
+    "about": "SBTs can be conducted with or without low-level PSV, ≤ 8 cm H2O"
    },
    "passage": {
     "words": 19,
@@ -72,6 +76,10 @@
     "fingerprint": "3b1919bacff05fd6cbb3ecd3597dad96",
     "numbers": [
      "8"
+    ],
+    "checked": [
+     "numbers",
+     "words"
     ]
    }
   },
@@ -91,13 +99,17 @@
    "fields": {
     "number": "3",
     "strength": "conditional, very low certainty",
-    "about": "a standard daily assessment of readiness, and the trial itself when appropriate, done before noon"
+    "about": "a standardized approach to assessment and, if appropriate, completion of an SBT before noon each day"
    },
    "passage": {
     "words": 23,
     "starts": "we",
     "fingerprint": "bc8e60ef6119d053cca5a16dcb5e618f",
-    "numbers": []
+    "numbers": [],
+    "checked": [
+     "numbers",
+     "words"
+    ]
    }
   },
   {
@@ -115,13 +127,17 @@
    "fields": {
     "number": "4",
     "strength": "conditional, very low certainty",
-    "about": "FIO2 should not be raised during a breathing trial"
+    "about": "FIO2 should not be increased during an SBT"
    },
    "passage": {
     "words": 16,
     "starts": "we",
     "fingerprint": "94862a02c78fb66f72ba139942f525d7",
-    "numbers": []
+    "numbers": [],
+    "checked": [
+     "numbers",
+     "words"
+    ]
    }
   },
   {
@@ -137,8 +153,8 @@
    ],
    "where": "PICO 4, background",
    "fields": {
-    "what": "Oxygenation commonly required before a breathing trial",
-    "value": "SpO2 > 90% on FIO2 0.40, or PaO2/FIO2 > 200 mm Hg",
+    "what": "Common criteria for adequate oxygenation prior to initiation of SBT",
+    "value": "SpO2 > 90% with an FIO2 of 0.40, or PaO2/FIO2 > 200 mm Hg",
     "when": "as the guideline describes common practice; it does not set this threshold"
    },
    "passage": {
@@ -149,6 +165,10 @@
      "90%",
      "0.40",
      "200"
+    ],
+    "checked": [
+     "numbers",
+     "words"
     ]
    }
   },
@@ -166,9 +186,9 @@
    ],
    "where": "PICO 4, background",
    "fields": {
-    "what": "Commonly, a breathing trial is stopped and support resumed if",
+    "what": "Commonly, an SBT is terminated with resumption of ventilator support if",
     "value": "SpO2 falls < 90%",
-    "when": "as the guideline describes common practice in the trials it reviewed"
+    "when": "as the guideline describes common practice"
    },
    "passage": {
     "words": 99,
@@ -176,6 +196,10 @@
     "fingerprint": "ac8194c8a9da5f29d0fe829cce3b5bc1",
     "numbers": [
      "90%"
+    ],
+    "checked": [
+     "numbers",
+     "words"
     ]
    }
   },
@@ -193,9 +217,9 @@
    ],
    "where": "Recommendation 2, justification",
    "fields": {
-    "what": "Common post-extubation NIV settings, described by the guideline as anecdotal",
-    "value": "PSV 5–8 cm H2O and PEEP 5 cm H2O",
-    "when": "for these patients the guideline finds it reasonable to run the trial on those settings"
+    "what": "Anecdotally, common postextubation NIV settings",
+    "value": "PSV of 5–8 cm H2O and PEEP 5 cm H2O",
+    "when": "it is reasonable that the SBT be performed on the settings that will be used postextubation"
    },
    "passage": {
     "words": 64,
@@ -204,6 +228,10 @@
     "numbers": [
      "5-8",
      "5"
+    ],
+    "checked": [
+     "numbers",
+     "words"
     ]
    }
   }
