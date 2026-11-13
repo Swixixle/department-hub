@@ -6,7 +6,8 @@ import { putSource, getSource, clearSources, loadState, saveState, putMedia, get
 import { GROUPS, STATUS_BY_GROUP, formatPhone, fullName, linkNames, personId, phoneLink } from './contacts.js';
 import { HOLIDAY_NAMES, census, holidayTracker, ledger, publicationRecord, releaseOrder, staffing, standing, statSheet } from './fairness.js';
 import { FILTERS, VOICE_LIMIT_SECONDS, clock, fileSize, linkParts, matchesFilter, mediaKind, refuseFiles, shareText, videoLink } from './board.js';
-import { localBoard } from './backend.js';
+import { localBoard, sharedBoard } from './backend.js';
+import { sharedClient, joinTokenFrom } from './shared.js';
 import { SUGGESTIONS, ask, findPeople, pretty as prettyDate, readingProblem, searchDocuments } from './ask.js';
 import { checkExchange, describe, exchangeBasis, exchangeCredits, findOptions, parties, shiftName } from './trades.js';
 import { keywords, qualifiers, tidyQuestion } from './words.js';
@@ -176,7 +177,7 @@ function markBoardSeen(value = new Date().toISOString()) {
   boardSeen = value;
   try { value ? localStorage.setItem(seenKey, JSON.stringify(value)) : localStorage.removeItem(seenKey); } catch { /* only affects what is new */ }
 }
-const askWorld = () => ({ today: localToday(), now:new Date().toISOString(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: state.posts,
+const askWorld = () => ({ today: localToday(), now:new Date().toISOString(), actor: state.actor, assignments: state.assignments, directory: state.directory, people: state.people, links: state.links, posts: boardPosts(),
   documents: state.documents, releases: state.releases, requests: creditRequests(), trade: { ...tradeWorld(), offers: state.offers }, rules: state.holidayRules, keeper: isKeeper(), seen: boardSeen, published: state.mode === 'sample' ? null : state.importedAt,
   answers: state.answers, learned: state.learned, corrections: state.corrections, last: ui.askContext, versions:sourceVersions, protocols: state.protocols, references: referenceList?.records || [], referencesCollected: referenceList?.collectedOn });
 function currentAsk(dialog = ui.dialog) {
@@ -210,21 +211,74 @@ function patientCheck(form, text) {
 const DOC_LIMIT = 300000, DOC_TOTAL = 1500000;
 // Attachments on board posts: the files themselves, and addresses the page can show them from.
 const mediaBlobs = new Map(), mediaUrls = new Map();
-// The one place the board keeps posts and files. A hosted service replaces this line (see src/backend.js).
-const boardStore = localBoard({
+// The one place the board keeps posts and files: this browser, or the department server once a person signs in to it.
+const localStore = localBoard({
   getPosts: () => state.posts,
   change: (type, details, update) => commit(type, details, previous => ({ ...previous, posts: update(previous.posts) }))
 });
+let boardStore = localStore;
+// The department server, when this page was opened from it. Opened from serve.py or the public demo there is none,
+// and everything stays the one-browser app. Signed in, only the board is shared; the schedule and the rest stay here.
+const shared = { client: publicDemo ? null : sharedClient(), available: false, posts: [], people: [], waiting: [], timer: null, joining: null };
+const boardPosts = () => boardStore.shared ? shared.posts : state.posts;
+const sharedMe = () => shared.client?.session || null;
+const isMyPost = post => boardStore.shared ? post.authorId === sharedMe()?.personId : Boolean(post.created) && isSame(post.author, state.actor);
+async function refreshShared({ quiet = false } = {}) {
+  if (!boardStore.shared) return;
+  const before = shared.posts.map(post => post.id + (post.media || []).length).join();
+  shared.posts = await boardStore.list();
+  if (!sharedMe()) { leaveShared('Your session ended. Sign in again to see the department board.'); return; }
+  await hydrateMedia({ redraw: false });
+  // A redraw while someone is writing would cost them attached files, so new posts wait until the composer is shut.
+  const changed = before !== shared.posts.map(post => post.id + (post.media || []).length).join();
+  if ((changed || !quiet) && !(quiet && app.querySelector('.composer.open'))) render();
+}
+async function connectShared() {
+  const me = await shared.client.refresh();
+  if (!me) { boardStore = localStore; return false; }
+  shared.people = await shared.client.directory().catch(() => []);
+  const names = new Map(shared.people.map(person => [person.personId, person.name]));
+  boardStore = sharedBoard({ baseUrl: location.origin, departmentId: me.departmentId, token: me.token, names: id => names.get(id) || 'Former member',
+    onState: () => {} });
+  clearInterval(shared.timer);
+  shared.timer = setInterval(() => { if (document.visibilityState === 'visible' && ui.tab === 'board') void refreshShared({ quiet:true }).catch(() => {}); }, 30000);
+  await refreshShared({ quiet:true });
+  return true;
+}
+function leaveShared(notice) {
+  clearInterval(shared.timer);
+  shared.client?.signOut();
+  boardStore = localStore;
+  shared.posts = [];
+  shared.people = [];
+  ui.notice = notice;
+  render();
+}
+async function startShared() {
+  if (!shared.client || !document.querySelector('meta[name="department-hub-server"]') || !(await shared.client.available())) return;
+  shared.available = true;
+  const token = joinTokenFrom();
+  if (token) {
+    // The invitation is read from the address once and taken out of it, so it is not left in history or a bookmark.
+    history.replaceState(null, '', location.pathname + location.search);
+    shared.joining = { token };
+    // The first-run notice comes first; joining reopens after it.
+    ui.dialog = noticeSeen ? { type:'join' } : { type:'notice' };
+    render();
+  }
+  if (sharedMe()) await connectShared().catch(() => {});
+  render();
+}
 let voice = null;         // a voice message being recorded or reviewed
-async function hydrateMedia() {
-  const wanted = state.posts.flatMap(post => post.media || []).filter(item => !mediaBlobs.has(item.id));
+async function hydrateMedia({ redraw = true } = {}) {
+  const wanted = boardPosts().flatMap(post => post.media || []).filter(item => !mediaBlobs.has(item.id));
   if (!wanted.length) return;
   for (const item of wanted) {
     const blob = await boardStore.file(item.id).catch(() => null);
     mediaBlobs.set(item.id, blob);
     if (blob) mediaUrls.set(item.id, URL.createObjectURL(blob));
   }
-  render();
+  if (redraw) render();
 }
 function forgetMedia(ids) {
   for (const id of ids) { if (mediaUrls.get(id)) URL.revokeObjectURL(mediaUrls.get(id)); mediaUrls.delete(id); mediaBlobs.delete(id); }
@@ -386,13 +440,13 @@ function postMarkup(post) {
     (post.media?.length ? '<div class="post-media">' + post.media.map(piece).join('') + '</div>' : '') +
     (link ? '<div class="link-player" data-embed="' + h(link.embed) + '">' + button('▶ Play here · ' + h(link.site), 'play-link', 'class="play-link"') + '</div>' : '') +
     '<div class="post-actions">' + (post.inside ? '<span class="subtle">Department only</span>' : button('↗ Share', 'share', 'class="post-action" ' + valueAttr(post.id))) +
-    (post.created && isSame(post.author, state.actor) ? button('Remove', 'remove-post', 'class="post-action quiet" ' + valueAttr(post.id)) : '') + '</div></article>';
+    (isMyPost(post) ? button('Remove', 'remove-post', 'class="post-action quiet" ' + valueAttr(post.id)) : '') + '</div></article>';
 }
 
 // The board is a feed: newest first, a page at a time. Older posts are added at the bottom as the reader nears it,
 // without redrawing the page, so a half-written post and a playing video are left alone.
 const FEED_PAGE = 10;
-const feedPosts = () => [...state.posts].reverse().filter(post => matchesFilter(post, ui.boardFilter || 'all'));
+const feedPosts = () => [...boardPosts()].reverse().filter(post => matchesFilter(post, ui.boardFilter || 'all'));
 function feedTail(shown, limit) {
   if (shown.length > limit) return '<div class="feed-more" data-feed-more>' + button('Show older posts · ' + (shown.length - limit) + ' more', 'feed-more', 'class="secondary"') + '</div>';
   return shown.length > FEED_PAGE ? '<p class="feed-end subtle" data-feed-end>That is everything on the board.</p>' : '';
@@ -415,11 +469,31 @@ function watchFeed() {
   feedWatcher.observe(tail);
 }
 
+// Where a post goes, said plainly: the department (signed in), the department after signing in, or this browser only.
+function boardStatus() {
+  if (boardStore.shared) return '<div class="roster-status shared-status"><span class="status-dot"></span><b>Shared with your department</b><span>Signed in as ' + h(sharedMe()?.name || 'a member') +
+    '. Only signed-in members of your department see these posts.</span>' + button('Account', 'shared-account', 'class="text-button"') + '</div>';
+  if (shared.available) return '<div class="panel shared-signin"><b>Your department’s board is on this server.</b><p class="subtle">Sign in with your passkey to see it and post to it. Until then, anything posted here stays in this browser.</p>' +
+    '<div class="actions wrap">' + button('Sign in with passkey', 'shared-signin', 'class="primary"') + button('I have an invitation link', 'shared-join-open', 'class="secondary"') + '</div></div>';
+  return '<div class="roster-status"><span class="status-dot"></span><b>Kept in ' + h(boardStore.where) + '</b><span>Nobody else sees a post until the shared version is switched on. Share sends one out now.</span></div>';
+}
+// What went wrong with a passkey or the server, in words a person can act on.
+function sharedProblem(error, during) {
+  if (error?.name === 'NotAllowedError' || error?.name === 'AbortError') return 'The passkey prompt was closed. Nothing changed.';
+  if (error?.name === 'InvalidStateError') return 'This phone already has a passkey for this department. Sign in with it instead.';
+  if (during === 'join' && error?.status === 404) return 'That invitation link has been used or has expired. Ask your administrator for a new one.';
+  if (during === 'signin' && (error?.status === 401 || error?.status === 403)) return 'That passkey isn’t confirmed for this department. If you just joined, your administrator still needs to confirm your code.';
+  if (error?.status === 403 && /code/.test(error.message)) return 'That code does not match. Ask them to read it again.';
+  if (error?.status === 403) return 'You do not have permission to do that.';
+  if (error?.status >= 500 || error instanceof TypeError) return 'The department server could not be reached. Check the connection and try again.';
+  return 'That did not work: ' + (error?.message || error) + '.';
+}
+
 function board() {
   const filter = ui.boardFilter || 'all', shown = feedPosts(), limit = ui.boardLimit || FEED_PAGE;
   return '<section class="intro board-intro"><div><div class="eyebrow">TEAM SPACE</div><h1>Department board</h1><p>News, pictures, files, video and voice for the whole department.</p></div>' +
     button('🎙 Voice message to everyone', 'voice', 'class="primary voice-start"') + '</section>' +
-    (boardStore.shared ? '' : '<div class="roster-status"><span class="status-dot"></span><b>Kept in ' + h(boardStore.where) + '</b><span>Nobody else sees a post until the shared version is switched on. Share sends one out now.</span></div>') +
+    boardStatus() +
     '<form data-form="post" class="panel form-panel composer' + (ui.draftPost ? ' open' : '') + '"><label for="post-text">Write to the department</label>' +
     '<textarea id="post-text" name="body" maxlength="2000" placeholder="Write to the department…">' + h(ui.draftPost || '') + '</textarea>' +
     '<div class="composer-more"><div class="cell-when"><label>Does it have a date?<select name="whenKind"><option value="">No date</option><option value="due">Due by</option><option value="meeting">Meeting on</option><option value="event">Event on</option></select></label>' +
@@ -991,8 +1065,52 @@ function dialogMarkup() {
         '<div class="actions">' + button('Record again', 'voice', 'class="secondary"') + '<button class="primary">Send to the department</button></div></form>';
     return shell('Voice message to everyone', body);
   }
+  if (type === 'join') {
+    const joining = shared.joining || {};
+    if (joining.code) return shell('Read this code to your administrator',
+      '<p>Read this code to your administrator in person, or over a phone number you already had for each other:</p><p class="join-code" aria-label="Code ' + h(joining.code.split('').join(' ')) + '">' + h(joining.code) + '</p>' +
+      '<p class="subtle">Nothing opens until they confirm it. It expires in 30 minutes. Once they say it is done, sign in.</p><div class="actions">' + button('Sign in', 'shared-signin', 'class="primary"') + '</div>');
+    if (joining.activated) return shell('You are the first administrator',
+      '<p>Your passkey is set up on this phone, and you administer this department.</p><p class="subtle">Next, invite a second administrator, so someone can recover your account if you lose this phone.</p><div class="actions">' + button('Sign in', 'shared-signin', 'class="primary"') + '</div>');
+    const intro = '<p>Your phone will make a passkey for your department, unlocked by Face ID, your fingerprint or your passcode. There is no password, and your face or fingerprint never leaves the phone.</p>' +
+      '<p class="subtle">Afterwards you will get a six-character code to read to your administrator, who confirms it is you.</p>';
+    if (joining.token) return shell('Join your department', intro + '<div class="actions">' + button('Create my passkey', 'shared-join-go', 'class="primary"') + '</div>');
+    return shell('Join your department', intro + '<form data-form="join"><label>Your invitation link<input name="link" autocomplete="off" required placeholder="Paste the link you were sent"></label><p class="refusal" role="alert"></p><button class="primary">Create my passkey</button></form>');
+  }
+  if (type === 'account') {
+    const me = sharedMe();
+    if (!me) return shell('Account', '<p>You are not signed in.</p>');
+    const admin = (me.roles || []).includes('admin');
+    const others = shared.people.filter(person => person.personId !== me.personId);
+    const admins = shared.people.filter(person => (person.roles || []).includes('admin')).length;
+    const invited = ui.dialog.invited;
+    const roles = list => (list || []).map(role => ({ admin:'administrator', custodian:'record keeper', member:'member' })[role] || role).join(', ');
+    return shell('Account', '<p><b>' + h(me.name) + '</b> · ' + h(roles(me.roles)) + '</p>' +
+      '<p class="subtle">Signed in with a passkey on this device. The department server holds the board. Your schedule and everything else stay in this browser.</p>' +
+      (admin && admins < 2 ? '<p class="notice">You are the only administrator. If you lose this phone, nobody can recover your account. Invite someone you trust and make them an administrator too.</p>' : '') +
+      (admin ? '<h3>Invite a coworker</h3>' + (invited ? '<p>Send this link to <b>' + h(invited.name) + '</b> by text or in person, through a channel you already use with them:</p>' +
+        '<textarea id="invite-link" readonly rows="3">' + h(invited.link) + '</textarea><div class="actions wrap">' + button('Copy the link', 'copy-invite', 'class="secondary"') + button('Invite someone else', 'invite-again', 'class="text-button"') + '</div>' +
+        '<p class="subtle">It works once and expires in 48 hours. When they open it, they get a code to read back to you, and you confirm them below.</p>'
+        : '<form data-form="invite"><label>Their name, as the department knows them<input name="name" maxlength="60" required autocomplete="off"></label><p class="refusal" role="alert"></p><button class="primary">Make an invitation link</button>' +
+        '<p class="subtle">Your phone asks you to unlock your passkey first.</p></form>') +
+        '<h3>Waiting for you to confirm</h3>' + (shared.waiting.length ? shared.waiting.map(claim => '<div class="panel waiting-claim"><p><b>' + h(claim.name) + '</b></p>' +
+          (claim.registered ? '<form data-form="approve"><input type="hidden" name="claim" value="' + h(claim.claimId) + '"><label>The code they read to you<input name="code" maxlength="6" required autocomplete="off" autocapitalize="characters"></label>' +
+            '<label>How you checked it was them<select name="method"><option value="in-person">In person</option><option value="known-number">On a number I already had</option><option value="work-channel">Through work</option></select></label>' +
+            '<p class="refusal" role="alert"></p><button class="primary">Confirm ' + h(claim.name) + '</button></form>' : '<p class="subtle">Has not opened the link yet.</p>') + '</div>').join('')
+          : '<p class="subtle">Nobody is waiting.</p>') +
+        '<h3>Members</h3>' + (others.length ? '<div class="line-list">' + others.map(person => '<div><span><b>' + h(person.name) + '</b> <small>' + h(roles(person.roles)) + '</small></span><span>' +
+          ((person.roles || []).includes('admin') ? '' : button('Make administrator', 'shared-admin', 'class="text-button" ' + valueAttr(person.membershipId))) + ' ' +
+          button('Remove', 'shared-remove', 'class="text-button" ' + valueAttr(person.membershipId)) + '</span></div>').join('') + '</div>' : '<p class="subtle">Nobody else has joined yet.</p>') : '') +
+      '<div class="actions">' + button('Sign out on this device', 'shared-signout', 'class="secondary"') + '</div>');
+  }
+  if (type === 'shared-remove') {
+    const person = shared.people.find(item => item.membershipId === id);
+    if (!person) return '';
+    return shell('Remove ' + person.name + '?', '<p>' + h(person.name) + ' will be signed out everywhere and will no longer see the department board. Their posts stay. You can invite them again later.</p>' +
+      '<div class="actions">' + button('Cancel', 'shared-account', 'class="secondary"') + button('Remove ' + h(person.name), 'shared-remove-yes', 'class="danger" ' + valueAttr(id)) + '</div>');
+  }
   if (type === 'share') {
-    const post = state.posts.find(item => item.id === id);
+    const post = boardPosts().find(item => item.id === id);
     if (!post) return '';
     const text = shareText(post), files = (post.media || []).filter(item => mediaUrls.get(item.id));
     return shell('Share this post', '<p class="subtle">On a phone, Share opens the phone’s own share sheet, which sends the file itself to Messages, Mail, YouTube or any other app. Here, use these.</p>' +
@@ -1664,7 +1782,8 @@ async function act({action, value, kind}) {
       await commit('Notice acknowledged', { by:state.actor }, previous => previous);
       noticeSeen = { at:new Date().toISOString(), by:state.actor };
       try { localStorage.setItem(noticeKey, JSON.stringify(noticeSeen)); } catch { /* asked again next time */ }
-      ui.dialog = null;
+      // Someone who arrived from an invitation goes straight back to joining once they have read the notice.
+      ui.dialog = shared.joining && !shared.joining.code && !shared.joining.activated ? { type:'join' } : null;
       break;
     case 'verify': {
       const check = await verifyReceipts(state.events);
@@ -1764,12 +1883,53 @@ async function act({action, value, kind}) {
     case 'teach-pick': if (isKeeper()) ui.dialog = { type:'teach', pick:value }; break;
     case 'teach-drop': if (isKeeper()) await commit('Question dismissed', { id:value }, previous => ({ ...previous, unanswered:previous.unanswered.filter(item => item.id !== value) })); break;
     case 'teach-remove': if (isKeeper()) await commit('Taught answer removed', { id:value }, previous => ({ ...previous, answers:previous.answers.filter(item => item.id !== value) })); break;
+    case 'shared-signin': {
+      try { await shared.client.signIn(); await connectShared(); ui.dialog = null; shared.joining = null; ui.tab = 'board'; ui.notice = 'Signed in as ' + (sharedMe()?.name || 'a member') + '.'; }
+      catch (error) { ui.notice = sharedProblem(error, 'signin'); if (ui.dialog?.type !== 'join') ui.dialog = null; }
+      break;
+    }
+    case 'shared-join-open': shared.joining = shared.joining || {}; ui.dialog = { type:'join' }; break;
+    case 'shared-join-go': {
+      try { const joined = await shared.client.join(shared.joining.token); shared.joining = { code: joined.activated ? null : joined.code, activated: joined.activated }; }
+      catch (error) { ui.notice = sharedProblem(error, 'join'); ui.dialog = null; shared.joining = null; }
+      break;
+    }
+    case 'shared-account': {
+      ui.dialog = { type:'account' };
+      if ((sharedMe()?.roles || []).includes('admin')) {
+        [shared.waiting, shared.people] = await Promise.all([shared.client.waiting().catch(() => []), shared.client.directory().catch(() => shared.people)]);
+      }
+      break;
+    }
+    case 'invite-again': ui.dialog = { type:'account' }; break;
+    case 'copy-invite': {
+      try { await navigator.clipboard.writeText(ui.dialog?.invited?.link || ''); ui.flash = 'Copied.'; } catch { ui.flash = 'Select the link in the box and copy it.'; }
+      break;
+    }
+    case 'shared-signout': leaveShared('Signed out on this device. The department board is still there for everyone else.'); ui.dialog = null; break;
+    case 'shared-remove': ui.dialog = { type:'shared-remove', id:value }; break;
+    case 'shared-remove-yes': {
+      const person = shared.people.find(item => item.membershipId === value);
+      try { await shared.client.remove(value); ui.flash = (person?.name || 'They') + ' no longer has access.'; }
+      catch (error) { ui.flash = sharedProblem(error); }
+      shared.people = await shared.client.directory().catch(() => shared.people);
+      ui.dialog = { type:'account' };
+      break;
+    }
+    case 'shared-admin': {
+      const person = shared.people.find(item => item.membershipId === value);
+      try { await shared.client.setRoles(value, [...new Set([...(person?.roles || ['member']), 'admin'])]); ui.flash = (person?.name || 'They') + ' is now an administrator.'; }
+      catch (error) { ui.flash = sharedProblem(error); }
+      shared.people = await shared.client.directory().catch(() => shared.people);
+      ui.dialog = { type:'account' };
+      break;
+    }
     case 'board-filter': ui.boardFilter = value; ui.boardLimit = FEED_PAGE; break;
     case 'feed-more': addOlderPosts(); return;
     case 'voice': void startVoice(); return;
     case 'voice-stop': if (voice?.recorder?.state === 'recording') voice.recorder.stop(); return;
     case 'share': {
-      const post = state.posts.find(item => item.id === value);
+      const post = boardPosts().find(item => item.id === value);
       if (!post || post.inside) return;
       // Everything up to navigator.share stays synchronous, so the browser still counts it as the person's own tap.
       const files = (post.media || []).map(item => mediaBlobs.get(item.id) ? new File([mediaBlobs.get(item.id)], item.name, { type: item.type || mediaBlobs.get(item.id).type }) : null).filter(Boolean);
@@ -1784,7 +1944,7 @@ async function act({action, value, kind}) {
       break;
     }
     case 'copy-share': {
-      const post = state.posts.find(item => item.id === value);
+      const post = boardPosts().find(item => item.id === value);
       if (!post || post.inside) return;
       void commit('Export requested', { kind:'board-copy', reference:post.id }, previous => previous).catch(fail);
       try { await navigator.clipboard.writeText(shareText(post)); ui.flash = 'Copied.'; }
@@ -1793,10 +1953,11 @@ async function act({action, value, kind}) {
     }
     case 'remove-post': ui.dialog = { type:'remove-post', id:value }; break;
     case 'remove-post-yes': {
-      const post = state.posts.find(item => item.id === value);
-      if (!post || !isSame(post.author, state.actor)) return;
+      const post = boardPosts().find(item => item.id === value);
+      if (!post || !isMyPost(post)) return;
       await boardStore.remove(post.id);
       forgetMedia((post.media || []).map(item => item.id));
+      await refreshShared({ quiet:true });
       ui.dialog = null;
       ui.notice = 'Post removed.';
       break;
@@ -2013,6 +2174,33 @@ async function submit(form) {
       media.forEach((item, index) => { mediaBlobs.set(item.id, files[index]); mediaUrls.set(item.id, URL.createObjectURL(files[index])); });
       ui.boardFilter = 'all';
       ui.draftPost = '';
+      await refreshShared({ quiet:true });
+      break;
+    }
+    case 'join': {
+      const token = joinTokenFrom('#' + String(data.link || '').split('#').pop()) || String(data.link || '').trim();
+      if (!token) { form.querySelector('.refusal').textContent = 'Paste the whole link you were sent.'; return; }
+      shared.joining = { token };
+      try { const joined = await shared.client.join(token); shared.joining = { code: joined.activated ? null : joined.code, activated: joined.activated }; }
+      catch (error) { form.querySelector('.refusal').textContent = sharedProblem(error, 'join'); shared.joining = null; return; }
+      break;
+    }
+    case 'invite': {
+      const name = String(data.name || '').trim();
+      if (!name) return;
+      try { const made = await shared.client.invite(name); ui.dialog = { type:'account', invited:{ name, link: made.link } }; }
+      catch (error) { form.querySelector('.refusal').textContent = sharedProblem(error); return; }
+      break;
+    }
+    case 'approve': {
+      try {
+        await shared.client.approve(data.claim, data.code, data.method);
+        [shared.waiting, shared.people] = await Promise.all([shared.client.waiting().catch(() => []), shared.client.directory().catch(() => shared.people)]);
+        const names = new Map(shared.people.map(person => [person.personId, person.name]));
+        boardStore = sharedBoard({ baseUrl: location.origin, departmentId: sharedMe().departmentId, token: sharedMe().token, names: id => names.get(id) || 'Former member' });
+        ui.flash = 'Confirmed. They can sign in now.';
+      } catch (error) { form.querySelector('.refusal').textContent = sharedProblem(error); return; }
+      ui.dialog = { type:'account' };
       break;
     }
     case 'mark': {
@@ -2083,6 +2271,7 @@ async function submit(form) {
       ui.dialog = null;
       ui.tab = 'board';
       ui.boardFilter = 'all';
+      await refreshShared({ quiet:true });
       ui.notice = 'Voice message posted to the board.' + (boardStore.shared ? '' : ' It is in this browser only for now. Press Share on it to send it out.');
       break;
     }
@@ -2298,3 +2487,4 @@ sourceVersions = await versionsFor(state.documents);
 render();
 void hydrateMedia();
 void loadReferences();
+void startShared().catch(() => {});

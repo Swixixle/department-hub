@@ -53,7 +53,20 @@ export function localBoard({ getPosts, change }) {
 //
 // A post carries an id the phone made before sending. A retry after a dropped connection carries the same one, and
 // the server returns the post that is already there, so a flaky signal does not post twice.
-export function sharedBoard({ baseUrl, departmentId, token, fetch: send = globalThis.fetch, onState = () => {} }) {
+// What a server post looks like on the phone's board: the same fields the local board uses, plus who wrote it.
+// names(personId) turns the author's id into the name the department knows them by.
+export function fromServerPost(post, names = id => id) {
+  const extras = post.extras || {};
+  return { id: post.id, author: names(post.authorId), authorId: post.authorId, body: post.body, created: post.createdAt,
+    ...(extras.learning ? { learning: true } : {}), ...(extras.inside ? { inside: true } : {}), ...(extras.voice ? { voice: true } : {}),
+    ...(extras.when ? { when: extras.when } : {}),
+    media: (post.media || []).map((item, index) => ({ id: item.id, name: item.name, type: item.contentType, size: item.bytes ?? undefined,
+      kind: kindOf(item.contentType, item.name), ...(index === 0 && extras.seconds ? { seconds: extras.seconds } : {}) })) };
+}
+const kindOf = (type = '', name = '') => /^image\//.test(type) ? 'image' : /^video\//.test(type) ? 'video' : /^audio\//.test(type) ? 'audio'
+  : /\.(png|jpe?g|gif|webp|heic)$/i.test(name) ? 'image' : /\.(mp4|mov|webm)$/i.test(name) ? 'video' : /\.(m4a|mp3|wav|ogg|webm)$/i.test(name) ? 'audio' : 'file';
+
+export function sharedBoard({ baseUrl, departmentId, token, fetch: send = globalThis.fetch, onState = () => {}, names = id => id }) {
   const root = new URL('/api/departments/' + encodeURIComponent(departmentId) + '/', baseUrl).href;
   const headers = () => ({ Authorization: 'Bearer ' + token });
   let state = 'ready', lastError = null, lastGood = null;
@@ -78,8 +91,7 @@ export function sharedBoard({ baseUrl, departmentId, token, fetch: send = global
     async list() {
       try {
         const posts = await (await ask('posts')).json();
-        lastGood = posts.map(post => ({ id: post.id, author: post.authorId, body: post.body, created: post.createdAt,
-          media: (post.media || []).map(item => ({ id: item.id, name: item.name, type: item.contentType })) }));
+        lastGood = posts.map(post => fromServerPost(post, names));
         settle('ready');
         return lastGood;
       } catch (error) {
@@ -97,16 +109,17 @@ export function sharedBoard({ baseUrl, departmentId, token, fetch: send = global
       const media = [];
       try {
         for (const [id, blob] of files) {
-          const uploaded = await (await ask('files?name=' + encodeURIComponent(id), { method: 'POST',
+          const named = (post.media || []).find(item => item.id === id)?.name || blob.name || id;
+          const uploaded = await (await ask('files?name=' + encodeURIComponent(named), { method: 'POST',
             headers: { 'Content-Type': blob.type || 'application/octet-stream' }, body: blob })).json();
           media.push(uploaded.id);
         }
-        const body = JSON.stringify({ body: post.body, clientId: post.id, media, ...(record.voice ? { voice: true } : {}) });
+        const extras = { ...(post.learning ? { learning: true } : {}), ...(post.inside ? { inside: true } : {}), ...(post.voice ? { voice: true } : {}),
+          ...(post.when ? { when: post.when } : {}), ...(post.voice && post.media?.[0]?.seconds ? { seconds: post.media[0].seconds } : {}) };
+        const body = JSON.stringify({ body: post.body || '', clientId: post.id, media, extras });
         const saved = await (await ask('posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })).json();
         settle('ready');
-        return { id: saved.id, author: saved.authorId, body: saved.body, created: saved.createdAt,
-          media: (saved.media || []).map(item => ({ id: item.id, name: item.name, type: item.contentType })),
-          duplicate: Boolean(saved.duplicate) };
+        return { ...fromServerPost(saved, names), duplicate: Boolean(saved.duplicate) };
       } catch (error) {
         // Whatever was uploaded before the failure is removed, so a retry does not leave orphans behind.
         for (const id of media) await ask('files/' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});

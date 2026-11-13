@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-demo
+local-data
+.git
+*.sqlite
+private-captures
+tests/fixtures/real

@@ -9,10 +9,14 @@
 //   DEPARTMENT_HUB_HOST      the interface (default 127.0.0.1); it listens on the loopback unless told otherwise
 //   DEPARTMENT_HUB_ORIGIN    an allowed browser origin for the app during development, repeatable, comma separated
 //   DEPARTMENT_HUB_BUILD     a build label written into receipts
+//   DEPARTMENT_HUB_STATIC    a folder holding the built app (dist/); when set, the server also serves the app itself,
+//                            so the page and its passkeys share one address, which passkeys require
 //
 // This is a local development and test service. It is not a deployment, it selects no hosting provider, and a
 // passkey registered against localhost proves nothing about a production relying party.
 import { createServer } from 'node:http';
+import { readFile, stat } from 'node:fs/promises';
+import { extname, join, normalize, resolve } from 'node:path';
 import { Refused, handle } from './api.mjs';
 import { handlePasskey } from './passkeys.mjs';
 import { open } from './db.mjs';
@@ -27,6 +31,7 @@ export const config = () => ({
   host: flag('host') || process.env.DEPARTMENT_HUB_HOST || '127.0.0.1',
   origins: String(process.env.DEPARTMENT_HUB_ORIGIN || '').split(',').map(value => value.trim()).filter(Boolean),
   build: process.env.DEPARTMENT_HUB_BUILD || 'local-server',
+  staticDir: flag('static') || process.env.DEPARTMENT_HUB_STATIC || null,
   rpId: process.env.DEPARTMENT_HUB_RP_ID || 'localhost',
   rpName: process.env.DEPARTMENT_HUB_RP_NAME || 'Department Hub (local)',
   rpOrigin: process.env.DEPARTMENT_HUB_RP_ORIGIN || 'http://localhost:5173'
@@ -50,6 +55,31 @@ async function readBody(request) {
   }
   // Anything else is treated as the bytes it is, for an upload. Nothing inspects what is inside them.
   return { bytes, contentType: String(request.headers['content-type'] || 'application/octet-stream') };
+}
+
+// The built app, served from the same address as the API. Files under assets/ carry the build's hash in their names
+// and never change; everything else is checked for a newer copy on every load, so an update shows up right away.
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.wasm': 'application/wasm',
+  '.txt': 'text/plain; charset=utf-8', '.webmanifest': 'application/manifest+json', '.gz': 'application/gzip', '.traineddata': 'application/octet-stream' };
+async function serveApp(root, pathname, request, response) {
+  const base = resolve(root);
+  let file = normalize(join(base, decodeURIComponent(pathname)));
+  if (file !== base && !file.startsWith(base + '/')) { response.writeHead(404).end(); return; }
+  let info = await stat(file).catch(() => null);
+  if (info?.isDirectory()) { file = join(file, 'index.html'); info = await stat(file).catch(() => null); }
+  if (!info) { response.writeHead(404, { 'Content-Type': 'text/plain' }).end('not found'); return; }
+  let bytes = await readFile(file);
+  // The page says it came from the department server, so the app looks for sign-in here and nowhere else. Opened from
+  // serve.py or the public demo the mark is absent and the app makes no request to find a server.
+  if (extname(file).toLowerCase() === '.html') bytes = Buffer.from(bytes.toString('utf8').replace('</head>', '<meta name="department-hub-server" content="1"></head>'));
+  response.writeHead(200, {
+    'Content-Type': TYPES[extname(file).toLowerCase()] || 'application/octet-stream',
+    'Content-Length': String(bytes.length),
+    'Cache-Control': pathname.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+    'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY'
+  });
+  response.end(request.method === 'HEAD' ? undefined : bytes);
 }
 
 export function createApp(db, settings) {
@@ -87,7 +117,10 @@ export function createApp(db, settings) {
       const method = request.method === 'HEAD' ? 'GET' : request.method;
 
       if (request.method === 'OPTIONS') return send(204, null);
-      if (segments[0] !== 'api') throw new Refused(404, 'not found');
+      if (segments[0] !== 'api') {
+        if (settings.staticDir && (request.method === 'GET' || request.method === 'HEAD')) return await serveApp(settings.staticDir, url.pathname, request, response);
+        throw new Refused(404, 'not found');
+      }
 
       if (segments[1] === 'health' && segments.length === 2) return send(200, { ok: true });
 
@@ -135,6 +168,6 @@ export function start(settings = config()) {
 if (import.meta.url === 'file://' + process.argv[1]) {
   const settings = config();
   const { url } = await start(settings);
-  console.log('Department Hub server on ' + url + ' · database ' + settings.db + ' · RP ID ' + settings.rpId);
+  console.log('Department Hub server on ' + url + ' · database ' + settings.db + ' · RP ID ' + settings.rpId + (settings.staticDir ? ' · app from ' + settings.staticDir : ''));
   console.log('This is a local service. It is not a deployment and selects no hosting provider.');
 }
